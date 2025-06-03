@@ -130,6 +130,7 @@
 //         New avs_add_func_r: alternative avs_add_func which returns the result in a byref parameter
 //         New AVS_ApplyFuncR type
 // 20250415 V11.1 Fix AVS_Value 64 bit data member declaration for 64-bit non Intel (other than X86_X64) systems.
+// 20250601 V12 Global lock acquire and release: avs_acquire_global_lock, avs_release_global_lock
 
 // Notes.
 // Choose either method:
@@ -160,11 +161,11 @@
 // Constants
 //
 
-#ifndef __AVISYNTH_11_H__
+#ifndef __AVISYNTH_12_H__
 enum {
   AVISYNTH_INTERFACE_CLASSIC_VERSION = 6,
-  AVISYNTH_INTERFACE_VERSION = 11,
-  AVISYNTHPLUS_INTERFACE_BUGFIX_VERSION = 1 // reset to zero whenever the normal interface version bumps
+  AVISYNTH_INTERFACE_VERSION = 12,
+  AVISYNTHPLUS_INTERFACE_BUGFIX_VERSION = 0 // reset to zero whenever the normal interface version bumps
 };
 #endif
 
@@ -1329,6 +1330,16 @@ AVSC_API(int, avs_set_memory_max)(AVS_ScriptEnvironment *, int mem);
 
 AVSC_API(int, avs_set_working_dir)(AVS_ScriptEnvironment *, const char * newdir);
 
+// V12
+// Acquire a global named lock.
+// 'env' is the environment handle, 'name' is the lock identifier (e.g., "fftw").
+// Returns 1 on success, 0 on failure.
+AVSC_API(int, avs_acquire_global_lock)(AVS_ScriptEnvironment *, const char* name);
+// V12
+// Release a global named lock.
+// 'env' is the environment handle, 'name' is the lock identifier.
+AVSC_API(void, avs_release_global_lock)(AVS_ScriptEnvironment *, const char* name);
+
 // avisynth.dll exports this; it's a way to use it as a library, without
 // writing an AVS script or without going through AVIFile.
 AVSC_API(AVS_ScriptEnvironment *, avs_create_script_environment)(int version);
@@ -1651,6 +1662,9 @@ struct AVS_Library {
   AVSC_DECLARE_FUNC(avs_val_is_string);
   AVSC_DECLARE_FUNC(avs_val_is_array);
   AVSC_DECLARE_FUNC(avs_val_is_error);
+  // V12
+  AVSC_DECLARE_FUNC(avs_acquire_global_lock);
+  AVSC_DECLARE_FUNC(avs_release_global_lock);
 };
 
 #undef AVSC_DECLARE_FUNC
@@ -1940,6 +1954,9 @@ avs_bits_per_component    constant 8 (8 bits/component)
   AVSC_LOAD_FUNC_OPT(avs_val_is_string);
   AVSC_LOAD_FUNC_OPT(avs_val_is_array);
   AVSC_LOAD_FUNC_OPT(avs_val_is_error);
+  // V12
+  AVSC_LOAD_FUNC_OPT(avs_acquire_global_lock);
+  AVSC_LOAD_FUNC_OPT(avs_release_global_lock);
 
 #undef __AVSC_STRINGIFY
 #undef AVSC_STRINGIFY

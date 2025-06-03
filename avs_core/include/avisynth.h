@@ -54,6 +54,7 @@
 //           - New propSetDataH, like propSetData but with optional data type hint (byte/string)
 //             (VSAPI4: mapSetData, our propSetData became VSAPI4: mapSetData3)
 // 20250415  V11.1 Fix AVS_Value 64 bit data member declaration for 64-bit non Intel (other than X86_X64) systems.
+// 20250601  V12 Global lock aquire and release: AcquireGlobalLock, ReleaseGlobalLock
 
 // http://avisynth.nl
 
@@ -90,8 +91,8 @@
 // graphical user interfaces.
 
 
-#ifndef __AVISYNTH_11_H__
-#define __AVISYNTH_11_H__
+#ifndef __AVISYNTH_12_H__
+#define __AVISYNTH_12_H__
 
 #include "avs/config.h"
 #include "avs/capi.h"
@@ -124,8 +125,8 @@ enum AvsVersion {
   AVISYNTH_CLASSIC_INTERFACE_VERSION_25 = 3,
   AVISYNTH_CLASSIC_INTERFACE_VERSION_26BETA = 5,
   AVISYNTH_CLASSIC_INTERFACE_VERSION = 6,
-  AVISYNTH_INTERFACE_VERSION = 11,
-  AVISYNTHPLUS_INTERFACE_BUGFIX_VERSION = 1 // reset to zero whenever the normal interface version bumps
+  AVISYNTH_INTERFACE_VERSION = 12,
+  AVISYNTHPLUS_INTERFACE_BUGFIX_VERSION = 0 // reset to zero whenever the normal interface version bumps
 };
 
 /* Compiler-specific crap */
@@ -1715,6 +1716,12 @@ public:
   virtual int __stdcall propGetDataTypeHint(const AVSMap* map, const char* key, int index, int* error) = 0; // returns AVSPropDataTypeHint
   virtual int __stdcall propSetDataH(AVSMap* map, const char* key, const char* d, int length, int type, int append) = 0;
 
+  // V12
+  // New Global Lock API for cross-plugin synchronization.
+  // Plugins must ensure these calls are balanced (acquire followed by release),
+  virtual bool __stdcall AcquireGlobalLock(const char* name) = 0;
+  virtual void __stdcall ReleaseGlobalLock(const char* name) = 0;
+
 }; // end class IScriptEnvironment. Order is important. Avoid overloads with the same name.
 
 
@@ -1940,6 +1947,9 @@ public:
   virtual void* __stdcall Allocate(size_t nBytes, size_t alignment, AvsAllocType type) = 0;
   virtual void __stdcall Free(void* ptr) = 0;
 
+  virtual bool __stdcall AcquireGlobalLock(const char* name) = 0;
+  virtual void __stdcall ReleaseGlobalLock(const char* name) = 0;
+
   virtual char* __stdcall SaveString(const char* s, int length = -1) = 0;
   virtual char* __stdcall SaveString(const char* s, int length, bool escape) = 0;
   virtual char* Sprintf(const char* fmt, ...) = 0;
@@ -2032,4 +2042,4 @@ AVSC_API(IScriptEnvironment2*, CreateScriptEnvironment2)(int version = AVISYNTH_
 
 #pragma pack(pop)
 
-#endif //__AVISYNTH_11_H__
+#endif //__AVISYNTH_12_H__

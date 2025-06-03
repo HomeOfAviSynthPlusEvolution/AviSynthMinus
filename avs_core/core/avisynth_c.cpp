@@ -1513,6 +1513,33 @@ int AVSC_CC avs_set_working_dir(AVS_ScriptEnvironment * p, const char* newdir)
   }
 }
 
+// V12
+extern "C"
+int AVSC_CC avs_acquire_global_lock(AVS_ScriptEnvironment* p, const char* name)
+{
+  p->error = 0;
+  try {
+    return p->env->AcquireGlobalLock(name) ? 1 : 0;
+  }
+  catch (const AvisynthError& err) {
+    p->error = err.msg;
+    return 0;
+  }
+}
+
+// V12
+extern "C"
+void AVSC_CC avs_release_global_lock(AVS_ScriptEnvironment* p, const char* name)
+{
+  p->error = 0;
+  try {
+    p->env->ReleaseGlobalLock(name);
+  }
+  catch (const AvisynthError& err) {
+    p->error = err.msg;
+  }
+}
+
 // Interface V8. See AVS_AEP_xxx enums
 extern "C"
 size_t AVSC_CC avs_get_env_property(AVS_ScriptEnvironment * p, int avs_aep_prop)

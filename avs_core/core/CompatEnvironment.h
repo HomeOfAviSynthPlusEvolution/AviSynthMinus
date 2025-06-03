@@ -295,6 +295,12 @@ public:
   virtual int __stdcall propGetDataTypeHint(const AVSMap* map, const char* key, int index, int* error) = 0; // returns AVSPropDataTypeHint
   virtual int __stdcall propSetDataH(AVSMap* map, const char* key, const char* d, int length, int type, int append) = 0;
 
+  // V12
+  // New Global Lock API for cross-plugin synchronization.
+  // Plugins must ensure these calls are balanced (acquire followed by release),
+  virtual bool __stdcall AcquireGlobalLock(const char* name) = 0;
+  virtual void __stdcall ReleaseGlobalLock(const char* name) = 0;
+
 }; // end class IScriptEnvironment_AvsPreV11C. Order is important.
 
 #endif // _AVS_COMPATENVIRONMENT_H_INCLUDED

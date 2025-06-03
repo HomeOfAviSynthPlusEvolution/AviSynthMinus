@@ -88,6 +88,7 @@
 #include <clocale>
 #include <cmath>
 #include <limits>
+#include <set>
 
 #include "FilterGraph.h"
 #include "DeviceManager.h"
@@ -96,6 +97,83 @@
 #ifndef YieldProcessor // low power spin idle
   #define YieldProcessor() __nop(void)
 #endif
+
+/* Global Lock Manager */
+class GlobalLockManager
+{
+public:
+  // Get a named mutex. If it doesn't exist, it's created.
+  static std::mutex& get_mutex(const std::string& name);
+
+  // Track which environments hold which locks for cleanup.
+  static void acquire_lock_for_env(const std::string& name, ScriptEnvironment* env);
+  static void release_lock_for_env(const std::string& name, ScriptEnvironment* env);
+
+  // Called when an IScriptEnvironment is destroyed.
+  static void on_environment_exit(ScriptEnvironment* env);
+
+private:
+  GlobalLockManager() = delete;
+  ~GlobalLockManager() = delete;
+
+  static std::map<std::string, std::unique_ptr<std::mutex>> s_namedMutexes;
+  static std::mutex s_mutexMapLock; // Protects s_namedMutexes
+
+  static std::map<ScriptEnvironment*, std::set<std::string>> s_envToHeldLocks;
+  static std::mutex s_envLocksMapLock; // Protects s_envToHeldLocks
+};
+
+std::map<std::string, std::unique_ptr<std::mutex>> GlobalLockManager::s_namedMutexes;
+std::mutex GlobalLockManager::s_mutexMapLock;
+std::map<ScriptEnvironment*, std::set<std::string>> GlobalLockManager::s_envToHeldLocks;
+std::mutex GlobalLockManager::s_envLocksMapLock;
+
+std::mutex& GlobalLockManager::get_mutex(const std::string& name)
+{
+  std::lock_guard<std::mutex> lock(s_mutexMapLock);
+  if (s_namedMutexes.find(name) == s_namedMutexes.end())
+  {
+    s_namedMutexes[name] = std::make_unique<std::mutex>();
+  }
+  return *s_namedMutexes[name];
+}
+
+void GlobalLockManager::acquire_lock_for_env(const std::string& name, ScriptEnvironment* env)
+{
+  std::lock_guard<std::mutex> envLock(s_envLocksMapLock);
+  s_envToHeldLocks[env].insert(name);
+}
+
+void GlobalLockManager::release_lock_for_env(const std::string& name, ScriptEnvironment* env)
+{
+  std::lock_guard<std::mutex> envLock(s_envLocksMapLock);
+  if (s_envToHeldLocks.count(env))
+  {
+    s_envToHeldLocks[env].erase(name);
+    if (s_envToHeldLocks[env].empty())
+    {
+      s_envToHeldLocks.erase(env);
+    }
+  }
+}
+
+void GlobalLockManager::on_environment_exit(ScriptEnvironment* env)
+{
+  std::lock_guard<std::mutex> envLock(s_envLocksMapLock);
+  auto it = s_envToHeldLocks.find(env);
+  if (it != s_envToHeldLocks.end())
+  {
+    // Note: The actual mutexes are not unlocked here, only the tracking is cleared.
+    // A truly stuck mutex requires more complex solutions (e.g., timed_mutex with recovery,
+    // or ensuring threads exit gracefully). For Avisynth's use case, clearing the tracking
+    // is important to prevent memory leaks in the map.
+
+    // If it tried to call unlock() on a mutex held by another (potentially crashed) thread,
+    // that would lead to undefined behavior.By simply removing the tracking entry,
+    // we avoid this dangerous operation.
+    s_envToHeldLocks.erase(it);
+  }
+}
 
 extern const AVSFunction Audio_filters[],
                          Combine_filters[],
@@ -781,6 +859,8 @@ public:
   PVideoFrame Subframe(PVideoFrame src, int rel_offset, int new_pitch, int new_row_size, int new_height);
   int SetMemoryMax(int mem);
   int SetWorkingDir(const char* newdir);
+  bool AcquireGlobalLock(const char* name);
+  void ReleaseGlobalLock(const char* name);
   AVSC_CC ~ScriptEnvironment();
   void* ManageCache(int key, void* data);
   bool PlanarChromaAlignment(IScriptEnvironment::PlanarChromaAlignmentMode key);
@@ -1915,6 +1995,14 @@ public:
     return core->SetWorkingDir(newdir);
   }
 
+  bool __stdcall AcquireGlobalLock(const char* name) {
+    return core->AcquireGlobalLock(name);
+  }
+
+  void __stdcall ReleaseGlobalLock(const char* name) {
+    core->ReleaseGlobalLock(name);
+  }
+
   void* __stdcall ManageCache(int key, void* data)
   {
     if (
@@ -2610,6 +2698,8 @@ ScriptEnvironment::~ScriptEnvironment() {
   // Before we start to pull the world apart
   // give every one their last wish.
   at_exit.Execute(threadEnv.get());
+
+  GlobalLockManager::on_environment_exit(this); // V12
 
   delete thread_pool;
 
@@ -5585,6 +5675,25 @@ PDevice ScriptEnvironment::GetDevice(AvsDeviceType device_type, int device_index
 int ScriptEnvironment::SetMemoryMax(AvsDeviceType type, int index, int mem)
 {
   return Devices->GetDevice(type, index)->SetMemoryMax(mem);
+}
+
+bool ScriptEnvironment::AcquireGlobalLock(const char* name)
+{
+  if (!name) return false;
+  std::string lock_name(name);
+  std::mutex& mtx = GlobalLockManager::get_mutex(lock_name);
+  mtx.lock(); // Blocks until lock is acquired.
+  GlobalLockManager::acquire_lock_for_env(lock_name, this); // Track for cleanup.
+  return true;
+}
+
+void ScriptEnvironment::ReleaseGlobalLock(const char* name)
+{
+  if (!name) return;
+  std::string lock_name(name);
+  std::mutex& mtx = GlobalLockManager::get_mutex(lock_name);
+  GlobalLockManager::release_lock_for_env(lock_name, this); // Untrack.
+  mtx.unlock();
 }
 
 PVideoFrame ScriptEnvironment::GetOnDeviceFrame(const PVideoFrame& src, Device* device)

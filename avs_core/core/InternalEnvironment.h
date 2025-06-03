@@ -202,6 +202,10 @@ public:
   virtual int __stdcall propGetDataTypeHint(const AVSMap* map, const char* key, int index, int* error) = 0; /* returns AVSPropDataTypeHint */
   virtual int __stdcall propSetDataH(AVSMap* map, const char* key, const char* d, int length, int type, int append) = 0;
 
+  // V12
+  virtual bool __stdcall AcquireGlobalLock(const char* name) = 0;
+  virtual void __stdcall ReleaseGlobalLock(const char* name) = 0;
+
   // IScriptEnvironment2
   virtual bool __stdcall LoadPlugin(const char* filePath, bool throwOnError, AVSValue *result) = 0;
   virtual void __stdcall AddAutoloadDir(const char* dirPath, bool toFront) = 0;
