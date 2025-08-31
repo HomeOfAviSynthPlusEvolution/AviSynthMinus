@@ -854,6 +854,7 @@ public:
   PVideoFrame SubframePlanar(PVideoFrame src, int rel_offset, int new_pitch, int new_row_size, int new_height, int rel_offsetU, int rel_offsetV, int new_pitchUV);
   void DeleteScriptEnvironment();
   void ApplyMessage(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size, int textcolor, int halocolor, int bgcolor);
+  void ApplyMessageEx(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size, int textcolor, int halocolor, int bgcolor, bool utf8);
   const AVS_Linkage* GetAVSLinkage();
 
   // alpha support
@@ -2042,6 +2043,11 @@ public:
   void __stdcall ApplyMessage(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size, int textcolor, int halocolor, int bgcolor)
   {
     core->ApplyMessage(frame, vi, message, size, textcolor, halocolor, bgcolor);
+  }
+
+  void __stdcall ApplyMessageEx(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size, int textcolor, int halocolor, int bgcolor, bool utf8)
+  {
+    core->ApplyMessageEx(frame, vi, message, size, textcolor, halocolor, bgcolor, utf8);
   }
 
   const AVS_Linkage* __stdcall GetAVSLinkage()
@@ -5821,6 +5827,9 @@ extern void ApplyMessage(PVideoFrame* frame, const VideoInfo& vi,
   const char* message, int size, int textcolor, int halocolor, int bgcolor,
   IScriptEnvironment* env);
 
+extern void ApplyMessageEx(PVideoFrame* frame, const VideoInfo& vi,
+  const char* message, int size, int textcolor, int halocolor, int bgcolor, bool utf8,
+  IScriptEnvironment* env);
 
 const AVS_Linkage* ScriptEnvironment::GetAVSLinkage() {
   extern const AVS_Linkage* const AVS_linkage; // In interface.cpp
@@ -5828,24 +5837,27 @@ const AVS_Linkage* ScriptEnvironment::GetAVSLinkage() {
   return AVS_linkage;
 }
 
-
-void ScriptEnvironment::ApplyMessage(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size, int textcolor, int halocolor, int bgcolor)
+void ScriptEnvironment::ApplyMessageEx(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size, int textcolor, int halocolor, int bgcolor, bool utf8)
 {
 #ifdef ENABLE_CUDA
   if ((*frame)->GetDevice()->device_type == DEV_TYPE_CUDA) {
     // if frame is CUDA frame, copy to CPU and apply
     PVideoFrame copy = GetOnDeviceFrame(*frame, Devices->GetCPUDevice());
     CopyCUDAFrame(copy, *frame, threadEnv.get(), true);
-    ::ApplyMessage(&copy, vi, message, size, textcolor, halocolor, bgcolor, threadEnv.get());
+    ::ApplyMessageEx(&copy, vi, message, size, textcolor, halocolor, bgcolor, utf8, threadEnv.get());
     CopyCUDAFrame(*frame, copy, threadEnv.get(), true);
   }
   else
 #endif
   {
-    ::ApplyMessage(frame, vi, message, size, textcolor, halocolor, bgcolor, threadEnv.get());
+    ::ApplyMessageEx(frame, vi, message, size, textcolor, halocolor, bgcolor, utf8, threadEnv.get());
   }
 }
 
+void ScriptEnvironment::ApplyMessage(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size, int textcolor, int halocolor, int bgcolor)
+{
+  ApplyMessageEx(frame, vi, message, size, textcolor, halocolor, bgcolor, false /* utf8 */);
+}
 
 void ScriptEnvironment::DeleteScriptEnvironment() {
   // Provide a method to delete this ScriptEnvironment in

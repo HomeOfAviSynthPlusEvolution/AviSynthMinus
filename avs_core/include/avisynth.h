@@ -55,6 +55,7 @@
 //             (VSAPI4: mapSetData, our propSetData became VSAPI4: mapSetData3)
 // 20250415  V11.1 Fix AVS_Value 64 bit data member declaration for 64-bit non Intel (other than X86_X64) systems.
 // 20250601  V12 Global lock aquire and release: AcquireGlobalLock, ReleaseGlobalLock
+//               New ApplyMessageEx
 
 // http://avisynth.nl
 
@@ -1932,6 +1933,8 @@ public:
   // Plugins must ensure these calls are balanced (acquire followed by release),
   virtual bool __stdcall AcquireGlobalLock(const char* name) = 0;
   virtual void __stdcall ReleaseGlobalLock(const char* name) = 0;
+  virtual void __stdcall ApplyMessageEx(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size,
+    int textcolor, int halocolor, int bgcolor, bool utf8) = 0;
 
 }; // end class IScriptEnvironment. Order is important. Avoid overloads with the same name.
 
@@ -2170,6 +2173,9 @@ public:
 
   virtual void __stdcall ApplyMessage(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size,
     int textcolor, int halocolor, int bgcolor) = 0;
+  // V12
+  virtual void __stdcall ApplyMessageEx(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size,
+    int textcolor, int halocolor, int bgcolor, bool utf8) = 0;
 
   // Setting
   virtual int __stdcall SetMemoryMax(int mem) = 0;
