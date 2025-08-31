@@ -300,6 +300,8 @@ public:
   // Plugins must ensure these calls are balanced (acquire followed by release),
   virtual bool __stdcall AcquireGlobalLock(const char* name) = 0;
   virtual void __stdcall ReleaseGlobalLock(const char* name) = 0;
+  virtual void __stdcall ApplyMessageEx(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size,
+    int textcolor, int halocolor, int bgcolor, bool utf8) = 0;
 
 }; // end class IScriptEnvironment_AvsPreV11C. Order is important.
 
