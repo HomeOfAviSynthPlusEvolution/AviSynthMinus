@@ -840,6 +840,14 @@ int __stdcall CacheGuard::SetCacheHints(int cachehints, int frame_range)
   case CACHE_GET_CHILD_DEV_TYPE:
     return (child->GetVersion() >= 5) ? child->SetCacheHints(cachehints, 0) : 0;
 
+
+  /*****************************************************
+  Passes actual number of threads after a Prefetch call
+  *****************************************************/
+  case CACHE_INFORM_NUM_THREADS:
+    // pass the request to the child
+    return (child->GetVersion() >= 5) ? child->SetCacheHints(cachehints, frame_range) : 0;
+
   default:
     return 0;
   }

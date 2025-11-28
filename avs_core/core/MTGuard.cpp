@@ -83,6 +83,9 @@ MTGuard::~MTGuard()
 
 void MTGuard::EnableMT(size_t nThreads)
 {
+  // called for each filter in the chain, starting from the top-level filter
+  // even if their mt_enabled were set by an earlier Prefetch.
+
   assert(nThreads >= 1);
 #ifdef OLD_PREFETCH
   assert((nThreads & (nThreads - 1)) == 0); // must be 2^n
@@ -97,7 +100,9 @@ void MTGuard::EnableMT(size_t nThreads)
     {
     case MT_NICE_FILTER:
     {
-      // Nothing to do
+      // already created single instance, just set the thread count
+      if (!this->mt_enabled)
+        ChildFilters[0].filter->SetCacheHints(CACHE_INFORM_NUM_THREADS, nThreads);
       break;
     }
     case MT_MULTI_INSTANCE:
@@ -130,13 +135,18 @@ void MTGuard::EnableMT(size_t nThreads)
             newchilds[i].filter = FilterCtor->InstantiateFilter().AsClip();
           }
         }
+        // inform all filter instances about the threading
+        for (size_t i = 0; i < nThreads; ++i)
+          newchilds[i].filter->SetCacheHints(CACHE_INFORM_NUM_THREADS, nThreads);
         ChildFilters = std::move(newchilds);
       }
       break;
     }
     case MT_SERIALIZED:
     {
-      // Nothing to do
+      // already created single instance, just set the thread count
+      if (!this->mt_enabled)
+        ChildFilters[0].filter->SetCacheHints(CACHE_INFORM_NUM_THREADS, 1);
       break;
     }
     default:
@@ -145,6 +155,10 @@ void MTGuard::EnableMT(size_t nThreads)
       break;
     }
     }
+  }
+  else if (nThreads == 1) {
+    if (!this->mt_enabled)
+      ChildFilters[0].filter->SetCacheHints(CACHE_INFORM_NUM_THREADS, 1);
   }
 
 #ifdef OLD_PREFETCH
@@ -355,8 +369,9 @@ PClip MTGuard::Create(MtMode mode, PClip filterInstance, std::unique_ptr<const F
     {
     case MT_NICE_FILTER:
     {
-        // No need to wrap and protect this filter
-        return filterInstance;
+      // Put a guard even around MT_NICE_FILTER mode filters, in order EnableMT to
+      // be able to inform the filter (CACHE_SET_NUM_OF_THREAD) about the actual (Prefetch) thread count.
+      return new MTGuard(filterInstance, mode, nullptr, nullptr, env);
     }
     case MT_MULTI_INSTANCE: // Fall-through intentional
     {
@@ -365,7 +380,9 @@ PClip MTGuard::Create(MtMode mode, PClip filterInstance, std::unique_ptr<const F
     }
     case MT_SERIALIZED:
     {
-        // FIXME 2021: probably MT_SERIALIZED do not need this one, after USE_MT_GUARDEXIT concept failed...
+      // Put a guard even around MT_SERIALIZED mode filters, in order EnableMT to
+      // be able to inform the filter (CACHE_SET_NUM_OF_THREAD) about the actual
+      // (1) thread count.
         return new MTGuard(filterInstance, mode, nullptr, nullptr, env);
         // args2 and args3 are not valid after this point anymore
     }
