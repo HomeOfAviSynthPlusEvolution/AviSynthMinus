@@ -5788,6 +5788,7 @@ ThreadPool* ScriptEnvironment::NewThreadPool(size_t nThreads)
 
   // Since this method basically enables MT operation,
   // upgrade all MTGuards to MT-mode.
+  // iterates through all filters in the chain, even is an earlier Prefetch has set the MT threads earlier
   for (MTGuard* guard : MTGuardRegistry)
   {
     if (guard != NULL)
