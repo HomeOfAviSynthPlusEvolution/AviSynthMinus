@@ -132,6 +132,7 @@
 // 20250415 V11.1 Fix AVS_Value 64 bit data member declaration for 64-bit non Intel (other than X86_X64) systems.
 // 20250601 V12 Global lock acquire and release: avs_acquire_global_lock, avs_release_global_lock
 // 20251127 V12 AVS_CACHE_INFORM_NUM_THREADS constant to inform the filter about the number of threads by avs_set_cache_hints
+//              Add const AVS_AEP_CACHESIZE_L2 for avs_get_env_property level 2 cache size query,
 
 // Notes.
 // Choose either method:
@@ -569,6 +570,7 @@ enum {
   AVS_AEP_HOST_SYSTEM_ENDIANNESS = 7,
   AVS_AEP_INTERFACE_VERSION = 8,
   AVS_AEP_INTERFACE_BUGFIX = 9,
+  AVS_AEP_CACHESIZE_L2 = 10, // v12
 
   // Neo additionals
   AVS_AEP_NUM_DEVICES = 901,

@@ -158,13 +158,76 @@ static int CPUCheckForExtensions()
 
   return result;
 }
+
+// ------------------------------------------------------------------
+// Core L2 Cache Detection Function
+// ------------------------------------------------------------------
+static size_t DetectL2CacheSize()
+{
+#if defined(X86_32) || defined(X86_64)
+  int info[4];
+
+  // -------------------------------------------------------
+  // 1. PRIMARY METHOD: Deterministic Cache Parameters (Leaf 4)
+  //    (Modern, cross-vendor, and supports topology)
+  // -------------------------------------------------------
+  for (int i = 0; ; ++i) {
+    // We use the helper that supports sub-leaves (i)
+    __cpuid_count_wrapper(info, 0x4, i);
+
+    // EAX[4:0] = Cache Type: 1=Data, 2=Instruction, 3=Unified
+    int cache_type = info[0] & 0x1F;
+
+    // EAX[7:5] = Cache Level: 1=L1, 2=L2, 3=L3, ...
+    int cache_level = (info[0] >> 5) & 0b111;
+
+    // Check for end of list (type 0)
+    if (cache_type == 0) {
+      break;
+    }
+
+    // We look for Cache Level 2, regardless of whether it's reported as Unified (3) or Instruction (2).
+    if (cache_level == 2) {
+      // Cache Size (Bytes) = (Ways + 1) * (Partitions + 1) * (Line Size + 1) * (Sets + 1)
+
+      size_t line_size = (info[1] & 0xFFF) + 1;           // EBX[11:0]
+      size_t partitions = ((info[1] >> 12) & 0x3FF) + 1;   // EBX[21:12]
+      size_t ways = ((info[1] >> 22) & 0x3FF) + 1;   // EBX[31:22]
+      size_t sets = (size_t)info[2] + 1;             // ECX[31:0]
+
+      return ways * partitions * line_size * sets;
+    }
+  }
+
+  // -------------------------------------------------------
+  // 2. FALLBACK METHOD: AMD Extended Cache (Leaf 80000006)
+  //    (Legacy method, but reliable for older AMD CPUs)
+  // -------------------------------------------------------
+  __cpuid(info, 0x80000000);
+  // Check if the CPU supports extended leaf 80000006
+  if (info[0] >= 0x80000006) {
+    __cpuid(info, 0x80000006);
+    // ECX[31:16] is L2 cache size in KB. Convert to bytes.
+    return (size_t)(info[2] >> 16) * 1024;
+  }
+
+  // 3. If neither method worked, return 0.
+  return 0;
+#elif defined(ARM64)
+  // Cache detection on ARM is highly vendor/OS-specific.
+  // Returning 0 is a safe default for a portable cross-platform implementation.
+  return 0;
+#else
+  return 0;
 #endif
+}
 
 class _CPUFlags
 {
 private:
-  int lCPUExtensionsAvailable;
+  size_t L2CacheSize; // in bytes
   _CPUFlags() { lCPUExtensionsAvailable = CPUCheckForExtensions(); }
+    L2CacheSize = DetectL2CacheSize();
 
 public:
   static _CPUFlags& getInstance() {
@@ -179,8 +242,16 @@ public:
   void SetCPUFlags(int new_flags) {
     lCPUExtensionsAvailable = new_flags;
   }
+
+  size_t GetL2CacheSize() {
+    return L2CacheSize;
+  }
 };
 
 int GetCPUFlags() {
   return _CPUFlags::getInstance().GetCPUFlags();
+}
+
+size_t GetL2CacheSize() {
+  return _CPUFlags::getInstance().GetL2CacheSize();
 }

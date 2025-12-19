@@ -57,6 +57,7 @@
 // 20250601  V12 Global lock aquire and release: AcquireGlobalLock, ReleaseGlobalLock
 //               New ApplyMessageEx
 // 20251127  V12 CACHE_INFORM_NUM_THREADS CachePolicyHint enum to inform the filter about the number of threads by SetCacheHints
+//               New env property AEP_CACHESIZE_L2
 
 // http://avisynth.nl
 
@@ -1748,6 +1749,7 @@ enum AvsEnvProperty {
   AEP_HOST_SYSTEM_ENDIANNESS = 7,
   AEP_INTERFACE_VERSION = 8,
   AEP_INTERFACE_BUGFIX = 9,
+  AEP_CACHESIZE_L2 = 10,
 
   // Neo additionals
   AEP_NUM_DEVICES = 901,
