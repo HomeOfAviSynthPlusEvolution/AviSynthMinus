@@ -1146,6 +1146,7 @@ private:
   CacheMode cacheMode;
 
   int cpuFlags;
+  size_t cache_size_L2;
 
   void InitMT();
 };
@@ -2535,6 +2536,7 @@ ScriptEnvironment::ScriptEnvironment()
 #endif
 
   cpuFlags = ::GetCPUFlags();
+  cache_size_L2 = ::GetL2CacheSize();
 
   try {
 #ifdef AVS_WINDOWS
@@ -3212,6 +3214,8 @@ size_t  ScriptEnvironment::GetEnvProperty(AvsEnvProperty prop)
     return nMaxFilterInstances;
   case AEP_PHYSICAL_CPUS:
     return GetNumPhysicalCPUs();
+  case AEP_CACHESIZE_L2:
+    return cache_size_L2;
   case AEP_LOGICAL_CPUS:
     return std::thread::hardware_concurrency();
   case AEP_THREAD_ID:
