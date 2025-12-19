@@ -133,6 +133,7 @@
 // 20250601 V12 Global lock acquire and release: avs_acquire_global_lock, avs_release_global_lock
 // 20251127 V12 AVS_CACHE_INFORM_NUM_THREADS constant to inform the filter about the number of threads by avs_set_cache_hints
 //              Add const AVS_AEP_CACHESIZE_L2 for avs_get_env_property level 2 cache size query,
+// 20251202     Add avs_get_cpu_flags_ex returning full 64 bit flags, new AVX-512 group flags, ARM64 CPU flags.
 
 // Notes.
 // Choose either method:
@@ -1219,49 +1220,80 @@ AVSC_API(AVS_Clip *, avs_new_c_filter)(AVS_ScriptEnvironment * e,
 // AVS_ScriptEnvironment
 //
 
-// For GetCPUFlags.  These are backwards-compatible with those in VirtualDub.
+// For GetCPUFlags.
+
+// Intel/AMD x86/x86-64 flags
+
+// start with enum, until we reach 32-bit limit
 enum {
                                 /* slowest CPU to support extension */
-  AVS_CPU_FORCE        = 0x01,   // N/A
-  AVS_CPU_FPU          = 0x02,   // 386/486DX
-  AVS_CPU_MMX          = 0x04,   // P55C, K6, PII
-  AVS_CPU_INTEGER_SSE  = 0x08,   // PIII, Athlon
-  AVS_CPU_SSE          = 0x10,   // PIII, Athlon XP/MP
-  AVS_CPU_SSE2         = 0x20,   // PIV, Hammer
-  AVS_CPU_3DNOW        = 0x40,   // K6-2
-  AVS_CPU_3DNOW_EXT    = 0x80,   // Athlon
-  AVS_CPU_X86_64       = 0xA0,   // Hammer (note: equiv. to 3DNow + SSE2,
+  AVS_CPU_FORCE = 0x01,   // N/A
+  AVS_CPU_FPU = 0x02,   // 386/486DX
+  AVS_CPU_MMX = 0x04,   // P55C, K6, PII
+  AVS_CPU_INTEGER_SSE = 0x08,   // PIII, Athlon
+  AVS_CPU_SSE = 0x10,   // PIII, Athlon XP/MP
+  AVS_CPU_SSE2 = 0x20,   // PIV, Hammer
+  AVS_CPU_3DNOW = 0x40,   // K6-2
+  AVS_CPU_3DNOW_EXT = 0x80,   // Athlon
+  AVS_CPU_X86_64 = 0xA0,   // Hammer (note: equiv. to 3DNow + SSE2,
                                  // which only Hammer will have anyway)
-  AVS_CPUF_SSE3       = 0x100,   //  PIV+, K8 Venice
-  AVS_CPUF_SSSE3      = 0x200,   //  Core 2
-  AVS_CPUF_SSE4       = 0x400,   //  Penryn, Wolfdale, Yorkfield
-  AVS_CPUF_SSE4_1     = 0x400,
-  AVS_CPUF_AVX        = 0x800,   //  Sandy Bridge, Bulldozer
-  AVS_CPUF_SSE4_2    = 0x1000,   //  Nehalem
+  AVS_CPUF_SSE3 = 0x100,   //  PIV+, K8 Venice
+  AVS_CPUF_SSSE3 = 0x200,   //  Core 2
+  AVS_CPUF_SSE4 = 0x400,   //  Penryn, Wolfdale, Yorkfield
+  AVS_CPUF_SSE4_1 = 0x400,
+  AVS_CPUF_AVX = 0x800,   //  Sandy Bridge, Bulldozer
+  AVS_CPUF_SSE4_2 = 0x1000,   //  Nehalem
   // AVS+
-  AVS_CPUF_AVX2      = 0x2000,   //  Haswell
-  AVS_CPUF_FMA3      = 0x4000,
-  AVS_CPUF_F16C      = 0x8000,
-  AVS_CPUF_MOVBE     = 0x10000,   // Big Endian Move
-  AVS_CPUF_POPCNT    = 0x20000,
-  AVS_CPUF_AES       = 0x40000,
-  AVS_CPUF_FMA4      = 0x80000,
+  AVS_CPUF_AVX2 = 0x2000,   //  Haswell
+  AVS_CPUF_FMA3 = 0x4000,
+  AVS_CPUF_F16C = 0x8000,
+  AVS_CPUF_MOVBE = 0x10000,   // Big Endian Move
+  AVS_CPUF_POPCNT = 0x20000,
+  AVS_CPUF_AES = 0x40000,
+  AVS_CPUF_FMA4 = 0x80000,
 
-  AVS_CPUF_AVX512F    = 0x100000,  // AVX-512 Foundation.
-  AVS_CPUF_AVX512DQ   = 0x200000,  // AVX-512 DQ (Double/Quad granular) Instructions
-  AVS_CPUF_AVX512PF   = 0x400000,  // AVX-512 Prefetch
-  AVS_CPUF_AVX512ER   = 0x800000,  // AVX-512 Exponential and Reciprocal
-  AVS_CPUF_AVX512CD   = 0x1000000, // AVX-512 Conflict Detection
-  AVS_CPUF_AVX512BW   = 0x2000000, // AVX-512 BW (Byte/Word granular) Instructions
-  AVS_CPUF_AVX512VL   = 0x4000000, // AVX-512 VL (128/256 Vector Length) Extensions
-  AVS_CPUF_AVX512IFMA = 0x8000000, // AVX-512 IFMA integer 52 bit
-  AVS_CPUF_AVX512VBMI = 0x10000000 // AVX-512 VBMI
+  // AVX-512
+  AVS_CPUF_AVX512F = 0x100000,    // F Foundation.
+  AVS_CPUF_AVX512DQ = 0x200000,    // DQ (Double/Quad granular) Instructions
+  AVS_CPUF_AVX512PF = 0x400000,    // PF Prefetch
+  AVS_CPUF_AVX512ER = 0x800000,    // ER Exponential and Reciprocal
+  AVS_CPUF_AVX512CD = 0x1000000,   // CD Conflict Detection
+  AVS_CPUF_AVX512BW = 0x2000000,   // BW (Byte/Word granular) Instructions
+  AVS_CPUF_AVX512VL = 0x4000000,   // VL (128/256 Vector Length) Extensions
+  AVS_CPUF_AVX512IFMA = 0x8000000,   // IFMA integer 52 bit
+  AVS_CPUF_AVX512VBMI = 0x10000000,  // VBMI, byte/word shuffling, sign/zero extension, and general pixel manipulation
+  // Group feature flags for convenience: checking a single flag for "base" and "fast" AVX512 feature sets.
+  AVS_CPUF_AVX512_BASE = 0x20000000,  // F, CD, BW, DQ, VL all set.
+  AVS_CPUF_AVX512_FAST = 0x40000000,   // Base + VNNI, VBMI, VBMI2, BITALG, VPOPCNTDQ. Spec detection logic excludes older/throttling models that also have these features.
+  // Last 32-bit flag reserved for future use:
+  // AVS_CPUF_AVX10    = 0x80000000LL; // AVX10 as one flag, version query needed in distinct function.
+
+  // The enum must stop here to remain compatible with a 32-bit int/enum.
+};
+
+// features beyond the initial 32 bits(0xFFFFFFFF) must be defined as 64 - bit constants
+// and can be returned only by avs_get_cpu_flags_ex (which returns int64_t)
+
+// Intel/AMD x86/x86-64 flags (Continued from 32-bit limit)
+#define AVS_CPUF_AVX512VNNI             0x00100000000LL
+#define AVS_CPUF_AVX512VBMI2            0x00200000000LL
+#define AVS_CPUF_AVX512BITALG           0x00400000000LL
+#define AVS_CPUF_AVX512VPOPCNTDQ        0x00800000000LL
+#define AVS_CPUF_AVX512FP16             0x01000000000LL
+#define AVS_CPUF_AVX512BF16             0x02000000000LL
+
+// ARMv8-A flags
+enum {
+  AVS_CPUF_ARM_NEON = 0x01,
+  AVS_CPUF_ARM_DOTPROD = 0x02,
+  AVS_CPUF_ARM_SVE2 = 0x04
 };
 
 
 AVSC_API(const char *, avs_get_error)(AVS_ScriptEnvironment *); // return 0 if no error
 
 AVSC_API(int, avs_get_cpu_flags)(AVS_ScriptEnvironment *);
+AVSC_API(int64_t, avs_get_cpu_flags_ex)(AVS_ScriptEnvironment *); // V12
 AVSC_API(int, avs_check_version)(AVS_ScriptEnvironment *, int version);
 
 AVSC_API(char *, avs_save_string)(AVS_ScriptEnvironment *, const char* s, int length);
@@ -1672,6 +1704,7 @@ struct AVS_Library {
   // V12
   AVSC_DECLARE_FUNC(avs_acquire_global_lock);
   AVSC_DECLARE_FUNC(avs_release_global_lock);
+  AVSC_DECLARE_FUNC(avs_get_cpu_flags_ex);
 };
 
 #undef AVSC_DECLARE_FUNC
@@ -1964,6 +1997,7 @@ avs_bits_per_component    constant 8 (8 bits/component)
   // V12
   AVSC_LOAD_FUNC_OPT(avs_acquire_global_lock);
   AVSC_LOAD_FUNC_OPT(avs_release_global_lock);
+  AVSC_LOAD_FUNC_OPT(avs_get_cpu_flags_ex);
 
 #undef __AVSC_STRINGIFY
 #undef AVSC_STRINGIFY

@@ -824,6 +824,7 @@ public:
   ScriptEnvironment();
   void CheckVersion(int version);
   int GetCPUFlags();
+  int64_t GetCPUFlagsEx();
   void AddFunction(const char* name, const char* params, INeoEnv::ApplyFunc apply, void* user_data = 0);
   void AddFunction25(const char* name, const char* params, INeoEnv::ApplyFunc apply, void* user_data = 0);
   void AddFunctionPreV11C(const char* name, const char* params, INeoEnv::ApplyFunc apply, void* user_data = 0);
@@ -1145,7 +1146,7 @@ private:
 
   CacheMode cacheMode;
 
-  int cpuFlags;
+  int64_t cpuFlagsEx; // extended 64 bits CPU flags
   size_t cache_size_L2;
 
   void InitMT();
@@ -1597,6 +1598,11 @@ public:
   int __stdcall GetCPUFlags()
   {
     return core->GetCPUFlags();
+  }
+
+  int64_t __stdcall GetCPUFlagsEx()
+  {
+    return core->GetCPUFlagsEx();
   }
 
   char* __stdcall SaveString(const char* s, int length = -1)
@@ -2535,7 +2541,7 @@ ScriptEnvironment::ScriptEnvironment()
       throw("ScriptEnvironment: TlsAlloc failed on DLL load");
 #endif
 
-  cpuFlags = ::GetCPUFlags();
+  cpuFlagsEx = ::GetCPUFlagsEx();
   cache_size_L2 = ::GetL2CacheSize();
 
   try {
@@ -3293,7 +3299,8 @@ void ScriptEnvironment::CheckVersion(int version) {
     ThrowError("Plugin was designed for a later version of Avisynth (%d)", version);
 }
 
-int ScriptEnvironment::GetCPUFlags() { return cpuFlags; }
+int ScriptEnvironment::GetCPUFlags() { return cpuFlagsEx & 0xFFFFFFFF; }
+int64_t ScriptEnvironment::GetCPUFlagsEx() { return cpuFlagsEx; }
 
 void ScriptEnvironment::AddFunction(const char* name, const char* params, ApplyFunc apply, void* user_data) {
   this->AddFunction(name, params, apply, user_data, NULL);
