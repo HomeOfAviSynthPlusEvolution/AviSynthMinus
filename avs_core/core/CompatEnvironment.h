@@ -142,7 +142,7 @@ class IScriptEnvironment_AvsPreV11C {
 public:
   virtual ~IScriptEnvironment_AvsPreV11C() {}
 
-  virtual /*static*/ int __stdcall GetCPUFlags() = 0;
+  virtual int __stdcall GetCPUFlags() = 0;
 
   virtual char* __stdcall SaveString(const char* s, int length = -1) = 0;
   virtual char* Sprintf(const char* fmt, ...) = 0;
@@ -302,7 +302,7 @@ public:
   virtual void __stdcall ReleaseGlobalLock(const char* name) = 0;
   virtual void __stdcall ApplyMessageEx(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size,
     int textcolor, int halocolor, int bgcolor, bool utf8) = 0;
-
+  virtual int64_t __stdcall GetCPUFlagsEx() = 0;
 }; // end class IScriptEnvironment_AvsPreV11C. Order is important.
 
 #endif // _AVS_COMPATENVIRONMENT_H_INCLUDED

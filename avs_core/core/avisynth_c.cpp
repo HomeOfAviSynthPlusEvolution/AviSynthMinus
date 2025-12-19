@@ -1199,6 +1199,13 @@ int AVSC_CC avs_get_cpu_flags(AVS_ScriptEnvironment * p)
 }
 
 extern "C"
+int64_t AVSC_CC avs_get_cpu_flags_ex(AVS_ScriptEnvironment* p)
+{
+  p->error = 0;
+  return p->env->GetCPUFlagsEx();
+}
+
+extern "C"
 char* AVSC_CC avs_save_string(AVS_ScriptEnvironment * p, const char* s, int length)
 {
   p->error = 0;
