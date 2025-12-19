@@ -2943,6 +2943,14 @@ void ScriptEnvironment::LogMsgOnce_valist(const OneTimeLogTicket& ticket, int le
 
 void ScriptEnvironment::SetMaxCPU(const char* features)
 {
+#if defined(ARM64)
+  enum CPUlevel {
+    CL_NONE,
+    CL_NEON,
+    CL_DOTPROD,
+    CL_SVE2
+  };
+#elif defined(X86_32) || defined(X86_64)
   enum CPUlevel {
     CL_NONE,
     CL_MMX,
@@ -2953,8 +2961,15 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
     CL_SSE4_1,
     CL_SSE4_2,
     CL_AVX,
-    CL_AVX2
+    CL_AVX2,
+    CL_AVX512_BASE,
+    CL_AVX512_FAST
   };
+#else
+  enum CPUlevel {
+    CL_NONE
+  };
+#endif
 
   std::string s;
   const int len = (int)strlen(features);
@@ -2962,7 +2977,7 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
   for (int i = 0; i < len; i++)
     s[i] = tolower(features[i]);
 
-  int cpu_flags = GetCPUFlags();
+  int64_t cpu_flags = GetCPUFlagsEx();
 
   std::vector<std::string> tokens;
   std::size_t start = 0, end = 0;
@@ -2995,6 +3010,12 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
     const char* t = token.c_str();
 
     if (streqi(t, "") || streqi(t, "none")) cpulevel = CL_NONE;
+#if defined(ARM64)
+    else if (streqi(t, "neon")) cpulevel = CL_NEON;
+    else if (streqi(t, "dotprod")) cpulevel = CL_DOTPROD;
+    else if (streqi(t, "sve2")) cpulevel = CL_SVE2;
+    else ThrowError("SetMaxCPU error: cpu level must be empty or none, neon, dotprod or sve2 (%s)", t);
+#elif defined(X86_32) || defined(X86_64)
     else if (streqi(t, "mmx")) cpulevel = CL_MMX;
     else if (streqi(t, "sse")) cpulevel = CL_SSE;
     else if (streqi(t, "sse2")) cpulevel = CL_SSE2;
@@ -3004,16 +3025,49 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
     else if (streqi(t, "sse4.2")) cpulevel = CL_SSE4_2;
     else if (streqi(t, "avx")) cpulevel = CL_AVX;
     else if (streqi(t, "avx2")) cpulevel = CL_AVX2;
-    else ThrowError("SetMaxCPU error: cpu level must be empty or none, mmx, sse, sse2, sse3, ssse3, sse4 or sse4.1, sse4.2, avx or avx2! (%s)", t);
+    else if (streqi(t, "avx512base")) cpulevel = CL_AVX512_BASE;
+    else if (streqi(t, "avx512fast")) cpulevel = CL_AVX512_FAST;
+    else ThrowError("SetMaxCPU error: cpu level must be empty or none, mmx, sse, sse2, sse3, ssse3, sse4 or sse4.1, sse4.2, avx, avx2, avx512base or avx512fast (%s)", t);
+#else
+    else ThrowError("SetMaxCPU error: cpu level must be empty or none (%s)", t);
+#endif
 
     if (0 == mode) { // limit
-      if (cpulevel <= CL_AVX2)
-        cpu_flags &= ~(CPUF_AVX512BW | CPUF_AVX512CD | CPUF_AVX512DQ |
-          CPUF_AVX512ER | CPUF_AVX512F | CPUF_AVX512IFMA | CPUF_AVX512PF | CPUF_AVX512VBMI | CPUF_AVX512VL);
+      // always switch off the more advanced features compared to previous check if limiting
+#if defined(ARM64)
+      if (cpulevel <= CL_SVE2) {
+        // already max level, nothing to do
+      }
+      if (cpulevel <= CL_DOTPROD) {
+        cpu_flags &= ~CPUF_ARM_SVE2;
+      }
+      if (cpulevel <= CL_NEON) {
+        cpu_flags &= ~CPUF_ARM_DOTPROD;
+      }
+      if (cpulevel <= CL_NONE) {
+        cpu_flags &= ~CPUF_ARM_NEON; // switch off the most minimal feature
+      }
+
+#elif defined(X86_32) || defined(X86_64)
+      // group feature
+      if (cpulevel <= CL_AVX512_FAST) {
+        // disable all avx512, re-enable the whole mask up to "fast"
+        cpu_flags &= ~CPUF_AVX512_MASK;
+        cpu_flags |= CPUF_AVX512_FAST_ALL;
+      }
+      // group feature
+      if (cpulevel <= CL_AVX512_BASE) {
+        // disable all avx512, re-enable the whole mask up to "base"
+        cpu_flags &= ~CPUF_AVX512_MASK;
+        cpu_flags |= CPUF_AVX512_BASE_ALL;
+      }
+      // individual features
+      if (cpulevel <= CL_AVX2) // just disable all avx512
+        cpu_flags &= ~CPUF_AVX512_MASK;
       if (cpulevel <= CL_AVX)
         cpu_flags &= ~(CPUF_AVX2 | CPUF_FMA3 | CPUF_FMA4 | CPUF_F16C);
       if (cpulevel <= CL_SSE4_2)
-        cpu_flags &= ~(CPUF_AVX);
+        cpu_flags &= ~(CPUF_AVX); // switch off AVX, when max is sse4.2, other features already off
       if (cpulevel <= CL_SSE4_1)
         cpu_flags &= ~(CPUF_SSE4_2);
       if (cpulevel <= CL_SSSE3)
@@ -3028,10 +3082,20 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
         cpu_flags &= ~(CPUF_SSE | CPUF_INTEGER_SSE); // ?
       if (cpulevel <= CL_NONE)
         cpu_flags &= ~(CPUF_MMX);
+#else
+      // nothing to do, only "none" exists
+#endif
     }
     else {
-      int current_flag;
+      int64_t current_flag;
       switch (cpulevel) {
+#if defined(ARM64)
+      case CL_SVE2: current_flag = CPUF_ARM_SVE2; break;
+      case CL_DOTPROD: current_flag = CPUF_ARM_DOTPROD; break;
+      case CL_NEON: current_flag = CPUF_ARM_NEON; break;
+#elif defined(X86_32) || defined(X86_64)
+      case CL_AVX512_FAST: current_flag = CPUF_AVX512_FAST_ALL; break;
+      case CL_AVX512_BASE: current_flag = CPUF_AVX512_BASE_ALL; break;
       case CL_AVX2: current_flag = CPUF_AVX2 | CPUF_FMA3; break;
       case CL_AVX: current_flag = CPUF_AVX; break;
       case CL_SSE4_2: current_flag = CPUF_SSE4_2; break;
@@ -3041,6 +3105,9 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
       case CL_SSE2: current_flag = CPUF_SSE2; break;
       case CL_SSE: current_flag = CPUF_SSE; break;
       case CL_MMX: current_flag = CPUF_MMX; break;
+#else
+        // nothing to do, only "none" exists
+#endif
       default:
         current_flag = 0;
       }
@@ -3054,7 +3121,7 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
     }
   }
 
-  cpuFlags = cpu_flags;
+  cpuFlagsEx = cpu_flags;
 }
 
 ClipDataStore* ScriptEnvironment::ClipData(IClip *clip)
