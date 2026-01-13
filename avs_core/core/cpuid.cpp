@@ -387,25 +387,32 @@ static int64_t X86CheckForExtensions()
 
       // 1. Check for Base AVX-512
       if ((result & avx512_base_mask) == avx512_base_mask) {
-        result |= CPUF_AVX512_BASE;
 
-        // 2. Check for AVX10
-        if (avx10_minor >= 1) {
-          // AVX10.x automatically sets the FAST flag and the AVX10 flag
-          // AVX10 version is queried separately from GetCPUFlags.
-          //result |= CPUF_AVX10; // not yet, RFU
+        // Check for AVX512_FAST (Pre-AVX10 minimum Ice Lake)
+        // Base + Core ICL + Crypto (to distinguish from older server CPUs)
+        const bool has_avx512_fast =
+          ((result & avx512_fast_core_mask) == avx512_fast_core_mask) && has_avx512_crypto;
+
+        const bool has_avx10 = (avx10_minor >= 1);
+
+        // The "Base" group feature flag is set only if FAST is present!
+        // Since only-Base means a very old throttling CPU, we disable AVX512 group flag by default.
+        // User can later re-enable it via SetMaxCPU("AVX512base+")
+        if (has_avx512_fast || has_avx10) {
+          result |= CPUF_AVX512_BASE; // fulfilling base mask is not enough
           result |= CPUF_AVX512_FAST;
         }
-        // 3. Check for AVX512_FAST (Pre-AVX10 minimum Ice Lake)
-        // Base + Core ICL + Crypto (to distinguish from older server CPUs)
-        else if (((result & avx512_fast_core_mask) == avx512_fast_core_mask) && has_avx512_crypto)
-        {
-          result |= CPUF_AVX512_FAST;
+
+        // Check for AVX10, no AVS flags atm.
+        if (has_avx10) {
+          //result |= CPUF_AVX10; // not yet, RFU
         }
       }
 
-      // GCC/clang compiler flags for matching CPUF_AVX512_FAST:
-      //" -mfma -mavx512f -mavx512cd -mavx512bw -mavx512dq -mavx512vl -mavx512vnni -mavx512vbmi -mavx512vbmi2 -mavx512bitalg -mavx512vpopcntdq "
+      // GCC/clang compiler flags for matching CPUF_AVX512_BASE
+      // " -mfma -mbmi2 -mavx512f -mavx512cd -mavx512bw -mavx512dq -mavx512vl "
+      // for matching CPUF_AVX512_FAST:
+      //" -mfma -mbmi2 -mavx512f -mavx512cd -mavx512bw -mavx512dq -mavx512vl -mavx512vnni -mavx512vbmi -mavx512vbmi2 -mavx512bitalg -mavx512vpopcntdq "
     }
   }
 #else
