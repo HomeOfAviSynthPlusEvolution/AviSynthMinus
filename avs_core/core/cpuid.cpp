@@ -32,7 +32,7 @@
 
 // Neon/Dotprod request in WinAPI ...
 #if defined(ARM64) && defined(AVS_WINDOWS)
-#include <Windows.h>
+#include <windows.h>
 #include <processthreadsapi.h>
 #endif
 
