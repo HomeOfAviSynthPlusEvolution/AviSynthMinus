@@ -360,10 +360,9 @@ AVSValue __cdecl ConvertToRGB::Create(AVSValue args, void* user_data, IScriptEnv
     }
 
     if (needConvertFinalBitdepth) {
-      // from any bitdepth planar rgb(a) -> 8/16 bits
-      clip = new ConvertBits(clip, -1 /*dither_type*/, finalBitdepth /*target_bitdepth*/, true /*assume_truerange*/, 
-        ColorRange_e::AVS_RANGE_FULL /*fulls*/, ColorRange_e::AVS_RANGE_FULL /*fulld*/, 
-        8 /*n/a dither_bitdepth*/, env);
+      // plain Invoke instead of "new ConvertBits", this detects and keeps source and target ranges
+      AVSValue new_args[2] = { clip, finalBitdepth };
+      clip = env->Invoke("ConvertBits", AVSValue(new_args, 2)).AsClip();
       vi = clip->GetVideoInfo();
     }
 
@@ -392,18 +391,18 @@ AVSValue __cdecl ConvertToRGB::Create(AVSValue args, void* user_data, IScriptEnv
   if (target_rgbtype == 24 || target_rgbtype == 32) {
     if (vi.ComponentSize() != 1) {
       // 64->32, 48->24
-      clip = new ConvertBits(clip, -1 /*dither_type*/, 8 /*target_bitdepth*/, true /*assume_truerange*/, 
-        ColorRange_e::AVS_RANGE_FULL /*fulls*/, ColorRange_e::AVS_RANGE_FULL /*fulld*/, 
-        8 /*n/a dither_bitdepth*/, env);
+      // using Invoke instead of new ConvertBits, this detects and keeps source and target ranges
+      AVSValue new_args[2] = { clip, 8 };
+      clip = env->Invoke("ConvertBits", AVSValue(new_args, 2)).AsClip();
       vi = clip->GetVideoInfo(); // new format
     }
   }
   else if (target_rgbtype == 48 || target_rgbtype == 64) {
     if (vi.ComponentSize() != 2) {
       // 32->64, 24->48
-      clip = new ConvertBits(clip, -1 /*dither_type*/, 16 /*target_bitdepth*/, true /*assume_truerange*/, 
-        ColorRange_e::AVS_RANGE_FULL /*fulls*/, ColorRange_e::AVS_RANGE_FULL /*fulld*/, 
-        8 /*n/a dither_bitdepth*/, env);
+      // using Invoke instead of new ConvertBits, this detects and keeps source and target ranges
+      AVSValue new_args[2] = { clip, 16 };
+      clip = env->Invoke("ConvertBits", AVSValue(new_args, 2)).AsClip();
       vi = clip->GetVideoInfo(); // new format
     }
   }
