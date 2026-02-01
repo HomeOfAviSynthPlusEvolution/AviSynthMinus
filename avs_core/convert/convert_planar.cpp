@@ -1057,9 +1057,9 @@ PVideoFrame __stdcall ConvertYUV444ToRGB::GetFrame(int n, IScriptEnvironment* en
           float b = matrix.y_b_f * Y + matrix.u_b_f * U + matrix.v_b_f * V + matrix.offset_rgb_f;
           float g = matrix.y_g_f * Y + matrix.u_g_f * U + matrix.v_g_f * V + matrix.offset_rgb_f;
           float r = matrix.y_r_f * Y + matrix.u_r_f * U + matrix.v_r_f * V + matrix.offset_rgb_f;
-          reinterpret_cast<float *>(dstpB)[x] = clamp(b, 0.0f, 1.0f);  // All the safety we can wish for.
-          reinterpret_cast<float *>(dstpG)[x] = clamp(g, 0.0f, 1.0f);  // Probably needed here.
-          reinterpret_cast<float *>(dstpR)[x] = clamp(r, 0.0f, 1.0f);
+          reinterpret_cast<float *>(dstpB)[x] = b;
+          reinterpret_cast<float *>(dstpG)[x] = g;
+          reinterpret_cast<float *>(dstpR)[x] = r;
           if(targetHasAlpha)
             reinterpret_cast<float *>(dstpA)[x] = A;
         }
