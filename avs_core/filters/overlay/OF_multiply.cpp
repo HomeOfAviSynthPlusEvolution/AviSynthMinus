@@ -281,19 +281,10 @@ void OL_MultiplyImage::BlendImageMask(ImageOverlayInternal* base, ImageOverlayIn
   else
 #endif
   {
-    // old integer C code: 8 bit is quicker than float-based
-    if (sizeof(pixel_t) == 1) {
-      if (opacity == 256)
-        of_multiply_c_old<pixel_t, true, true>(bits_per_pixel, opacity_f, opacity, w, h, ovY, overlaypitch, baseY, baseU, baseV, basepitch, maskY, maskU, maskV, maskpitch);
-      else
-        of_multiply_c_old<pixel_t, false, true>(bits_per_pixel, opacity_f, opacity, w, h, ovY, overlaypitch, baseY, baseU, baseV, basepitch, maskY, maskU, maskV, maskpitch);
-    }
-    else {
-      if (opacity == 256)
-        of_multiply_c<pixel_t, true, true>(bits_per_pixel, opacity_f, opacity, w, h, ovY, overlaypitch, baseY, baseU, baseV, basepitch, maskY, maskU, maskV, maskpitch);
-      else
-        of_multiply_c<pixel_t, false, true>(bits_per_pixel, opacity_f, opacity, w, h, ovY, overlaypitch, baseY, baseU, baseV, basepitch, maskY, maskU, maskV, maskpitch);
-    }
+    if (opacity == 256)
+      of_multiply_c<pixel_t, true, true>(bits_per_pixel, opacity_f, opacity, w, h, ovY, overlaypitch, baseY, baseU, baseV, basepitch, maskY, maskU, maskV, maskpitch);
+    else
+      of_multiply_c<pixel_t, false, true>(bits_per_pixel, opacity_f, opacity, w, h, ovY, overlaypitch, baseY, baseU, baseV, basepitch, maskY, maskU, maskV, maskpitch);
   }
 }
 
@@ -329,19 +320,9 @@ void OL_MultiplyImage::BlendImage(ImageOverlayInternal* base, ImageOverlayIntern
   else
 #endif
   {
-    if (sizeof(pixel_t) == 1) {
-      // old integer C code: 8 bit is quicker than float-based
-      if (opacity == 256)
-        of_multiply_c_old<pixel_t, true, false>(bits_per_pixel, opacity_f, opacity, w, h, ovY, overlaypitch, baseY, baseU, baseV, basepitch, nullptr, nullptr, nullptr, 0);
-      else
-        of_multiply_c_old<pixel_t, false, false>(bits_per_pixel, opacity_f, opacity, w, h, ovY, overlaypitch, baseY, baseU, baseV, basepitch, nullptr, nullptr, nullptr, 0);
-    }
-    else {
-      if (opacity == 256)
-        of_multiply_c<pixel_t, true, false>(bits_per_pixel, opacity_f, opacity, w, h, ovY, overlaypitch, baseY, baseU, baseV, basepitch, nullptr, nullptr, nullptr, 0);
-      else
-        of_multiply_c<pixel_t, false, false>(bits_per_pixel, opacity_f, opacity, w, h, ovY, overlaypitch, baseY, baseU, baseV, basepitch, nullptr, nullptr, nullptr, 0);
-    }
-
+    if (opacity == 256)
+      of_multiply_c<pixel_t, true, false>(bits_per_pixel, opacity_f, opacity, w, h, ovY, overlaypitch, baseY, baseU, baseV, basepitch, nullptr, nullptr, nullptr, 0);
+    else
+      of_multiply_c<pixel_t, false, false>(bits_per_pixel, opacity_f, opacity, w, h, ovY, overlaypitch, baseY, baseU, baseV, basepitch, nullptr, nullptr, nullptr, 0);
   }
 }
