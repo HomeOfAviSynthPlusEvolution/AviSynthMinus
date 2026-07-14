@@ -123,7 +123,8 @@ static void BuildMatrix_Rgb2Yuv_core(double Kr, double Kb, int int_arith_shift, 
 
     // FIXME: do we need it to expand for the other u and v constants?
     // anti overflow e.g. for 15 bits the sum must not exceed 32768
-    if (matrix.offset_y == 0 && matrix.y_g + matrix.y_r + matrix.y_b != mulfac_int)
+    // Unity gain correction is valid only for full-range RGB to full-range Y.
+    if (full_scale_s && full_scale_d && matrix.y_g + matrix.y_r + matrix.y_b != mulfac_int)
       matrix.y_g = mulfac_int - (matrix.y_r + matrix.y_b);
 
     // special precalculations for direct RGB to YUY2
