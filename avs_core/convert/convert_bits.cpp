@@ -1059,42 +1059,22 @@ static void get_convert_uintN_to_uintN_functions(int source_bitdepth, int target
 #undef convert_uintN_to_uintN_functions
 }
 
-ConvertBits::ConvertBits(PClip _child, const int _dither_mode, const int _target_bitdepth, bool _truerange,
-  int _ColorRange_src, int _ColorRange_dest,
-  int _dither_bitdepth, IScriptEnvironment* env) :
-  GenericVideoFilter(_child),
-  conv_function(nullptr), conv_function_chroma(nullptr), conv_function_a(nullptr),
-  target_bitdepth(_target_bitdepth), dither_mode(_dither_mode), dither_bitdepth(_dither_bitdepth),
-  fulls(false), fulld(false), truerange(_truerange)
+static void set_convert_functions(int bits_per_pixel, int target_bitdepth, int dither_mode,
+  bool fulls, bool fulld, int cpu_flags,
+  BitDepthConvFuncPtr& conv_function, BitDepthConvFuncPtr& conv_function_chroma,
+  BitDepthConvFuncPtr& conv_function_a)
 {
-
-  pixelsize = vi.ComponentSize();
-  bits_per_pixel = vi.BitsPerComponent();
-  format_change_only = false;
+  conv_function = nullptr;
+  conv_function_chroma = nullptr;
+  conv_function_a = nullptr;
 
 #ifdef INTEL_INTRINSICS
-  const bool sse2 = !!(env->GetCPUFlags() & CPUF_SSE2);
-  const bool sse4 = !!(env->GetCPUFlags() & CPUF_SSE4_1);
-  const bool avx2 = !!(env->GetCPUFlags() & CPUF_AVX2);
+  const bool sse2 = !!(cpu_flags & CPUF_SSE2);
+  const bool sse4 = !!(cpu_flags & CPUF_SSE4_1);
+  const bool avx2 = !!(cpu_flags & CPUF_AVX2);
+#else
+  (void)cpu_flags;
 #endif
-
-  // full or limited decision
-  // dest: if undefined, use src
-  if (_ColorRange_dest != ColorRange_e::AVS_RANGE_LIMITED && _ColorRange_dest != ColorRange_e::AVS_RANGE_FULL) {
-    _ColorRange_dest = _ColorRange_src;
-  }
-  //
-  fulls = _ColorRange_src == ColorRange_e::AVS_RANGE_FULL;
-  fulld = _ColorRange_dest == ColorRange_e::AVS_RANGE_FULL;
-
-  if (!truerange) {
-    if ((target_bitdepth == 8 || target_bitdepth == 32) && pixelsize == 2)
-      bits_per_pixel = 16;
-    if (target_bitdepth > 8 && target_bitdepth <= 16 && (bits_per_pixel == 8 || bits_per_pixel == 32))
-      target_bitdepth = 16;
-    if (target_bitdepth > 8 && target_bitdepth <= 16 && bits_per_pixel > 8 && bits_per_pixel <= 16)
-      format_change_only = true;
-  }
 
   if (bits_per_pixel <= 16 && target_bitdepth <= 16)
   {
@@ -1137,6 +1117,48 @@ ConvertBits::ConvertBits(PClip _child, const int _dither_mode, const int _target
     else
       get_convert_float_to_float_functions(fulls, fulld, conv_function, conv_function_chroma, conv_function_a);
   }
+}
+
+ConvertBits::ConvertBits(PClip _child, const int _dither_mode, const int _target_bitdepth, bool _truerange,
+  int _ColorRange_src, int _ColorRange_dest,
+  int _dither_bitdepth, IScriptEnvironment* env, bool _source_range_from_frame) :
+  GenericVideoFilter(_child),
+  conv_function(nullptr), conv_function_chroma(nullptr), conv_function_a(nullptr),
+  conv_function_alternate(nullptr), conv_function_chroma_alternate(nullptr),
+  target_bitdepth(_target_bitdepth), dither_mode(_dither_mode), dither_bitdepth(_dither_bitdepth),
+  fulls(false), fulld(false), truerange(_truerange),
+  source_range_from_frame(_source_range_from_frame), default_source_full(false)
+{
+
+  default_source_full = vi.IsRGB();
+  pixelsize = vi.ComponentSize();
+  bits_per_pixel = vi.BitsPerComponent();
+  format_change_only = false;
+
+  // full or limited decision
+  // dest: if undefined, use src
+  if (_ColorRange_dest != ColorRange_e::AVS_RANGE_LIMITED && _ColorRange_dest != ColorRange_e::AVS_RANGE_FULL) {
+    _ColorRange_dest = _ColorRange_src;
+  }
+  //
+  fulls = _ColorRange_src == ColorRange_e::AVS_RANGE_FULL;
+  fulld = _ColorRange_dest == ColorRange_e::AVS_RANGE_FULL;
+
+  if (!truerange) {
+    if ((target_bitdepth == 8 || target_bitdepth == 32) && pixelsize == 2)
+      bits_per_pixel = 16;
+    if (target_bitdepth > 8 && target_bitdepth <= 16 && (bits_per_pixel == 8 || bits_per_pixel == 32))
+      target_bitdepth = 16;
+    if (target_bitdepth > 8 && target_bitdepth <= 16 && bits_per_pixel > 8 && bits_per_pixel <= 16)
+      format_change_only = true;
+  }
+
+  const int cpu_flags = env->GetCPUFlags();
+  set_convert_functions(bits_per_pixel, target_bitdepth, dither_mode, fulls, fulld, cpu_flags,
+    conv_function, conv_function_chroma, conv_function_a);
+  if (source_range_from_frame)
+    set_convert_functions(bits_per_pixel, target_bitdepth, dither_mode, !fulls, fulld, cpu_flags,
+      conv_function_alternate, conv_function_chroma_alternate, conv_function_a);
 
   // Set VideoInfo
   if (target_bitdepth == 8) {
@@ -1249,6 +1271,7 @@ AVSValue __cdecl ConvertBits::Create(AVSValue args, void* user_data, IScriptEnvi
   // retrieve full/limited
   int ColorRange_src;
   int ColorRange_dest;
+  const bool source_range_from_frame = !args[5].Defined();
   if (args[5].Defined())
     ColorRange_src = args[5].AsBool() ? ColorRange_e::AVS_RANGE_FULL : ColorRange_e::AVS_RANGE_LIMITED;
   else
@@ -1263,6 +1286,9 @@ AVSValue __cdecl ConvertBits::Create(AVSValue args, void* user_data, IScriptEnvi
     const AVSMap* props = env->getFramePropsRO(frame0);
     if (env->propNumElements(props, "_ColorRange") > 0) {
       ColorRange_src = (int)env->propGetIntSaturated(props, "_ColorRange", 0, nullptr);
+      if (ColorRange_src != ColorRange_e::AVS_RANGE_LIMITED &&
+          ColorRange_src != ColorRange_e::AVS_RANGE_FULL)
+        env->ThrowError("ConvertBits: unsupported _ColorRange value: %d", ColorRange_src);
     }
     else {
       // no param, no frame property -> rgb is full others are limited
@@ -1403,7 +1429,20 @@ AVSValue __cdecl ConvertBits::Create(AVSValue args, void* user_data, IScriptEnvi
     clip = env->Invoke("ConvertToYV16", AVSValue(new_args, 1)).AsClip();
   }
 
-  AVSValue result = new ConvertBits(clip, dither_type, target_bitdepth, assume_truerange, ColorRange_src, ColorRange_dest, dither_bitdepth, env);
+  // If an intermediate clip was used for a large dither_bits gap, dither at
+  // its actual depth first and expand to the requested depth afterwards.
+  const bool need_expand_back_after_dither = dither_type >= 0 && target_bitdepth > source_bitdepth;
+  const int final_target_bitdepth = target_bitdepth;
+  if (need_expand_back_after_dither)
+    target_bitdepth = source_bitdepth;
+
+  AVSValue result = new ConvertBits(clip, dither_type, target_bitdepth, assume_truerange, ColorRange_src, ColorRange_dest, dither_bitdepth, env, source_range_from_frame);
+
+  if (need_expand_back_after_dither) {
+    AVSValue new_args[7] = { result, final_target_bitdepth, true, -1, AVSValue(), fulld, fulld };
+    result = env->Invoke("ConvertBits", AVSValue(new_args, 7)).AsClip();
+    target_bitdepth = final_target_bitdepth;
+  }
 
   // convert back to packed rgb from planar on the fly
   if (need_convert_24 || need_convert_48) {
@@ -1430,6 +1469,25 @@ AVSValue __cdecl ConvertBits::Create(AVSValue args, void* user_data, IScriptEnvi
 
 PVideoFrame __stdcall ConvertBits::GetFrame(int n, IScriptEnvironment* env) {
   PVideoFrame src = child->GetFrame(n, env);
+
+  if (source_range_from_frame) {
+    int color_range = -1;
+    const AVSMap* props = env->getFramePropsRO(src);
+    if (env->propNumElements(props, "_ColorRange") > 0) {
+      color_range = (int)env->propGetIntSaturated(props, "_ColorRange", 0, nullptr);
+      if (color_range != ColorRange_e::AVS_RANGE_LIMITED &&
+          color_range != ColorRange_e::AVS_RANGE_FULL)
+        env->ThrowError("ConvertBits: unsupported _ColorRange value: %d", color_range);
+    }
+
+    const bool frame_source_full = color_range == ColorRange_e::AVS_RANGE_FULL ||
+      (color_range < 0 && default_source_full);
+    if (frame_source_full != fulls) {
+      std::swap(conv_function, conv_function_alternate);
+      std::swap(conv_function_chroma, conv_function_chroma_alternate);
+      fulls = frame_source_full;
+    }
+  }
 
   if (format_change_only)
   {

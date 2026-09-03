@@ -1413,6 +1413,8 @@ ConvertToPlanarGeneric::ConvertToPlanarGeneric(
   const int ymask = ysOut - 1;
   if (vi.height & ymask)
     env->ThrowError("Convert: Cannot convert if height isn't mod%d!", ysOut);
+  if (interlaced && ysOut == 2 && (vi.height & 3))
+    env->ThrowError("Convert: interlaced 4:2:0 conversion requires height to be mod4!");
 
   int uv_width  = vi.width  >> vi.GetPlaneWidthSubsampling(PLANAR_U);
   int uv_height = vi.height >> vi.GetPlaneHeightSubsampling(PLANAR_U);

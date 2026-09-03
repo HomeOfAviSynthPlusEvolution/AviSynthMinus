@@ -78,7 +78,7 @@ typedef void (*BitDepthConvFuncPtr)(const BYTE *srcp, BYTE *dstp, int src_rowsiz
 class ConvertBits : public GenericVideoFilter
 {
 public:
-  ConvertBits(PClip _child, const int _dither_mode, const int _target_bitdepth, bool _truerange, int _ColorRange_src, int _ColorRange_dest, int _dither_bitdepth, IScriptEnvironment* env);
+  ConvertBits(PClip _child, const int _dither_mode, const int _target_bitdepth, bool _truerange, int _ColorRange_src, int _ColorRange_dest, int _dither_bitdepth, IScriptEnvironment* env, bool _source_range_from_frame = false);
   PVideoFrame __stdcall GetFrame(int n,IScriptEnvironment* env) override;
 
   int __stdcall SetCacheHints(int cachehints, int frame_range) override {
@@ -91,12 +91,16 @@ private:
   BitDepthConvFuncPtr conv_function;
   BitDepthConvFuncPtr conv_function_chroma; // 32bit float YUV chroma
   BitDepthConvFuncPtr conv_function_a;
+  BitDepthConvFuncPtr conv_function_alternate;
+  BitDepthConvFuncPtr conv_function_chroma_alternate;
   int target_bitdepth;
   int dither_mode;
   int dither_bitdepth;
   bool fulls; // source is full range (defaults: rgb=true, yuv=false (bit shift))
   bool fulld; // destination is full range (defaults: rgb=true, yuv=false (bit shift))
   bool truerange; // if 16->10 range reducing or e.g. 14->16 bit range expansion needed
+  bool source_range_from_frame;
+  bool default_source_full;
   int pixelsize;
   int bits_per_pixel;
   bool format_change_only;
