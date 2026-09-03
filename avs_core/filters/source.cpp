@@ -2097,8 +2097,14 @@ public:
 
   static AVSValue __cdecl Create(AVSValue args, void*, IScriptEnvironment* env)
   {
-    return new Tone(args[0].AsFloat(10.0f), args[1].AsFloat(440.0f), args[2].AsInt(48000),
-          args[3].AsInt(2), args[4].AsString("Sine"), args[5].AsFloatf(1.0f), env);
+    int samplerate = args[2].AsInt(48000);
+    int channels = args[3].AsInt(2);
+    if (samplerate <= 0)
+      env->ThrowError("Tone: samplerate must be greater than zero");
+    if (channels <= 0)
+      env->ThrowError("Tone: channels must be greater than zero");
+    return new Tone(args[0].AsFloat(10.0f), args[1].AsFloat(440.0f), samplerate,
+          channels, args[4].AsString("Sine"), args[5].AsFloatf(1.0f), env);
   }
 
   PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) {
