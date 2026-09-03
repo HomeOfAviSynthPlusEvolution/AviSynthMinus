@@ -1012,6 +1012,7 @@ class VideoFrameBuffer {
 
   // AVS+CUDA extension, does not break plugins if appended here
   Device* device;
+  int margin;
 
 protected:
   VideoFrameBuffer(int size, int margin, Device* device);
