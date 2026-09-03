@@ -138,7 +138,7 @@ public:
 
 private:
   const unsigned luma_threshold, chroma_threshold;
-  const int diameter;
+  int diameter;
 
 };
 
