@@ -44,7 +44,7 @@
 
 static void BuildMatrix_Rgb2Yuv_core(double Kr, double Kb, int int_arith_shift, bool full_scale_s, bool full_scale_d, int bits_per_pixel, ConversionMatrix& matrix)
 {
-  int Sy, Suv, Oy, Orgb;
+  int Sy, Suv, Oy, Orgb, cmin = 0, cmax = 0;
   float Sy_f, Suv_f, Oy_f, Orgb_f;
 
   if (bits_per_pixel <= 16) {
@@ -60,8 +60,8 @@ static void BuildMatrix_Rgb2Yuv_core(double Kr, double Kb, int int_arith_shift, 
     Sy = ymax - ymin;
     Sy_f = (float)Sy;
 
-    int cmin = full_scale_d ? 0 : (16 << (bits_per_pixel - 8));
-    int cmax = full_scale_d ? max_pixel_value : (240 << (bits_per_pixel - 8));
+    cmin = full_scale_d ? 0 : (16 << (bits_per_pixel - 8));
+    cmax = full_scale_d ? max_pixel_value : (240 << (bits_per_pixel - 8));
     Suv = (cmax - cmin) / 2;
     Suv_f = (cmax - cmin) / 2.0f;
 
@@ -106,16 +106,17 @@ static void BuildMatrix_Rgb2Yuv_core(double Kr, double Kb, int int_arith_shift, 
   const double Kg = 1. - Kr - Kb;
 
   if (bits_per_pixel <= 16) {
-    const auto Srgb = (((1 << bits_per_pixel) - 1) * (full_scale_s ? 1.0 : 219.0 / 255.0) + 0.5);
+    const auto Srgb = (((1 << bits_per_pixel) - 1) * (full_scale_s ? 1.0 : 219.0 / 255.0));
+    const double Suv_d = (cmax - cmin) / 2.0;
     matrix.y_b = (int)(Sy * Kb * mulfac / Srgb + 0.5); //B
     matrix.y_g = (int)(Sy * Kg * mulfac / Srgb + 0.5); //G
     matrix.y_r = (int)(Sy * Kr * mulfac / Srgb + 0.5); //R
-    matrix.u_b = (int)(Suv * mulfac / Srgb + 0.5);
-    matrix.u_g = (int)(Suv * Kg / (Kb - 1) * mulfac / Srgb + 0.5);
-    matrix.u_r = (int)(Suv * Kr / (Kb - 1) * mulfac / Srgb + 0.5);
-    matrix.v_b = (int)(Suv * Kb / (Kr - 1) * mulfac / Srgb + 0.5);
-    matrix.v_g = (int)(Suv * Kg / (Kr - 1) * mulfac / Srgb + 0.5);
-    matrix.v_r = (int)(Suv * mulfac / Srgb + 0.5);
+    matrix.u_b = (int)(Suv_d * mulfac / Srgb + 0.5);
+    matrix.u_g = (int)(Suv_d * Kg / (Kb - 1) * mulfac / Srgb + 0.5);
+    matrix.u_r = (int)(Suv_d * Kr / (Kb - 1) * mulfac / Srgb + 0.5);
+    matrix.v_b = (int)(Suv_d * Kb / (Kr - 1) * mulfac / Srgb + 0.5);
+    matrix.v_g = (int)(Suv_d * Kg / (Kr - 1) * mulfac / Srgb + 0.5);
+    matrix.v_r = (int)(Suv_d * mulfac / Srgb + 0.5);
 
     matrix.offset_y = Oy;
     matrix.offset_rgb = -Orgb; // yes, minus, because addition is used
@@ -126,8 +127,8 @@ static void BuildMatrix_Rgb2Yuv_core(double Kr, double Kb, int int_arith_shift, 
       matrix.y_g = mulfac_int - (matrix.y_r + matrix.y_b);
 
     // special precalculations for direct RGB to YUY2
-    double dku = Suv / (Srgb * (1.0 - Kb)) * mulfac;
-    double dkv = Suv / (Srgb * (1.0 - Kr)) * mulfac;
+    double dku = Suv_d / (Srgb * (1.0 - Kb)) * mulfac;
+    double dkv = Suv_d / (Srgb * (1.0 - Kr)) * mulfac;
     matrix.ku = (int)(dku + 0.5);
     matrix.kv = (int)(dkv + 0.5);
     matrix.ku_luma = -(int)(dku * Srgb / Sy + 0.5);
@@ -151,7 +152,7 @@ static void BuildMatrix_Rgb2Yuv_core(double Kr, double Kb, int int_arith_shift, 
 
 static void BuildMatrix_Yuv2Rgb_core(double Kr, double Kb, int int_arith_shift, bool full_scale_s, bool full_scale_d, int bits_per_pixel, ConversionMatrix& matrix)
 {
-  int Sy, Suv, Oy, Orgb;
+  int Sy, Suv, Oy, Orgb, cmin = 0, cmax = 0;
   float Sy_f, Suv_f, Oy_f, Orgb_f;
 
   if (bits_per_pixel <= 16) {
@@ -167,8 +168,8 @@ static void BuildMatrix_Yuv2Rgb_core(double Kr, double Kb, int int_arith_shift, 
     Sy = ymax - ymin;
     Sy_f = (float)Sy;
 
-    int cmin = full_scale_s ? 0 : (16 << (bits_per_pixel - 8));
-    int cmax = full_scale_s ? max_pixel_value : (240 << (bits_per_pixel - 8));
+    cmin = full_scale_s ? 0 : (16 << (bits_per_pixel - 8));
+    cmax = full_scale_s ? max_pixel_value : (240 << (bits_per_pixel - 8));
     Suv = (cmax - cmin) / 2;
     Suv_f = (cmax - cmin) / 2.0f;
   }
@@ -213,19 +214,20 @@ static void BuildMatrix_Yuv2Rgb_core(double Kr, double Kb, int int_arith_shift, 
   const double Kg = 1. - Kr - Kb;
 
   if (bits_per_pixel <= 16) {
-    const auto Srgb = (((1 << bits_per_pixel) - 1) * (full_scale_d ? 1.0 : 219.0/255.0) + 0.5);
+    const auto Srgb = (((1 << bits_per_pixel) - 1) * (full_scale_d ? 1.0 : 219.0/255.0));
+    const double Suv_d = (cmax - cmin) / 2.0;
 
     matrix.y_b = (int)(Srgb * 1.000 * mulfac / Sy + 0.5); //Y
-    matrix.u_b = (int)(Srgb * (1 - Kb) * mulfac / Suv + 0.5); //U
-    matrix.v_b = (int)(Srgb * 0.000 * mulfac / Suv + 0.5); //V
+    matrix.u_b = (int)(Srgb * (1 - Kb) * mulfac / Suv_d + 0.5); //U
+    matrix.v_b = (int)(Srgb * 0.000 * mulfac / Suv_d + 0.5); //V
 
     matrix.y_g = (int)(Srgb * 1.000 * mulfac / Sy + 0.5);
-    matrix.u_g = (int)(Srgb * (Kb - 1) * Kb / Kg * mulfac / Suv + 0.5);
-    matrix.v_g = (int)(Srgb * (Kr - 1) * Kr / Kg * mulfac / Suv + 0.5);
+    matrix.u_g = (int)(Srgb * (Kb - 1) * Kb / Kg * mulfac / Suv_d + 0.5);
+    matrix.v_g = (int)(Srgb * (Kr - 1) * Kr / Kg * mulfac / Suv_d + 0.5);
 
     matrix.y_r = (int)(Srgb * 1.000 * mulfac / Sy + 0.5);
-    matrix.u_r = (int)(Srgb * 0.000 * mulfac / Suv + 0.5);
-    matrix.v_r = (int)(Srgb * (1 - Kr) * mulfac / Suv + 0.5);
+    matrix.u_r = (int)(Srgb * 0.000 * mulfac / Suv_d + 0.5);
+    matrix.v_r = (int)(Srgb * (1 - Kr) * mulfac / Suv_d + 0.5);
 
     matrix.offset_y = -Oy;
     matrix.offset_rgb = Orgb;
