@@ -505,10 +505,10 @@ void VideoFrame::Release() {
   VideoFrameBuffer* _vfb = vfb;
 
   if (!InterlockedDecrement(&refcount)) {
-    if (properties != nullptr) {
-      delete properties; // if needed, frame registry will re-create
-      properties = nullptr;
-    }
+    // Do NOT touch 'properties' here. The FrameRegistry (under memory_mutex) is the
+    // sole owner: it clears the AVSMap contents for reuse (winner frames) or deletes
+    // it entirely (discarded frames). Freeing or clearing here without that lock would
+    // race with concurrent FrameRegistry access.
     InterlockedDecrement(&_vfb->refcount);
   }
 }
