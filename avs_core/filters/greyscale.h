@@ -62,6 +62,7 @@ private:
   int theOutColorRange;
   int pixelsize;
   int bits_per_pixel;
+  bool coeff_int16_overflow;
 
 };
 

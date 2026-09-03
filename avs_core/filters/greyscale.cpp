@@ -64,7 +64,7 @@ extern const AVSFunction Greyscale_filters[] = {
 };
 
 Greyscale::Greyscale(PClip _child, const char* matrix_name, IScriptEnvironment* env)
- : GenericVideoFilter(_child)
+ : GenericVideoFilter(_child), coeff_int16_overflow(false)
 {
   if (matrix_name && !vi.IsRGB())
     env->ThrowError("GreyScale: invalid \"matrix\" parameter (RGB data only)");
@@ -89,6 +89,21 @@ Greyscale::Greyscale(PClip _child, const char* matrix_name, IScriptEnvironment* 
     // input _ColorRange frame property can appear for RGB source (studio range limited rgb)
     if (!do_BuildMatrix_Rgb2Yuv(theMatrix, theColorRange, theOutColorRange, shift, bits_per_pixel, /*ref*/greyMatrix))
       env->ThrowError("GreyScale: Unknown matrix.");
+
+    if (bits_per_pixel <= 16) {
+      // all y coeffs must be [-1.0;1.0) to fit into signed 16 bit when upscaled by 2^15,
+      // in order to use int16 arithmetic for the conversion.
+      // The only suspicious case is AVS_MATRIX_RGB which returns G for Y in greyscale (RGB is otherwise the IDENTITY matrix)
+      // Greyscale SSE2 SIMD must work with valid coefficients
+      const int max_coeff = (1 << shift) - 1; // 32767 in 15 bit fixed point, maximum positive
+      const int min_coeff = -(1 << shift);    // -32768
+      if (greyMatrix.y_r > max_coeff || greyMatrix.y_r < min_coeff ||
+        greyMatrix.y_g > max_coeff || greyMatrix.y_g < min_coeff ||
+        greyMatrix.y_b > max_coeff || greyMatrix.y_b < min_coeff)
+      {
+        coeff_int16_overflow = true;
+      }
+    }
   }
   // greyscale does not change color space, rgb remains rgb
   // Leave matrix and range frame properties as is.
@@ -260,13 +275,17 @@ PVideoFrame Greyscale::GetFrame(int n, IScriptEnvironment* env)
 
   if (vi.IsRGB32()) {
     if (env->GetCPUFlags() & CPUF_SSE2) {
-      greyscale_rgb32_sse2(srcp, width, height, pitch, greyMatrix);
-      return frame;
+      if (!coeff_int16_overflow) {
+        greyscale_rgb32_sse2(srcp, width, height, pitch, greyMatrix);
+        return frame;
+      }
     }
 #ifdef X86_32
     else if (env->GetCPUFlags() & CPUF_MMX) {
-      greyscale_rgb32_mmx(srcp, width, height, pitch, greyMatrix);
-      return frame;
+      if (!coeff_int16_overflow) {
+        greyscale_rgb32_mmx(srcp, width, height, pitch, greyMatrix);
+        return frame;
+      }
     }
 #endif
   }
