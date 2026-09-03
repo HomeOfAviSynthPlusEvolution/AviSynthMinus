@@ -1,0 +1,66 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "msvc-debug",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/msvc-debug",
+      "cacheVariables": {
+        "BUILD_SHARED_LIBS": "OFF",
+        "ENABLE_TESTS": "ON",
+        "ENABLE_PLUGINS": "OFF",
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo"
+      }
+    },
+    {
+      "name": "msvc-release",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/msvc-release",
+      "cacheVariables": {
+        "BUILD_SHARED_LIBS": "OFF",
+        "ENABLE_TESTS": "ON",
+        "ENABLE_PLUGINS": "OFF",
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "msvc-debug",
+      "configurePreset": "msvc-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "msvc-release",
+      "configurePreset": "msvc-release",
+      "configuration": "Release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "msvc-debug",
+      "configurePreset": "msvc-debug",
+      "configuration": "Debug",
+      "output": {
+        "shortProgress": true,
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "msvc-release",
+      "configurePreset": "msvc-release",
+      "configuration": "Release",
+      "output": {
+        "shortProgress": true,
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

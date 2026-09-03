@@ -93,7 +93,7 @@ target_include_directories("AvsCore" PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions("AvsCore" PRIVATE BUILDING_AVSCORE)
 
 if(NOT ${BUILD_SHARED_LIBS})
-    target_compile_definitions("AvsCore" PRIVATE AVS_STATIC_LIB)
+    target_compile_definitions("AvsCore" PUBLIC AVS_STATIC_LIB)
 endif()
 
 # If checked out with compat filesystem submodule, add that to system include directories
@@ -160,7 +160,7 @@ if(ENABLE_CUDA)
   endif()
 endif()
 
-if (MSVC_IDE)
+if (MSVC_IDE AND BUILD_SHARED_LIBS)
   # Copy output to a common folder for easy deployment
   add_custom_command(
     TARGET AvsCore

@@ -1,4 +1,5 @@
 avisynth-build/*
+build/*
 CMakeCache.txt
 CMakeFiles/*
 distrib/docs/english/build/
