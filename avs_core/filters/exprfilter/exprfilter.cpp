@@ -5612,7 +5612,8 @@ PVideoFrame __stdcall Exprfilter::GetFrame(int n, IScriptEnvironment *env) {
       const int copySource = d.planeCopySourceClip[plane];
       // when input is a single Y, use PLANAR_Y instead of the plane matching to the output
       const VideoInfo& vi_src = d.clips[copySource]->GetVideoInfo();
-      const int plane_enum_s = vi_src.IsY() ? PLANAR_Y : plane_enums_d[plane];
+      const int* plane_enums_s = (vi_src.IsYUV() || vi_src.IsYUVA()) ? planes_y : planes_r;
+      const int plane_enum_s = vi_src.IsY() ? PLANAR_Y : plane_enums_s[plane];
 
       env->BitBlt(dst->GetWritePtr(plane_enum_d), dst->GetPitch(plane_enum_d),
         src[copySource]->GetReadPtr(plane_enum_s),
