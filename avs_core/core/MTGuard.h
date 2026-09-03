@@ -25,11 +25,22 @@ private:
   VideoInfo vi;
 
   std::unique_ptr<const FilterConstructor> FilterCtor;
+
+#ifdef AVS_WINDOWS
+  std::wstring CurrentDirectory;
+#else
+  std::string CurrentDirectory;
+#endif
+
   const MtMode MTMode;
 
 public:
   ~MTGuard();
-  MTGuard(PClip firstChild, MtMode mtmode, std::unique_ptr<const FilterConstructor> &&funcCtor, InternalEnvironment* env);
+#ifdef AVS_WINDOWS
+  MTGuard(PClip firstChild, MtMode mtmode, std::unique_ptr<const FilterConstructor>&& funcCtor, const wchar_t* current_directory, InternalEnvironment* env);
+#else
+  MTGuard(PClip firstChild, MtMode mtmode, std::unique_ptr<const FilterConstructor>&& funcCtor, const char* current_directory, InternalEnvironment* env);
+#endif
   void EnableMT(size_t nThreads);
 
   PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env);
@@ -40,7 +51,12 @@ public:
 
 
   static bool __stdcall IsMTGuard(const PClip& p);
-  static PClip Create(MtMode mode, PClip filterInstance, std::unique_ptr<const FilterConstructor> funcCtor, InternalEnvironment* env);
+
+#ifdef AVS_WINDOWS
+  static PClip Create(MtMode mode, PClip filterInstance, std::unique_ptr<const FilterConstructor> funcCtor, const wchar_t* current_directory, InternalEnvironment* env);
+#else
+  static PClip Create(MtMode mode, PClip filterInstance, std::unique_ptr<const FilterConstructor> funcCtor, const char* current_directory, InternalEnvironment* env);
+#endif
 };
 
 #ifdef USE_MT_GUARDEXIT

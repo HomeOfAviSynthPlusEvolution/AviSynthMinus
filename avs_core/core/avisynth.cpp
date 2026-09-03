@@ -4949,7 +4949,10 @@ bool ScriptEnvironment::Invoke_(AVSValue *result, const AVSValue& implicit_last,
         }
 
 
-        *result = MTGuard::Create(mtmode, clip, std::move(funcCtor), threadEnv.get());
+        // pass current directory as well, in order to remember it when a MT_MULTI_INSTANCE filter is populated to threads during Prefetch
+        auto current_directory = CWDChanger::GetCurrentWorkingDirectory();
+
+        *result = MTGuard::Create(mtmode, clip, std::move(funcCtor), current_directory.c_str(), threadEnv.get());
 
 #ifdef USE_MT_GUARDEXIT
         // 170531: concept introduced in r2069 is not working

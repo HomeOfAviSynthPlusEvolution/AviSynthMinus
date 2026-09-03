@@ -148,6 +148,12 @@ public:
   CWDChanger(const wchar_t* new_cwd);
   ~CWDChanger(void);
 
+#ifdef AVS_WINDOWS
+  static std::wstring GetCurrentWorkingDirectory();
+#else
+  static std::string GetCurrentWorkingDirectory();
+#endif
+
 private:
   void Init(const wchar_t* new_cwd);
 #ifdef AVS_WINDOWS
