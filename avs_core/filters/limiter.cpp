@@ -34,6 +34,7 @@
 
 
 #include "limiter.h"
+#include <cmath>
 #ifdef INTEL_INTRINSICS
 #include "intel/limiter_sse.h"
 #endif
@@ -60,6 +61,9 @@ Limiter::Limiter(PClip _child, float _min_luma, float _max_luma, float _min_chro
   min_chroma_f(_min_chroma),
   show(show_e(_show))
 {
+  if (!std::isfinite(_min_luma) || !std::isfinite(_max_luma) || !std::isfinite(_min_chroma) || !std::isfinite(_max_chroma))
+    env->ThrowError("Limiter: limits must be finite");
+
   if (!vi.IsYUV() && !vi.IsYUVA())
       env->ThrowError("Limiter: Source must be YUV or YUVA");
 

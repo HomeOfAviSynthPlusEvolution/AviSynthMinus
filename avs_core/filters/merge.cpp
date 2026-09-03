@@ -39,6 +39,7 @@
 // iSSE code by Ian Brabham
 
 #include <avisynth.h>
+#include <cmath>
 #include "merge.h"
 #ifdef INTEL_INTRINSICS
 #include "intel/merge_sse.h"
@@ -296,6 +297,9 @@ static void merge_plane(BYTE* srcp, const BYTE* otherp, int src_pitch, int other
 MergeChroma::MergeChroma(PClip _child, PClip _clip, float _weight, IScriptEnvironment* env)
   : GenericVideoFilter(_child), clip(_clip), weight(_weight)
 {
+  if (std::isnan(_weight))
+    env->ThrowError("MergeChroma: weight cannot be NaN");
+
   const VideoInfo& vi2 = clip->GetVideoInfo();
 
   if (!(vi.IsYUV() || vi.IsYUVA()) || !(vi2.IsYUV() || vi2.IsYUVA()))
@@ -441,6 +445,9 @@ AVSValue __cdecl MergeChroma::Create(AVSValue args, void* , IScriptEnvironment* 
 MergeLuma::MergeLuma(PClip _child, PClip _clip, float _weight, IScriptEnvironment* env)
   : GenericVideoFilter(_child), clip(_clip), weight(_weight)
 {
+  if (std::isnan(_weight))
+    env->ThrowError("MergeLuma: weight cannot be NaN");
+
   const VideoInfo& vi2 = clip->GetVideoInfo();
 
   if (!(vi.IsYUV() || vi.IsYUVA()) || !(vi2.IsYUV() || vi2.IsYUVA()))
@@ -584,6 +591,9 @@ AVSValue __cdecl MergeLuma::Create(AVSValue args, void* , IScriptEnvironment* en
 MergeAll::MergeAll(PClip _child, PClip _clip, float _weight, IScriptEnvironment* env)
   : GenericVideoFilter(_child), clip(_clip), weight(_weight)
 {
+  if (std::isnan(_weight))
+    env->ThrowError("Merge: weight cannot be NaN");
+
   const VideoInfo& vi2 = clip->GetVideoInfo();
 
   if (!vi.IsSameColorspace(vi2))

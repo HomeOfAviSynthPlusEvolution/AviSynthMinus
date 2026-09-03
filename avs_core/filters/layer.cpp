@@ -38,6 +38,7 @@
 // by "poptones" (poptones@myrealbox.com)
 
 #include "layer.h"
+#include <cmath>
 #ifdef INTEL_INTRINSICS
 #include "intel/layer_sse.h"
 #endif
@@ -432,6 +433,9 @@ AVSValue __cdecl ColorKeyMask::Create(AVSValue args, void*, IScriptEnvironment* 
 ResetMask::ResetMask(PClip _child, float _mask_f, IScriptEnvironment* env)
   : GenericVideoFilter(_child)
 {
+  if (std::isnan(_mask_f))
+    env->ThrowError("ResetMask: mask cannot be NaN");
+
   if (!(vi.IsRGB32() || vi.IsRGB64() || vi.IsPlanarRGBA() || vi.IsYUVA()))
     env->ThrowError("ResetMask: format has no alpha channel");
 

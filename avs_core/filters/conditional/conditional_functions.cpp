@@ -633,6 +633,9 @@ void get_minmax_int_c(const BYTE* srcp, int pitch, int w, int h, int& min, int& 
 
 AVSValue MinMaxPlane::MinMax(AVSValue clip, void* , double threshold, int offset, int plane, int mode, bool setvar, IScriptEnvironment* env) {
 
+  if (!std::isfinite(threshold))
+    env->ThrowError("MinMax: threshold must be finite");
+
   if (!clip.IsClip())
     env->ThrowError("MinMax: No clip supplied!");
 
