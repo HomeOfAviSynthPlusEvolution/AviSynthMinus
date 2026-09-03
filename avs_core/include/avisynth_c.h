@@ -964,7 +964,7 @@ struct AVS_Value {
 // Should also set to avs_void after the value is released
 // with avs_copy_value.  Consider it the equivalent of setting
 // a pointer to NULL
-static const AVS_Value avs_void = {'v'};
+static const AVS_Value avs_void = {'v', 0, {0}};
 // see also avs_set_to_void v11 API
 
 /*******************************
