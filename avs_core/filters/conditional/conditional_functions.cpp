@@ -351,7 +351,8 @@ AVSValue ComparePlane::CmpPlane(AVSValue clip, AVSValue clip2, void* , int plane
   n = clamp(n,0,vi.num_frames-1);
 
   PVideoFrame src = child->GetFrame(n,env);
-  PVideoFrame src2 = child2->GetFrame(n,env);
+  int n2 = clamp(n, 0, vi2.num_frames - 1);
+  PVideoFrame src2 = child2->GetFrame(n2,env);
 
   int pixelsize = vi.ComponentSize();
 
