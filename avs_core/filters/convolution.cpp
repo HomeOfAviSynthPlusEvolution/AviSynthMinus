@@ -547,8 +547,10 @@ void GeneralConvolution::setMatrix(const char * _matrix, bool _isInteger, IScrip
       else
         fMatrix.resize(maxsize);
     }
+    const double val = atof(s.c_str());
+    if (!std::isfinite(val))
+      env->ThrowError("GeneralConvolution: matrix elements must be finite");
     if (_isInteger) {
-      const double val = atof(s.c_str());
       const int ival = (int)std::lround(val);
       iNormalizeSum += ival;
       iMatrix[nSize++] = ival;
@@ -558,9 +560,9 @@ void GeneralConvolution::setMatrix(const char * _matrix, bool _isInteger, IScrip
         iWeightSumNegatives += ival;
     }
     else {
-      const float val = (float)atof(s.c_str());
-      fNormalizeSum += val;
-      fMatrix[nSize++] = val;
+      const float fval = static_cast<float>(val);
+      fNormalizeSum += fval;
+      fMatrix[nSize++] = fval;
     }
 
   }

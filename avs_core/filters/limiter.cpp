@@ -137,6 +137,16 @@ Limiter::Limiter(PClip _child, float _min_luma, float _max_luma, float _min_chro
       env->ThrowError("Limiter: Invalid minimum chroma");
     if ((max_chroma < 0) || (max_chroma > pixel_max))
       env->ThrowError("Limiter: Invalid maximum chroma");
+    if (min_luma > max_luma)
+      env->ThrowError("Limiter: min_luma cannot be greater than max_luma");
+    if (min_chroma > max_chroma)
+      env->ThrowError("Limiter: min_chroma cannot be greater than max_chroma");
+  }
+  else {
+    if (min_luma_f > max_luma_f)
+      env->ThrowError("Limiter: min_luma cannot be greater than max_luma");
+    if (min_chroma_f > max_chroma_f)
+      env->ThrowError("Limiter: min_chroma cannot be greater than max_chroma");
   }
 
 }
