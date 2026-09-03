@@ -1075,6 +1075,8 @@ private:
 
   CacheMode cacheMode;
 
+  int cpuFlags;
+
   void InitMT();
 };
 
@@ -2444,6 +2446,8 @@ ScriptEnvironment::ScriptEnvironment()
       throw("ScriptEnvironment: TlsAlloc failed on DLL load");
 #endif
 
+  cpuFlags = ::GetCPUFlags();
+
   try {
 #ifdef AVS_WINDOWS
     // Make sure COM is initialised
@@ -2954,7 +2958,7 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
     }
   }
 
-  ::SetMaxCPU(cpu_flags);
+  cpuFlags = cpu_flags;
 }
 
 ClipDataStore* ScriptEnvironment::ClipData(IClip *clip)
@@ -3201,7 +3205,7 @@ void ScriptEnvironment::CheckVersion(int version) {
     ThrowError("Plugin was designed for a later version of Avisynth (%d)", version);
 }
 
-int ScriptEnvironment::GetCPUFlags() { return ::GetCPUFlags(); }
+int ScriptEnvironment::GetCPUFlags() { return cpuFlags; }
 
 void ScriptEnvironment::AddFunction(const char* name, const char* params, ApplyFunc apply, void* user_data) {
   this->AddFunction(name, params, apply, user_data, NULL);
