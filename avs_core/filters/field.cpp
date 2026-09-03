@@ -792,8 +792,10 @@ AVSValue __cdecl Interleave::Create(AVSValue args, void*, IScriptEnvironment* en
 SelectEvery::SelectEvery(PClip _child, int _every, int _from, IScriptEnvironment* env)
 : NonCachedGenericVideoFilter(_child), every(_every), from(_from)
 {
-  if (_every == 0)
-    env->ThrowError("Parameter 'every' of SelectEvery cannot be zero.");
+  if (_every <= 0)
+    env->ThrowError("Parameter 'every' of SelectEvery must be greater than zero.");
+  if (_from < 0 || _from >= _every || _from >= _child->GetVideoInfo().num_frames)
+    env->ThrowError("Parameter 'from' of SelectEvery must be less than 'every' and the number of frames in the source clip.");
 
   vi.MulDivFPS(1, every);
   vi.num_frames = (vi.num_frames-1-from) / every + 1;

@@ -456,8 +456,13 @@ AssumeFPS::AssumeFPS(PClip _child, unsigned numerator, unsigned denominator, boo
 
 AVSValue __cdecl AssumeFPS::Create(AVSValue args, void*, IScriptEnvironment* env)
 {
-  return new AssumeFPS( args[0].AsClip(), args[1].AsInt(),
-                        args[2].AsInt(1), args[3].AsBool(false), env );
+  int numerator = args[1].AsInt();
+  int denominator = args[2].AsInt(1);
+  if (numerator <= 0 || denominator <= 0)
+    env->ThrowError("AssumeFPS: numerator and denominator must be greater than zero");
+
+  return new AssumeFPS( args[0].AsClip(), numerator,
+                        denominator, args[3].AsBool(false), env );
 }
 
 

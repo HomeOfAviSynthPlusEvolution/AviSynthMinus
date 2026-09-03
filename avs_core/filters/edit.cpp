@@ -331,8 +331,14 @@ bool FreezeFrame::GetParity(int n)
 
 AVSValue __cdecl FreezeFrame::Create(AVSValue args, void*, IScriptEnvironment* env)
 {
-  AVS_UNUSED(env);
-  return new FreezeFrame(args[1].AsInt(), args[2].AsInt(), args[3].AsInt(), args[0].AsClip());
+  int first = args[1].AsInt();
+  int last = args[2].AsInt();
+  int source = args[3].AsInt();
+  PClip child = args[0].AsClip();
+  int num_frames = child->GetVideoInfo().num_frames;
+  if (first < 0 || first >= num_frames || last < 0 || last >= num_frames || source < 0 || source >= num_frames)
+    env->ThrowError("FreezeFrame: frame index out of bounds");
+  return new FreezeFrame(first, last, source, child);
 }
 
 
@@ -358,8 +364,15 @@ bool DeleteFrame::GetParity(int n)
 
 AVSValue __cdecl DeleteFrame::Create(AVSValue args, void*, IScriptEnvironment* env)
 {
-  AVS_UNUSED(env);
   const int n = args[1].ArraySize();
+  PClip source_clip = args[0].AsClip();
+  int num_frames = source_clip->GetVideoInfo().num_frames;
+  for (int i = 0; i < n; i++) {
+    int f = args[1][i].AsInt();
+    if (f < 0 || f >= num_frames)
+      env->ThrowError("DeleteFrame: frame index out of bounds");
+  }
+
   int m = n-1;
   int *frames = new int[n];
 
@@ -381,6 +394,9 @@ AVSValue __cdecl DeleteFrame::Create(AVSValue args, void*, IScriptEnvironment* e
       }
     }
   }
+  if (num_frames - (m + 1) <= 0)
+    env->ThrowError("DeleteFrame: cannot delete all frames from a clip");
+
   PClip result = args[0].AsClip();
   for (int k=m; k>=0; --k)
     result = new DeleteFrame(frames[k], result);
@@ -413,8 +429,15 @@ bool DuplicateFrame::GetParity(int n)
 
 AVSValue __cdecl DuplicateFrame::Create(AVSValue args, void*, IScriptEnvironment* env)
 {
-  AVS_UNUSED(env);
   const int n = args[1].ArraySize();
+  PClip source_clip = args[0].AsClip();
+  int num_frames = source_clip->GetVideoInfo().num_frames;
+  for (int i = 0; i < n; i++) {
+    int f = args[1][i].AsInt();
+    if (f < 0 || f >= num_frames)
+      env->ThrowError("DuplicateFrame: frame index out of bounds");
+  }
+
   int *frames = new int[n];
 
   frames[0] = args[1][0].AsInt();
