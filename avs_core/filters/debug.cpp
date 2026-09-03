@@ -72,7 +72,14 @@ public:
             ? IScriptEnvironment::PlanarChromaAlignmentOn
             : IScriptEnvironment::PlanarChromaAlignmentOff;
 
-  PVideoFrame src = child->GetFrame(n, env);              // run the GetFrame chain
+  PVideoFrame src;
+  try {
+    src = child->GetFrame(n, env);                        // run the GetFrame chain
+  }
+  catch (...) {
+    env->PlanarChromaAlignment(oldmode);                  // reset after a child error
+    throw;
+  }
 
   env->PlanarChromaAlignment(oldmode);                    // reset the PLANAR alignement mode
 
@@ -248,7 +255,7 @@ PVideoFrame __stdcall Null::GetFrame(int n, IScriptEnvironment* env)
   env->BitBlt(bar, 8, foo, 8, 8, 8);
 
   md.reset();
-  int i = md.randomCheck(bar, 9, 8, 8);
+  int i = md.randomCheck(bar, 8, 8, 8);
 
   if (i)
     env->ThrowError("bug found");
@@ -330,7 +337,7 @@ int MemDebug::randomCheck(BYTE* const buf, const int pitch, const int row_size, 
   {
     for(int y=0; y<row_size; ++y)
     {
-      int n = nextNum();
+      const BYTE n = static_cast<BYTE>(nextNum());
       if (buf[x*pitch + y] != n) return x*pitch + y;
     }
   }
