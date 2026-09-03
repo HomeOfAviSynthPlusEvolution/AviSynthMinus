@@ -841,7 +841,8 @@ static void convert_yv24_chroma_to_yv16_c(BYTE *dstp8, const BYTE *srcp8, int ds
 
 void ConvertYToYV12Chroma(BYTE *dst, BYTE *src, int dstpitch, int srcpitch, int pixelsize, int w, int h, IScriptEnvironment* env)
 {
-  if ((env->GetCPUFlags() & CPUF_SSE2) && IsPtrAligned(src, 16) && IsPtrAligned(dst, 16))
+  if ((env->GetCPUFlags() & CPUF_SSE2) && IsPtrAligned(src, 16) && IsPtrAligned(dst, 16)
+    && w * pixelsize >= 16)
   {
     if (pixelsize == 1)
       convert_yv24_chroma_to_yv12_sse2<uint8_t>(dst, src, dstpitch, srcpitch, w, h);
