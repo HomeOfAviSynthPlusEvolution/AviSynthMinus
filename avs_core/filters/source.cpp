@@ -1584,7 +1584,7 @@ public:
     }
     else {
       // ColorBars can be rgb or yuv
-      theMatrix = vi.IsRGB() ? Matrix_e::AVS_MATRIX_RGB : Matrix_e::AVS_MATRIX_BT709;
+      theMatrix = vi.IsRGB() ? Matrix_e::AVS_MATRIX_RGB : Matrix_e::AVS_MATRIX_ST170_M;
       // Studio RGB: limited!
       theColorRange = vi.IsRGB() ? ColorRange_e::AVS_RANGE_LIMITED : ColorRange_e::AVS_RANGE_LIMITED;
     }
