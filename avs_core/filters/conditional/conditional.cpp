@@ -414,7 +414,7 @@ PVideoFrame __stdcall ConditionalFilter::GetFrame(int n, IScriptEnvironment* env
   } catch (const AvisynthError &error) {
     const char* error_msg = error.msg;
 
-    PVideoFrame dst = source1->GetFrame(n,env);
+    PVideoFrame dst = source1->GetFrame(min(vi1.num_frames-1, n),env);
     env->MakeWritable(&dst);
     env->ApplyMessage(&dst, vi1, error_msg, vi.width/W_DIVISOR, 0xa0a0a0, 0, 0);
 
@@ -476,7 +476,7 @@ PVideoFrame __stdcall ConditionalFilter::GetFrame(int n, IScriptEnvironment* env
   } catch (const AvisynthError &error) {
     const char* error_msg = error.msg;
 
-    PVideoFrame dst = source1->GetFrame(n,env);
+    PVideoFrame dst = source1->GetFrame(min(vi1.num_frames-1, n),env);
     env->MakeWritable(&dst);
     env->ApplyMessage(&dst, vi1, error_msg, vi.width/W_DIVISOR, 0xa0a0a0, 0, 0);
     return dst;
@@ -540,7 +540,7 @@ PVideoFrame __stdcall ConditionalFilter::GetFrame(int n, IScriptEnvironment* env
   if (state)
     return source1->GetFrame(min(vi1.num_frames-1,n),env);
 
-  return source2->GetFrame(min(vi1.num_frames-1,n),env);
+  return source2->GetFrame(min(vi2.num_frames-1,n),env);
 }
 
 void __stdcall ConditionalFilter::GetAudio(void* buf, int64_t start, int64_t count, IScriptEnvironment* env) {

@@ -2922,8 +2922,10 @@ static void compare_uint16_t_c(uint64_t mask64, int increment,
 
 PVideoFrame __stdcall Compare::GetFrame(int n, IScriptEnvironment* env)
 {
-  PVideoFrame f1 = child->GetFrame(n, env);
-  PVideoFrame f2 = child2->GetFrame(n, env);
+  int n1 = min(max(0, n), child->GetVideoInfo().num_frames - 1);
+  int n2 = min(max(0, n), child2->GetVideoInfo().num_frames - 1);
+  PVideoFrame f1 = child->GetFrame(n1, env);
+  PVideoFrame f2 = child2->GetFrame(n2, env);
 
   int64_t SD = 0;
   int64_t SAD = 0;

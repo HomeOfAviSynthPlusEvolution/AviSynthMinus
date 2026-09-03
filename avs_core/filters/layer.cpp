@@ -4739,8 +4739,10 @@ static void subtract_plane(BYTE* src1p, const BYTE* src2p, int src1_pitch, int s
 
 PVideoFrame __stdcall Subtract::GetFrame(int n, IScriptEnvironment* env)
 {
-  PVideoFrame src1 = child1->GetFrame(n, env);
-  PVideoFrame src2 = child2->GetFrame(n, env);
+  int n1 = min(max(0, n), child1->GetVideoInfo().num_frames - 1);
+  int n2 = min(max(0, n), child2->GetVideoInfo().num_frames - 1);
+  PVideoFrame src1 = child1->GetFrame(n1, env);
+  PVideoFrame src2 = child2->GetFrame(n2, env);
 
   env->MakeWritable(&src1);
 

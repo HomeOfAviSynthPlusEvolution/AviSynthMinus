@@ -1395,7 +1395,8 @@ static void CopyOneFrameProp(const char* key, AVSMap* mapv, const AVSMap* avsmap
 PVideoFrame __stdcall CopyProperties::GetFrame(int n, IScriptEnvironment* env)
 {
   PVideoFrame frame = child->GetFrame(n, env);
-  PVideoFrame frame2 = child2->GetFrame(n, env);
+  int n2 = min(max(0, n), child2->GetVideoInfo().num_frames - 1);
+  PVideoFrame frame2 = child2->GetFrame(n2, env);
 
   const AVSMap* avsmap_from = env->getFramePropsRO(frame2);
   const int propNum = env->propNumKeys(avsmap_from);
