@@ -544,8 +544,10 @@ PVideoFrame __stdcall ShowFiveVersions::GetFrame(int n, IScriptEnvironment* env)
   BYTE* dstp = dst->GetWritePtr();
   BYTE* dstpU = dst->GetWritePtr(PLANAR_U);
   BYTE* dstpV = dst->GetWritePtr(PLANAR_V);
+  BYTE* dstpA = dst->GetWritePtr(PLANAR_A);
   const int dst_pitch = dst->GetPitch();
   const int dst_pitchUV = dst->GetPitch(PLANAR_U);
+  const int dst_pitchA = dst->GetPitch(PLANAR_A);
   const int height = dst->GetHeight()/2;
   const int heightUV = dst->GetHeight(PLANAR_U)/2;
   // todo: >8 bits, planar RGB
@@ -584,24 +586,35 @@ PVideoFrame __stdcall ShowFiveVersions::GetFrame(int n, IScriptEnvironment* env)
       const BYTE* srcpY = src->GetReadPtr(PLANAR_Y);
       const BYTE* srcpU = src->GetReadPtr(PLANAR_U);
       const BYTE* srcpV = src->GetReadPtr(PLANAR_V);
+      const BYTE* srcpA = src->GetReadPtr(PLANAR_A);
       const int src_pitchY  = src->GetPitch(PLANAR_Y);
       const int src_pitchUV = src->GetPitch(PLANAR_U);
+      const int src_pitchA = src->GetPitch(PLANAR_A);
       const int src_row_sizeY  = src->GetRowSize(PLANAR_Y);
       const int src_row_sizeUV = src->GetRowSize(PLANAR_U);
+      const int src_row_sizeA = src->GetRowSize(PLANAR_A);
 
       // staggered arrangement
       BYTE* dstp2  = dstp  + (c>>1) * src_row_sizeY;
       BYTE* dstp2U = dstpU + (c>>1) * src_row_sizeUV;
       BYTE* dstp2V = dstpV + (c>>1) * src_row_sizeUV;
+      BYTE* dstp2A = nullptr;
       if (c&1) {
         dstp2  += (height   * dst_pitch)   + src_row_sizeY /2;
         dstp2U += (heightUV * dst_pitchUV) + src_row_sizeUV/2;
         dstp2V += (heightUV * dst_pitchUV) + src_row_sizeUV/2;
+        if (vi.IsYUVA())
+          dstp2A = dstpA + (height * dst_pitchA) + (c >> 1) * src_row_sizeA + src_row_sizeA / 2;
+      }
+      else if (vi.IsYUVA()) {
+        dstp2A = dstpA + (c >> 1) * src_row_sizeA;
       }
 
       env->BitBlt(dstp2,  dst_pitch,   srcpY, src_pitchY,  src_row_sizeY,  height);
       env->BitBlt(dstp2U, dst_pitchUV, srcpU, src_pitchUV, src_row_sizeUV, heightUV);
       env->BitBlt(dstp2V, dst_pitchUV, srcpV, src_pitchUV, src_row_sizeUV, heightUV);
+      if (vi.IsYUVA())
+        env->BitBlt(dstp2A, dst_pitchA, srcpA, src_pitchA, src_row_sizeA, height);
     }
     else {
       const BYTE* srcp = src->GetReadPtr();
