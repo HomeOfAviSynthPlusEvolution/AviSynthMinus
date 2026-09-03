@@ -686,13 +686,13 @@ TemporalSoften::TemporalSoften( PClip _child, unsigned radius, unsigned luma_thr
   if (vi.IsPlanar() && (vi.IsYUV() || vi.IsYUVA())) {
     if (luma_thresh>0) {
       planes[c].planeId = PLANAR_Y;
-      planes[c++].threshold = luma_thresh;
+      planes[c++].threshold = luma_threshold;
     }
     if (chroma_thresh>0) {
       planes[c].planeId = PLANAR_V;
-      planes[c++].threshold =chroma_thresh;
+      planes[c++].threshold = chroma_threshold;
       planes[c].planeId = PLANAR_U;
-      planes[c++].threshold = chroma_thresh;
+      planes[c++].threshold = chroma_threshold;
     }
   } else if (vi.IsYUY2()) {
     planes[c].planeId=0;
@@ -700,15 +700,15 @@ TemporalSoften::TemporalSoften( PClip _child, unsigned radius, unsigned luma_thr
   } else if (vi.IsRGB()) {  // For RGB We use Luma.
     if (vi.IsPlanar()) {
       planes[c].planeId = PLANAR_G;
-      planes[c++].threshold = luma_thresh;
+      planes[c++].threshold = luma_threshold;
       planes[c].planeId = PLANAR_B;
-      planes[c++].threshold = luma_thresh;
+      planes[c++].threshold = luma_threshold;
       planes[c].planeId = PLANAR_R;
-      planes[c++].threshold = luma_thresh;
+      planes[c++].threshold = luma_threshold;
     }
     else { // packed RGB
       planes[c].planeId = 0;
-      planes[c++].threshold = luma_thresh;
+      planes[c++].threshold = luma_threshold;
     }
   }
   planes[c].planeId=0;
