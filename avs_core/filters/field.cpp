@@ -868,7 +868,8 @@ void copy_field(const PVideoFrame& dst, const PVideoFrame& src, bool yuv, bool p
 PVideoFrame DoubleWeaveFields::GetFrame(int n, IScriptEnvironment* env)
 {
   PVideoFrame a = child->GetFrame(n, env);
-  PVideoFrame b = child->GetFrame(n+1, env);
+  const int last_frame = child->GetVideoInfo().num_frames - 1;
+  PVideoFrame b = child->GetFrame(min(n + 1, last_frame), env);
 
   PVideoFrame result = env->NewVideoFrameP(vi, &a);
 
@@ -937,7 +938,8 @@ PVideoFrame DoubleWeaveFrames::GetFrame(int n, IScriptEnvironment* env)
   }
   else {
     PVideoFrame a = child->GetFrame(n>>1, env);
-    PVideoFrame b = child->GetFrame((n+1)>>1, env);
+    const int last_frame = child->GetVideoInfo().num_frames - 1;
+    PVideoFrame b = child->GetFrame(min((n + 1) >> 1, last_frame), env);
     bool parity = this->GetParity(n);
 
     if (a->IsWritable()) {
