@@ -23,7 +23,7 @@
 namespace avsut::test {
 
 using TextOverlayCompareFunction = void (*)(std::uint32_t, int, const BYTE*, int, const BYTE*, int,
-                                            int, int, int&, int&, int&, int&, double&);
+                                            int, int, std::int64_t&, std::int64_t&, int&, int&, double&);
 
 struct TextOverlayCompareCase {
   std::string format;
@@ -199,8 +199,8 @@ inline void run_text_overlay_compare_case(const TextOverlayCompareCase& test_cas
   const auto expected =
       text_overlay_compare_reference(test_case, source.view().as_const(), other.view().as_const());
 
-  int actual_sad = test_case.initial_sad;
-  int actual_sd = test_case.initial_sd;
+  std::int64_t actual_sad = test_case.initial_sad;
+  std::int64_t actual_sd = test_case.initial_sd;
   int actual_pos = test_case.initial_pos;
   int actual_neg = test_case.initial_neg;
   double actual_ssd = test_case.initial_ssd;
