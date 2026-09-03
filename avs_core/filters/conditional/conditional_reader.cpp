@@ -37,6 +37,7 @@
 #include <iomanip>
 #include <string>
 #include <cstring>
+#include <cmath>
 #include "../convert/convert_helper.h"
 #include <regex>
 
@@ -1756,8 +1757,13 @@ AVSValue __cdecl ShowProperties::Create(AVSValue args, void*, IScriptEnvironment
   const bool isXdefined = args[7].Defined();
   const bool isYdefined = args[8].Defined();
 
-  int x = int(args[7].AsDblDef(defx) * PIXEL_MUL_FACTOR + 0.5);
-  int y = int(args[8].AsDblDef(defy) * PIXEL_MUL_FACTOR + 0.5);
+  const double xreal = args[7].AsDblDef(defx);
+  const double yreal = args[8].AsDblDef(defy);
+  if (!std::isfinite(xreal) || !std::isfinite(yreal))
+    env->ThrowError("propShow: x and y coordinates must be finite");
+
+  int x = int(xreal * PIXEL_MUL_FACTOR + 0.5);
+  int y = int(yreal * PIXEL_MUL_FACTOR + 0.5);
 
   if (!isXdefined && x_center)
     x = (clip->GetVideoInfo().width >> 1) * PIXEL_MUL_FACTOR;
