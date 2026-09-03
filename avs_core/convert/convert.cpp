@@ -34,6 +34,7 @@
 
 
 #include "convert.h"
+#include <cmath>
 #include "convert_matrix.h"
 #include "convert_helper.h"
 #include "convert_bits.h"
@@ -560,8 +561,14 @@ AVSValue AddAlphaPlane::Create(AVSValue args, void*, IScriptEnvironment* env)
     // alphaClip is always greyscale here
   }
   float maskAsFloat = -1.0f;
-  if (!maskIsClip)
+  if (!maskIsClip) {
     maskAsFloat = (float)args[1].AsFloat(-1.0f);
+    if (isMaskDefined && std::isnan(maskAsFloat))
+      env->ThrowError("AddAlphaPlane: mask/opacity cannot be NaN");
+  }
+  if (args.ArraySize() >= 3 && args[2].Defined() && args[2].IsFloat() && std::isnan(args[2].AsFloat())) {
+    env->ThrowError("AddAlphaPlane: mask/opacity cannot be NaN");
+  }
   if (vi.IsRGB24()) {
     AVSValue new_args[1] = { args[0].AsClip() };
     PClip child = env->Invoke("ConvertToRGB32", AVSValue(new_args, 1)).AsClip();

@@ -33,6 +33,7 @@
 // import and export plugins, or graphical user interfaces.
 
 #include "resample.h"
+#include <cmath>
 #ifdef INTEL_INTRINSICS
 #include "intel/resample_sse.h"
 #include "intel/resample_avx2.h"
@@ -1295,6 +1296,9 @@ PClip FilteredResize::CreateResize(PClip clip, int target_width, int target_heig
   const double subrange_left = args[0].AsFloat(0), subrange_top = args[1].AsFloat(0);
 
   double subrange_width = args[2].AsDblDef(vi.width), subrange_height = args[3].AsDblDef(vi.height);
+
+  if (std::isnan(subrange_left) || std::isnan(subrange_top) || std::isnan(subrange_width) || std::isnan(subrange_height))
+    env->ThrowError("Resize: crop arguments cannot be NaN");
   // Crop style syntax
   if (subrange_width <= 0.0) subrange_width = vi.width - subrange_left + subrange_width;
   if (subrange_height <= 0.0) subrange_height = vi.height - subrange_top + subrange_height;

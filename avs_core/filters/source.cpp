@@ -388,6 +388,8 @@ static AVSValue __cdecl Create_BlankClip(AVSValue args, void*, IScriptEnvironmen
 
 
   double n = args[5].AsDblDef(double(vi_default.fps_numerator));
+  if (std::isnan(n))
+    env->ThrowError("BlankClip: fps cannot be NaN");
 
   if (args[5].Defined() && !args[6].Defined()) {
     unsigned d = 1;

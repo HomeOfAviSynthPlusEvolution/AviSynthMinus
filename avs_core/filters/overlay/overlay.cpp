@@ -34,6 +34,7 @@
 
 // Overlay (c) 2003, 2004 by Klaus Post
 #include <avisynth.h>
+#include <cmath>
 #ifdef AVS_WINDOWS
     #include <avs/win.h>
 #else
@@ -107,6 +108,8 @@ GenericVideoFilter(_child) {
   viInternalWorkingFormat = vi;
 
   opacity_f = (float)args[ARG_OPACITY].AsDblDef(1.0); // for float support
+  if (!std::isfinite(opacity_f))
+    env->ThrowError("Overlay: opacity must be finite");
   opacity = (int)(256.0*opacity_f + 0.5); // range is converted to 256 for all all bit_depth
   offset_x = args[ARG_X].AsInt(0);
   offset_y = args[ARG_Y].AsInt(0);
