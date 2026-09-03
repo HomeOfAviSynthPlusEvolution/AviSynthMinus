@@ -773,7 +773,7 @@ AVISource::AVISource(const char filename[], bool fAudio, const char pixel_type[]
   frame = 0;
 
   auto filename_w = utf8 ? Utf8ToWideChar(filename) : AnsiToWideChar(filename);
-
+  auto filename_utf8 = WideCharToUtf8(filename_w.get());
   AVIFileInit();
   try {
 
@@ -781,7 +781,7 @@ AVISource::AVISource(const char filename[], bool fAudio, const char pixel_type[]
       // if it looks like an AVI file, open in OpenDML mode; otherwise AVIFile mode
       HANDLE h = CreateFileW(filename_w.get(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
       if (h == INVALID_HANDLE_VALUE) {
-        env->ThrowError("AVISource autodetect: couldn't open file '%s'\nError code: %d", filename, GetLastError());
+        env->ThrowError("AVISource autodetect: couldn't open file '%s'\nError code: %d", filename_utf8.get(), GetLastError());
       }
       unsigned int buf[3];
       DWORD bytes_read;
@@ -796,7 +796,7 @@ AVISource::AVISource(const char filename[], bool fAudio, const char pixel_type[]
       PAVIFILE paf = NULL;
       try { // The damn .WAV clsid handler has only a 48 byte buffer to parse the filename and GPF's
     if (FAILED(AVIFileOpenW(&paf, filename_w.get(), OF_READ, 0)))
-      env->ThrowError("AVIFileSource: couldn't open file '%s'", filename);
+      env->ThrowError("AVIFileSource: couldn't open file '%s'", filename_utf8.get());
       }
     catch (AvisynthError) {
     throw;

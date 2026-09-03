@@ -600,15 +600,19 @@ AVSValue Import(AVSValue args, void*, IScriptEnvironment* env)
       DWORD len = GetFullPathNameW(script_name_w.get(), 0, NULL, NULL); // buffer size for path + terminating zero
       full_path_w = std::make_unique<wchar_t[]>(len);
       len = GetFullPathNameW(script_name_w.get(), len, full_path_w.get(), &file_part_w);
-      if (len == 0)
-        env->ThrowError("Import: unable to open \"%s\" (path invalid?), error=0x%x", script_name, GetLastError());
+      if (len == 0) {
+        auto script_name_utf8 = WideCharToUtf8(script_name_w.get());
+        env->ThrowError("Import: unable to open \"%s\" (path invalid?), error=0x%x", script_name_utf8.get(), GetLastError());
+      }
     }
     else {
       DWORD len = SearchPathW(NULL, script_name_w.get(), NULL, 0, NULL, NULL); // buffer size for path + terminating zero
       full_path_w = std::make_unique<wchar_t[]>(len);
       len = SearchPathW(NULL, script_name_w.get(), NULL, len, full_path_w.get(), &file_part_w);
-      if (len == 0)
-        env->ThrowError("Import: unable to locate \"%s\" (try specifying a path), error=0x%x", script_name, GetLastError());
+      if (len == 0) {
+        auto script_name_utf8 = WideCharToUtf8(script_name_w.get());
+        env->ThrowError("Import: unable to locate \"%s\" (try specifying a path), error=0x%x", script_name_utf8.get(), GetLastError());
+      }
     }
 
     // back to 8 bit Ansi and Utf8
