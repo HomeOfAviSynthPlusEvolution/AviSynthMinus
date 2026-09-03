@@ -1152,7 +1152,7 @@ AVSValue GetAllProperties::Create(AVSValue args, void*, IScriptEnvironment* env_
     const char propType = env->propGetType(avsmap, propName);
     const int propNumElements = env->propNumElements(avsmap, propName);
 
-    int error;
+    int error = 0;
 
     AVSValue elem;
     if (propType == 'u') {
@@ -1181,10 +1181,22 @@ AVSValue GetAllProperties::Create(AVSValue args, void*, IScriptEnvironment* env_
       }
     }
     else if (propType == 's') {
-      // no string arrays
-      const char* s = env->propGetData(avsmap, propName, 0, &error);
-      if (!error)
-        elem = AVSValue(env->SaveString(s));
+      if (propNumElements == 1) {
+        const char* s = env->propGetData(avsmap, propName, 0, &error);
+        if (!error)
+          elem = AVSValue(env->SaveString(s));
+      }
+      else {
+        std::vector<AVSValue> avsarr(propNumElements);
+        for (int i = 0; i < propNumElements; ++i) {
+          const char* s = env->propGetData(avsmap, propName, i, &error);
+          if (error)
+            break;
+          avsarr[i] = AVSValue(env->SaveString(s));
+        }
+        if (!error)
+          elem = AVSValue(avsarr.data(), propNumElements); // array deep copy
+      }
     }
     else if (propType == 'c') {
       if (propNumElements == 1)
