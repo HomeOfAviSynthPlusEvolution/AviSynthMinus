@@ -754,7 +754,7 @@ AVSValue Sqrt(AVSValue args, void* , IScriptEnvironment* ) { return sqrt(args[0]
 
 // v11: up to int64 range
 AVSValue Abs(AVSValue args, void* , IScriptEnvironment* ) { 
-  int64_t result = abs(args[0].AsLong());
+  int64_t result = std::abs(args[0].AsLong());
   if (result >= INT_MIN && result <= INT_MAX)
     return (int)result;
   return result;
