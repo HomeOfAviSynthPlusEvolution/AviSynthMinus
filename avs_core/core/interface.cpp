@@ -615,7 +615,7 @@ int VideoFrame::CheckMemory() const {
 #ifdef _DEBUG
   if (vfb->data && vfb->device->device_type == DEV_TYPE_CPU) {
     // check buffer overrun
-    int *pInt = (int *)(vfb->data + vfb->data_size);
+    int *pInt = (int *)(vfb->data + vfb->margin + vfb->data_size);
     if (pInt[0] != 0xDEADBEEF ||
       pInt[1] != 0xDEADBEEF ||
       pInt[2] != 0xDEADBEEF ||

@@ -507,7 +507,8 @@ VideoFrameBuffer::VideoFrameBuffer() :
   data_size(0),
   sequence_number(0),
   refcount(1),
-  device(nullptr)
+  device(nullptr),
+  margin(0)
 { }
 
 
@@ -516,7 +517,8 @@ VideoFrameBuffer::VideoFrameBuffer(int size, int margin, Device* device) :
   data_size(size),
   sequence_number(0),
   refcount(0),
-  device(device)
+  device(device),
+  margin(margin)
 { }
 
 VideoFrameBuffer::~VideoFrameBuffer() { DESTRUCTOR(); }
@@ -3267,7 +3269,7 @@ VideoFrame* ScriptEnvironment::AllocateFrame(size_t vfb_size, size_t margin, Dev
 static void DebugOut(char* s)
 {
 #ifdef AVS_POSIX
-  LogMsg(LOGLEVEL_DEBUG, s);
+  std::fputs(s, stderr);
 #else
   _RPT0(0, s);
 #endif
