@@ -416,6 +416,11 @@ SwapYToUV::SwapYToUV(PClip _child, PClip _clip, PClip _clipY, PClip _clipA, IScr
   }
 
   const VideoInfo& vi2 = clip->GetVideoInfo();
+  if (!vi2.IsYUV() && !vi2.IsYUVA())
+    env->ThrowError("YToUV: Only YUV or YUVA data accepted for U and V clips");
+  if (vi.BitsPerComponent() != vi2.BitsPerComponent() ||
+      vi.ComponentSize() != vi2.ComponentSize())
+    env->ThrowError("YToUV: U and V clips must have the same component format");
   if (vi.height != vi2.height)
     env->ThrowError("YToUV: Clips do not have the same height (U & V mismatch) !");
   if (vi.width != vi2.width)
@@ -446,6 +451,11 @@ SwapYToUV::SwapYToUV(PClip _child, PClip _clip, PClip _clipY, PClip _clipA, IScr
 
   // Y clip parameter exists, Y channel will be copied from that
   const VideoInfo& vi3 = clipY->GetVideoInfo();
+  if (!vi3.IsYUV() && !vi3.IsYUVA())
+    env->ThrowError("YToUV: Only YUV or YUVA data accepted for Y clip");
+  if (vi.BitsPerComponent() != vi3.BitsPerComponent() ||
+      vi.ComponentSize() != vi3.ComponentSize())
+    env->ThrowError("YToUV: Y and U/V clips must have the same component format");
   if (vi.IsYUY2() != vi3.IsYUY2())
     env->ThrowError("YToUV: YUY2 Clips must have same colorspace (UV & Y mismatch) !");
 
@@ -462,10 +472,13 @@ SwapYToUV::SwapYToUV(PClip _child, PClip _clip, PClip _clipY, PClip _clipA, IScr
     if(vi.IsYUY2())
       env->ThrowError("YToUV: YUY2 not supported with alpha clip");
     const VideoInfo& vi4 = clipA->GetVideoInfo();
+    if (!vi4.IsYUV() && !vi4.IsYUVA() && !vi4.IsPlanarRGBA())
+      env->ThrowError("YToUV: Only YUV, YUVA or planar RGBA data accepted for alpha clip");
     if (vi4.width != vi3.width || vi4.height != vi3.height) // Y width == A width
       env->ThrowError("YToUV: different Y and A clip dimensions");
-    if(vi4.BitsPerComponent() != vi3.BitsPerComponent())
-      env->ThrowError("YToUV: different Y and A clip bit depth");
+    if (vi4.BitsPerComponent() != vi3.BitsPerComponent() ||
+        vi4.ComponentSize() != vi3.ComponentSize())
+      env->ThrowError("YToUV: different Y and A clip component format");
   }
 
   // Autogenerate destination colorformat
