@@ -2943,7 +2943,7 @@ PVideoFrame __stdcall Compare::GetFrame(int n, IScriptEnvironment* env)
     const int rowsize = f1->GetRowSize();
     const int height = f1->GetHeight();
 
-    bytecount = (rowsize / pixelsize) * height * masked_bytes / 4;
+    bytecount = (rowsize / pixelsize) * height * masked_bytes / incr;
 #ifdef INTEL_INTRINSICS
 
     if (((vi.IsRGB32() && (rowsize % 16 == 0)) || (vi.IsRGB24() && (rowsize % 12 == 0)) || (vi.IsYUY2() && (rowsize % 16 == 0))) &&
