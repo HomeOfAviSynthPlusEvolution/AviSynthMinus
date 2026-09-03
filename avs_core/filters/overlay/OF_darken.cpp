@@ -121,13 +121,13 @@ void OL_DarkenImage::BlendImageMask(ImageOverlayInternal* base, ImageOverlayInte
         for (int x = 0; x < w; x++) {
           bool cmp;
           if (of_darken)
-            cmp = ovY[x] < baseY[x];
+            cmp = ovY[x] <= baseY[x];
           else
-            cmp = ovY[x] > baseY[x];
+            cmp = ovY[x] >= baseY[x];
           if (cmp) {
-            result_t maskYx = maskY[x];
-            result_t maskUx = maskU[x];
-            result_t maskVx = maskV[x];
+            result_t maskYx = overlay_mask_to_weight(maskY[x], max_pixel_value);
+            result_t maskUx = overlay_mask_to_weight(maskU[x], max_pixel_value);
+            result_t maskVx = overlay_mask_to_weight(maskV[x], max_pixel_value);
             baseY[x] = (pixel_t)((((pixel_range - maskYx)*baseY[x]) + (maskYx * ovY[x] + half_pixel_value)) >> MASK_CORR_SHIFT);
             baseU[x] = (pixel_t)((((pixel_range - maskUx)*baseU[x]) + (maskUx * ovU[x] + half_pixel_value)) >> MASK_CORR_SHIFT);
             baseV[x] = (pixel_t)((((pixel_range - maskVx)*baseV[x]) + (maskVx * ovV[x] + half_pixel_value)) >> MASK_CORR_SHIFT);
@@ -190,14 +190,14 @@ void OL_DarkenImage::BlendImageMask(ImageOverlayInternal* base, ImageOverlayInte
       for (int x = 0; x < w; x++) {
         bool cmp;
         if (of_darken)
-          cmp = ovY[x] < baseY[x];
+          cmp = ovY[x] <= baseY[x];
         else
-          cmp = ovY[x] > baseY[x];
+          cmp = ovY[x] >= baseY[x];
         if (cmp)  {
           if (maskMode) {
-            result_t mY = (maskY[x] * opacity) >> OPACITY_SHIFT;
-            result_t mU = (maskU[x] * opacity) >> OPACITY_SHIFT;
-            result_t mV = (maskV[x] * opacity) >> OPACITY_SHIFT;
+            result_t mY = (overlay_mask_to_weight(maskY[x], max_pixel_value) * opacity) >> OPACITY_SHIFT;
+            result_t mU = (overlay_mask_to_weight(maskU[x], max_pixel_value) * opacity) >> OPACITY_SHIFT;
+            result_t mV = (overlay_mask_to_weight(maskV[x], max_pixel_value) * opacity) >> OPACITY_SHIFT;
             baseY[x] = (pixel_t)((((pixel_range - mY)*baseY[x]) + (mY*ovY[x] + half_pixel_value)) >> MASK_CORR_SHIFT);
             baseU[x] = (pixel_t)((((pixel_range - mU)*baseU[x]) + (mU*ovU[x] + half_pixel_value)) >> MASK_CORR_SHIFT);
             baseV[x] = (pixel_t)((((pixel_range - mV)*baseV[x]) + (mV*ovV[x] + half_pixel_value)) >> MASK_CORR_SHIFT);
@@ -225,4 +225,3 @@ void OL_DarkenImage::BlendImageMask(ImageOverlayInternal* base, ImageOverlayInte
     }
   }
 }
-

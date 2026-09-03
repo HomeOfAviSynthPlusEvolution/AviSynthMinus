@@ -115,9 +115,9 @@ void OL_AddImage::BlendImageMask(ImageOverlayInternal* base, ImageOverlayInterna
       for (int x = 0; x < w; x++) {
         int Y, U, V;
         if (of_add) {
-          Y = baseY[x] + (maskMode ? (((result_t)ovY[x] * maskY[x]) >> MASK_CORR_SHIFT) : ovY[x]);
-          U = baseU[x] + (int)(maskMode ? ((((result_t)half_pixel_value*(pixel_range - maskU[x])) + ((result_t)maskU[x] * ovU[x])) >> MASK_CORR_SHIFT) : ovU[x]) - half_pixel_value;
-          V = baseV[x] + (int)(maskMode ? ((((result_t)half_pixel_value*(pixel_range - maskV[x])) + ((result_t)maskV[x] * ovV[x])) >> MASK_CORR_SHIFT) : ovV[x]) - half_pixel_value;
+          Y = baseY[x] + (maskMode ? (((result_t)ovY[x] * overlay_mask_to_weight(maskY[x], max_pixel_value)) >> MASK_CORR_SHIFT) : ovY[x]);
+          U = baseU[x] + (int)(maskMode ? ((((result_t)half_pixel_value*(pixel_range - overlay_mask_to_weight(maskU[x], max_pixel_value))) + ((result_t)overlay_mask_to_weight(maskU[x], max_pixel_value) * ovU[x])) >> MASK_CORR_SHIFT) : ovU[x]) - half_pixel_value;
+          V = baseV[x] + (int)(maskMode ? ((((result_t)half_pixel_value*(pixel_range - overlay_mask_to_weight(maskV[x], max_pixel_value))) + ((result_t)overlay_mask_to_weight(maskV[x], max_pixel_value) * ovV[x])) >> MASK_CORR_SHIFT) : ovV[x]) - half_pixel_value;
           if (Y>max_pixel_value) {  // Apply overbrightness to UV
             int multiplier = max(0,pixel_range + over32 -Y);  // 0 to 32
             U = ((U*(         multiplier)) + (half_pixel_value*(over32-multiplier)))>>SHIFT;
@@ -127,9 +127,9 @@ void OL_AddImage::BlendImageMask(ImageOverlayInternal* base, ImageOverlayInterna
         }
         else {
           // of_subtract
-          Y = baseY[x] - (maskMode ? (((result_t)ovY[x] * maskY[x]) >> MASK_CORR_SHIFT) : ovY[x]);
-          U = baseU[x] - (int)(maskMode ? ((((result_t)half_pixel_value*(pixel_range - maskU[x])) + ((result_t)maskU[x] * ovU[x])) >> MASK_CORR_SHIFT) : ovU[x]) + half_pixel_value;
-          V = baseV[x] - (int)(maskMode ? ((((result_t)half_pixel_value*(pixel_range - maskV[x])) + ((result_t)maskV[x] * ovV[x])) >> MASK_CORR_SHIFT) : ovV[x]) + half_pixel_value;
+          Y = baseY[x] - (maskMode ? (((result_t)ovY[x] * overlay_mask_to_weight(maskY[x], max_pixel_value)) >> MASK_CORR_SHIFT) : ovY[x]);
+          U = baseU[x] - (int)(maskMode ? ((((result_t)half_pixel_value*(pixel_range - overlay_mask_to_weight(maskU[x], max_pixel_value))) + ((result_t)overlay_mask_to_weight(maskU[x], max_pixel_value) * ovU[x])) >> MASK_CORR_SHIFT) : ovU[x]) + half_pixel_value;
+          V = baseV[x] - (int)(maskMode ? ((((result_t)half_pixel_value*(pixel_range - overlay_mask_to_weight(maskV[x], max_pixel_value))) + ((result_t)overlay_mask_to_weight(maskV[x], max_pixel_value) * ovV[x])) >> MASK_CORR_SHIFT) : ovV[x]) + half_pixel_value;
           if (Y<0) {  // Apply superdark to UV
             int multiplier = min(-Y,over32);  // 0 to 32
             U = ((U*(over32 - multiplier)) + (half_pixel_value*(       multiplier)))>>SHIFT;
@@ -160,12 +160,12 @@ void OL_AddImage::BlendImageMask(ImageOverlayInternal* base, ImageOverlayInterna
       for (int x = 0; x < w; x++) {
         int Y, U, V;
         if(of_add)
-          Y = baseY[x] + (maskMode ? (((result_t)maskY[x] * opacity*ovY[x]) >> (OPACITY_SHIFT + MASK_CORR_SHIFT)) : ((opacity*ovY[x]) >> OPACITY_SHIFT));
+          Y = baseY[x] + (maskMode ? (((result_t)overlay_mask_to_weight(maskY[x], max_pixel_value) * opacity*ovY[x]) >> (OPACITY_SHIFT + MASK_CORR_SHIFT)) : ((opacity*ovY[x]) >> OPACITY_SHIFT));
         else
-          Y = baseY[x] - (maskMode ? (((result_t)maskY[x] * opacity*ovY[x]) >> (OPACITY_SHIFT + MASK_CORR_SHIFT)) : ((opacity*ovY[x]) >> OPACITY_SHIFT));
+          Y = baseY[x] - (maskMode ? (((result_t)overlay_mask_to_weight(maskY[x], max_pixel_value) * opacity*ovY[x]) >> (OPACITY_SHIFT + MASK_CORR_SHIFT)) : ((opacity*ovY[x]) >> OPACITY_SHIFT));
         if (maskMode) {
-          result_t mU = (maskU[x] * opacity) >> OPACITY_SHIFT;
-          result_t mV = (maskV[x] * opacity) >> OPACITY_SHIFT;
+          result_t mU = (overlay_mask_to_weight(maskU[x], max_pixel_value) * opacity) >> OPACITY_SHIFT;
+          result_t mV = (overlay_mask_to_weight(maskV[x], max_pixel_value) * opacity) >> OPACITY_SHIFT;
           if(of_add) {
             U = baseU[x] + (int)(((half_pixel_value*(pixel_range - mU)) + (mU*ovU[x])) >> MASK_CORR_SHIFT) - half_pixel_value;
             V = baseV[x] + (int)(((half_pixel_value*(pixel_range - mV)) + (mV*ovV[x])) >> MASK_CORR_SHIFT) - half_pixel_value;
@@ -222,4 +222,3 @@ void OL_AddImage::BlendImageMask(ImageOverlayInternal* base, ImageOverlayInterna
     }
   }
 }
-

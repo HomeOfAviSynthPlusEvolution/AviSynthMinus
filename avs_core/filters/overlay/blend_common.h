@@ -81,6 +81,11 @@ AVS_FORCEINLINE static float overlay_blend_c_core_f(const float p1, const float 
   return p1 + (p2-p1)*mask; // p1*(1-mask) + p2*mask
 }
 
+template<typename pixel_t>
+AVS_FORCEINLINE static int overlay_mask_to_weight(const pixel_t mask, const int max_pixel_value) {
+  return mask == max_pixel_value ? max_pixel_value + 1 : static_cast<int>(mask);
+}
+
 /*******************************************
  ********* Merge Two Masks Function ********
  *******************************************/

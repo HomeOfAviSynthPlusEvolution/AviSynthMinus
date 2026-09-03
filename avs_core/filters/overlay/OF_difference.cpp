@@ -98,9 +98,9 @@ void OL_DifferenceImage::BlendImageMask(ImageOverlayInternal* base, ImageOverlay
         int U = abs((int)baseU[x] - (int)ovU[x]) + half_pixel_value;
         int V = abs((int)baseV[x] - (int)ovV[x]) + half_pixel_value;
         if(maskMode) {
-          result_t mY = maskY[x];
-          result_t mU = maskU[x];
-          result_t mV = maskV[x];
+          result_t mY = overlay_mask_to_weight(maskY[x], max_pixel_value);
+          result_t mU = overlay_mask_to_weight(maskU[x], max_pixel_value);
+          result_t mV = overlay_mask_to_weight(maskV[x], max_pixel_value);
           Y = (int)(((Y*mY) + ((pixel_range - mY)*baseY[x])) >> MASK_CORR_SHIFT);
           U = (int)(((U*mU) + ((pixel_range - mU)*baseU[x])) >> MASK_CORR_SHIFT);
           V = (int)(((V*mV) + ((pixel_range - mV)*baseV[x])) >> MASK_CORR_SHIFT);
@@ -141,9 +141,9 @@ void OL_DifferenceImage::BlendImageMask(ImageOverlayInternal* base, ImageOverlay
         int U = abs((int)baseU[x] - (int)ovU[x]) + half_pixel_value;
         int V = abs((int)baseV[x] - (int)ovV[x]) + half_pixel_value;
         if(maskMode) {
-          result_t  mY = (maskY[x] * opacity) >> OPACITY_SHIFT;
-          result_t  mU = (maskU[x] * opacity) >> OPACITY_SHIFT;
-          result_t  mV = (maskV[x] * opacity) >> OPACITY_SHIFT;
+          result_t  mY = (overlay_mask_to_weight(maskY[x], max_pixel_value) * opacity) >> OPACITY_SHIFT;
+          result_t  mU = (overlay_mask_to_weight(maskU[x], max_pixel_value) * opacity) >> OPACITY_SHIFT;
+          result_t  mV = (overlay_mask_to_weight(maskV[x], max_pixel_value) * opacity) >> OPACITY_SHIFT;
           Y = (int)(((Y*mY) + ((pixel_range - mY)*baseY[x])) >> MASK_CORR_SHIFT);
           U = (int)(((U*mU) + ((pixel_range - mU)*baseU[x])) >> MASK_CORR_SHIFT);
           V = (int)(((V*mV) + ((pixel_range - mV)*baseV[x])) >> MASK_CORR_SHIFT);
@@ -184,4 +184,3 @@ void OL_DifferenceImage::BlendImageMask(ImageOverlayInternal* base, ImageOverlay
     } // for x
   } // for y
 }
-
