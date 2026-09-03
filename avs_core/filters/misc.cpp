@@ -68,6 +68,8 @@ FixLuminance::FixLuminance(PClip _child, int _vertex, int _slope, IScriptEnviron
 {
   if (!vi.IsYUY2())
     env->ThrowError("FixLuminance: requires YUY2 input");
+  if (_slope == 0)
+    env->ThrowError("FixLuminance: slope must not be zero");
 }
 
 
@@ -153,7 +155,8 @@ PeculiarBlend::PeculiarBlend(PClip _child, int _cutoff, IScriptEnvironment* env)
 
 PVideoFrame PeculiarBlend::GetFrame(int n, IScriptEnvironment* env) {
   PVideoFrame a = child->GetFrame(n, env);
-  PVideoFrame b = child->GetFrame(n+1, env);
+  const int last_frame = child->GetVideoInfo().num_frames - 1;
+  PVideoFrame b = child->GetFrame(min(n + 1, last_frame), env);
   env->MakeWritable(&a);
   BYTE* main = a->GetWritePtr();
   const BYTE* other = b->GetReadPtr();
@@ -201,6 +204,9 @@ SkewRows::SkewRows(PClip _child, int skew, IScriptEnvironment* env)
 
   if (vi.IsYUY2() && skew&1)
     env->ThrowError("SkewRows: For YUY2 skew must be even");
+
+  if (skew <= -vi.width)
+    env->ThrowError("SkewRows: output width must be positive");
 
   vi.height *= vi.width;
   vi.width  += skew;

@@ -239,6 +239,9 @@ Histogram::Histogram(PClip _child, Mode _mode, AVSValue _option, int _show_bits,
     if (vi.IsY8()) {
       env->ThrowError("Histogram: AudioLevels mode not available in Y8.");
     }
+    const int minimum_width = (1 + vi.AudioChannels() * 2) * 4;
+    if (vi.width < minimum_width)
+      env->ThrowError("Histogram: AudioLevels width is too small for all audio bars");
 
     aud_clip = ConvertAudio::Create(child, SAMPLE_INT16, SAMPLE_INT16);
   }

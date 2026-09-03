@@ -1099,10 +1099,13 @@ SpatialSoften::SpatialSoften( PClip _child, int _radius, unsigned _luma_threshol
                               unsigned _chroma_threshold, IScriptEnvironment* env )
   : GenericVideoFilter(_child),
     luma_threshold(_luma_threshold), chroma_threshold(_chroma_threshold),
-    diameter(_radius * 2 + 1)
+    diameter(0)
 {
   if (!vi.IsYUY2())
     env->ThrowError("SpatialSoften: requires YUY2 input");
+  if (_radius < 0 || _radius > 32)
+    env->ThrowError("SpatialSoften: radius must be between 0 and 32");
+  diameter = _radius * 2 + 1;
 }
 
 
