@@ -1558,10 +1558,10 @@ PVideoFrame MergeRGB::GetFrame(int n, IScriptEnvironment* env)
     BYTE* dstp = dst->GetWritePtr();
 
 
-    int planeB = viB.IsPlanar() && viB.IsRGB() ? PLANAR_B : vi.IsRGB() ? 0 : PLANAR_Y;
-    int planeG = viG.IsPlanar() && viG.IsRGB() ? PLANAR_G : vi.IsRGB() ? 0 : PLANAR_Y;
-    int planeR = viR.IsPlanar() && viR.IsRGB() ? PLANAR_R : vi.IsRGB() ? 0 : PLANAR_Y;
-    int planeA = viA.IsPlanar() && viA.IsRGB() ? PLANAR_A : vi.IsRGB() ? 0 : PLANAR_Y;
+    int planeB = viB.IsPlanar() ? (viB.IsRGB() ? PLANAR_B : PLANAR_Y) : 0;
+    int planeG = viG.IsPlanar() ? (viG.IsRGB() ? PLANAR_G : PLANAR_Y) : 0;
+    int planeR = viR.IsPlanar() ? (viR.IsRGB() ? PLANAR_R : PLANAR_Y) : 0;
+    int planeA = viA.IsPlanar() ? (viA.IsRGB() ? PLANAR_A : PLANAR_Y) : 0;
 
     // RGB is upside-down, backscan any Planar to match
     const int Bpitch = (viB.IsPlanar()) ? -(B->GetPitch(planeB)) : B->GetPitch();
@@ -1570,8 +1570,8 @@ PVideoFrame MergeRGB::GetFrame(int n, IScriptEnvironment* env)
 
     // Bump any RGB channels, move any YUV channels to last line
     const BYTE* Bp = B->GetReadPtr(planeB) + (viB.IsPlanar() ? Bpitch * (1 - height) : 0);
-    const BYTE* Gp = G->GetReadPtr(planeG) + (viG.IsPlanar() ? Gpitch * (1 - height) : (1 * pixelsize));
-    const BYTE* Rp = R->GetReadPtr(planeR) + (viR.IsPlanar() ? Rpitch * (1 - height) : (2 * pixelsize));
+    const BYTE* Gp = G->GetReadPtr(planeG) + (viG.IsPlanar() ? Gpitch * (1 - height) : (viG.IsRGB() ? 1 * pixelsize : 0));
+    const BYTE* Rp = R->GetReadPtr(planeR) + (viR.IsPlanar() ? Rpitch * (1 - height) : (viR.IsRGB() ? 2 * pixelsize : 0));
 
     // Adjustment from the end of 1 line to the start of the next
     const int Bmodulo = Bpitch - B->GetRowSize(planeB);
@@ -1588,7 +1588,7 @@ PVideoFrame MergeRGB::GetFrame(int n, IScriptEnvironment* env)
 
     if (alpha) { // ARGB mode
       const int Apitch = (viA.IsPlanar()) ? -(A->GetPitch(planeA)) : A->GetPitch();
-      const BYTE* Ap = A->GetReadPtr(planeA) + (viA.IsPlanar() ? Apitch * (1 - height) : (3 * pixelsize));
+      const BYTE* Ap = A->GetReadPtr(planeA) + (viA.IsPlanar() ? Apitch * (1 - height) : (viA.IsRGB() ? 3 * pixelsize : 0));
       const int Amodulo = Apitch - A->GetRowSize(planeA);
       const int Astride = viA.IsPlanar() ? pixelsize : (viA.BitsPerPixel() >> 3);
 
@@ -1828,6 +1828,9 @@ Layer::Layer(PClip _child1, PClip _child2, const char _op[], int _lev, int _x, i
   hasAlpha = vi.IsRGB32() || vi.IsRGB64() || vi.IsYUVA() || vi.IsPlanarRGBA();
   bits_per_pixel = vi.BitsPerComponent();
 
+  if (_t < 0 || _t > 255)
+    env->ThrowError("Layer: threshold must be between 0 and 255");
+
   const bool levelSpecified = levelB >= 0;
   const bool strengthSpecified = opacity >= 0.0f;
 
@@ -1933,6 +1936,8 @@ static void layer_yuv_mul_c(BYTE* dstp8, const BYTE* ovrp8, const BYTE* maskp8, 
   constexpr bool allow_leftminus1 = false; // RFU for SIMD, takes part in templates at other functions
 
   typedef typename std::conditional < sizeof(pixel_t) == 1, int, int64_t>::type calc_t;
+  const int half_pixel_value = (sizeof(pixel_t) == 1) ? 128 : (1 << (bits_per_pixel - 1));
+  const int max_pixel_value = (sizeof(pixel_t) == 1) ? 255 : (1 << bits_per_pixel) - 1;
   for (int y = 0; y < height; ++y) {
     int mask_right; // used for MPEG2 color schemes
     if constexpr (has_alpha) {
@@ -1995,25 +2000,15 @@ static void layer_yuv_mul_c(BYTE* dstp8, const BYTE* ovrp8, const BYTE* maskp8, 
         }
       }
 
-      alpha_mask = has_alpha ? (int)(((calc_t)effective_mask * level + 1) >> bits_per_pixel) : level;
+      alpha_mask = has_alpha
+        ? min(max_pixel_value, (int)(((calc_t)effective_mask * level + (1 << (bits_per_pixel - 1))) >> bits_per_pixel))
+        : min(level, max_pixel_value);
 
-      // fixme: no rounding? (code from YUY2)
-      // for mul: no.
-      if constexpr (!is_chroma)
-        dstp[x] = (pixel_t)(dstp[x] + ((((((calc_t)ovrp[x] * dstp[x]) >> bits_per_pixel) - dstp[x]) * alpha_mask) >> bits_per_pixel));
-      else if constexpr (use_chroma) {
-        // chroma mode + process chroma
-        dstp[x] = (pixel_t)(dstp[x] + (((calc_t)(ovrp[x] - dstp[x]) * alpha_mask) >> bits_per_pixel));
-        // U = U + ( ((Uovr - U)*level) >> 8 )
-        // V = V + ( ((Vovr - V)*level) >> 8 )
-      }
-      else {
-        // non-chroma mode + process chroma
-        constexpr int half = 1 << (bits_per_pixel - 1);
-        dstp[x] = (pixel_t)(dstp[x] + (((calc_t)(half - dstp[x]) * (alpha_mask / 2)) >> bits_per_pixel));
-        // U = U + ( ((128 - U)*(level/2)) >> 8 )
-        // V = V + ( ((128 - V)*(level/2)) >> 8 )
-      }
+      const calc_t target_pixel = !is_chroma
+        ? ((calc_t)ovrp[x] * dstp[x]) / max_pixel_value
+        : use_chroma ? ovrp[x] : half_pixel_value;
+      const calc_t inverse_alpha = max_pixel_value - alpha_mask;
+      dstp[x] = (pixel_t)(((calc_t)dstp[x] * inverse_alpha + target_pixel * alpha_mask + max_pixel_value / 2) / max_pixel_value);
     }
     dstp += dst_pitch;
     ovrp += overlay_pitch;
