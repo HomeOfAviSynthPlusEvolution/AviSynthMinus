@@ -2,6 +2,7 @@ add_executable(core_tests
   script_tests.cpp
   config_tests.cpp
   c_api_tests.cpp
+  environment_tests.cpp
 )
 target_include_directories(core_tests PRIVATE
   ${PROJECT_SOURCE_DIR}/tests
