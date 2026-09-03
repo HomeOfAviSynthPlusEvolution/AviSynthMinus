@@ -304,6 +304,8 @@ ConditionalReader::ConditionalReader(PClip _child, const char* filename, const c
           AVSValue set_stop = ConvertType(stop_value, lines, env);
 
           const int range = stop-start;
+          if (range == 0)
+            ThrowLine("ConditionalReader: Interpolation range must span at least two frames in line %d", lines, env);
           const double diff = (set_stop.AsFloat() - set_start.AsFloat()) / range;
           for (int i = 0; i<=range; i++) {
             const double n = i * diff + set_start.AsFloat();
