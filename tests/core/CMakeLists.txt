@@ -8,6 +8,7 @@ add_executable(core_tests
   import_tests.cpp
   animate_tests.cpp
   source_tests.cpp
+  greyscale_tests.cpp
 )
 target_include_directories(core_tests PRIVATE
   ${PROJECT_SOURCE_DIR}/tests
