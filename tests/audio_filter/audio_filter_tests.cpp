@@ -581,6 +581,30 @@ TEST(AudioEditFilters, ReversesInterleavedAudioFrames) {
   EXPECT_TRUE(output.memory_intact());
 }
 
+TEST(AudioEditFilters, ReversesTwentyFourBitAudioFrames) {
+  AviSynthEnvironment environment;
+  const auto vi = make_audio_video_info(AudioInfoSpec{10, SAMPLE_INT24, 3, 1});
+  const std::vector<std::uint8_t> sample_bytes{
+      0x33, 0x22, 0x11,
+      0x66, 0x55, 0x44,
+      0x99, 0x88, 0x77,
+  };
+  auto* source_clip = new AudioSequenceClip(vi, sample_bytes);
+  PClip source(source_clip);
+  Reverse filter(source);
+
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, 1);
+  filter.GetAudio(output.data(), 0, 3, environment.get());
+
+  const std::vector<std::uint8_t> expected_bytes{
+      0x99, 0x88, 0x77,
+      0x66, 0x55, 0x44,
+      0x33, 0x22, 0x11,
+  };
+  EXPECT_EQ(std::vector<std::uint8_t>(output.data(), output.data() + 9), expected_bytes);
+  EXPECT_TRUE(output.memory_intact());
+}
+
 TEST(AudioEditFilters, LoopsAnAudioOnlyClipAcrossBoundaries) {
   AviSynthEnvironment environment;
   const auto vi = make_audio_video_info(AudioInfoSpec{10, SAMPLE_FLOAT, 4, 1});
