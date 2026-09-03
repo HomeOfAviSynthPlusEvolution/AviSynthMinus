@@ -15,6 +15,7 @@
         "BUILD_SHARED_LIBS": "OFF",
         "ENABLE_TESTS": "ON",
         "ENABLE_PLUGINS": "OFF",
+        "ENABLE_GIT_VERSIONING": "OFF",
         "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo"
       }
     },
@@ -27,6 +28,7 @@
         "BUILD_SHARED_LIBS": "OFF",
         "ENABLE_TESTS": "ON",
         "ENABLE_PLUGINS": "OFF",
+        "ENABLE_GIT_VERSIONING": "OFF",
         "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo"
       }
     }

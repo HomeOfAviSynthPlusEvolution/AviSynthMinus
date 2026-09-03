@@ -190,17 +190,25 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/core/arch.h.in ${CMAKE_CURRENT_BINARY
 
 # Dynamically generate the sequential version info from Git
 # Based on the example here: http://www.cmake.org/pipermail/cmake/2010-July/038015.html
-FIND_PACKAGE(Git)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
-ADD_CUSTOM_TARGET(
-    VersionGen
-    ${CMAKE_COMMAND} -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/core/version.h.in
-                     -D DST=${CMAKE_CURRENT_BINARY_DIR}/version.h
-                     -D GIT=${GIT_EXECUTABLE}
-                     -D REPO=${CMAKE_SOURCE_DIR}
-                     -P ${CMAKE_CURRENT_SOURCE_DIR}/Version.cmake
-)
-ADD_DEPENDENCIES("AvsCore" VersionGen)
+option(ENABLE_GIT_VERSIONING "Dynamically regenerate version.h from git on every build" ON)
+if(ENABLE_GIT_VERSIONING)
+  FIND_PACKAGE(Git)
+  ADD_CUSTOM_TARGET(
+      VersionGen
+      ${CMAKE_COMMAND} -D SRC=${CMAKE_CURRENT_SOURCE_DIR}/core/version.h.in
+                       -D DST=${CMAKE_CURRENT_BINARY_DIR}/version.h
+                       -D GIT=${GIT_EXECUTABLE}
+                       -D REPO=${CMAKE_SOURCE_DIR}
+                       -P ${CMAKE_CURRENT_SOURCE_DIR}/Version.cmake
+  )
+  ADD_DEPENDENCIES("AvsCore" VersionGen)
+else()
+  set(AVS_DEVNEXT_REV 0)
+  set(AVS_DEV_GITHASH "")
+  set(AVS_DEV_REVDATE "")
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/core/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/version.h @ONLY)
+endif()
 
 if (NOT EXISTS "${CMAKE_SOURCE_DIR}/.git" OR NOT GIT_FOUND)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRELEASE_TARBALL")
