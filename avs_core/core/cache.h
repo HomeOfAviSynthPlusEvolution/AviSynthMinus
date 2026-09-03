@@ -98,7 +98,7 @@ private:
   CacheHints hints;
   mutable std::mutex mutex;
 
-  PClip GetCache(IScriptEnvironment* env);
+  PClip GetCache(IScriptEnvironment* env_, bool use_child_if_notfound, PClip child);
 
   void ApplyHints(int cachehints, int frame_range);
 
