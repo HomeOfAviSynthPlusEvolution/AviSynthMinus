@@ -2648,6 +2648,8 @@ Compare::Compare(PClip _child1, PClip _child2, const char* channels, const char 
 
   if (vi.width != vi2.width || vi.height != vi2.height)
     env->ThrowError("Compare: Clips must have same size.");
+  if (vi.num_frames > vi2.num_frames)
+    env->ThrowError("Compare: second clip must have at least as many frames as the first clip.");
 
   if (!(vi.IsRGB24() || vi.IsYUY2() || vi.IsRGB32() || vi.IsPlanar() || vi.IsRGB48() || vi.IsRGB64()))
     env->ThrowError("Compare: Clips have unknown pixel format. RGB24/32/48/64, YUY2 and YUV/RGB Planar supported.");
@@ -2771,13 +2773,17 @@ Compare::~Compare()
 {
   if (log) {
     fprintf(log,"\n\n\nTotal frames processed: %d\n\n", framecount);
-    fprintf(log,"                           Minimum   Average   Maximum\n");
-    fprintf(log,"Mean Absolute Deviation: %9.4f %9.4f %9.4f\n", MAD_min, MAD_tot/framecount, MAD_max);
-    fprintf(log,"         Mean Deviation: %+9.4f %+9.4f %+9.4f\n", MD_min, MD_tot/framecount, MD_max);
-    fprintf(log,"                   PSNR: %9.4f %9.4f %9.4f\n", PSNR_min, PSNR_tot/framecount, PSNR_max);
-    double factor = (1 << bits_per_pixel) - 1;
-    double PSNR_overall = 10.0 * log10(bytecount_overall * factor * factor / SSD_overall);
-    fprintf(log,"           Overall PSNR: %9.4f\n", PSNR_overall);
+    if (framecount > 0) {
+      fprintf(log,"                           Minimum   Average   Maximum\n");
+      fprintf(log,"Mean Absolute Deviation: %9.4f %9.4f %9.4f\n", MAD_min, MAD_tot/framecount, MAD_max);
+      fprintf(log,"         Mean Deviation: %+9.4f %+9.4f %+9.4f\n", MD_min, MD_tot/framecount, MD_max);
+      fprintf(log,"                   PSNR: %9.4f %9.4f %9.4f\n", PSNR_min, PSNR_tot/framecount, PSNR_max);
+      double factor = (1 << bits_per_pixel) - 1;
+      double PSNR_overall = 10.0 * log10(bytecount_overall * factor * factor / SSD_overall);
+      fprintf(log,"           Overall PSNR: %9.4f\n", PSNR_overall);
+    } else {
+      fprintf(log,"No frame metrics available.\n");
+    }
     fclose(log);
   }
   delete[] psnrs;
