@@ -48,6 +48,7 @@
 #include <avs/minmax.h>
 #include <avs/alignment.h>
 #include <stdint.h>
+#include <utility>
 
 
 
@@ -931,11 +932,76 @@ bool Reverse::GetParity(int n)
 void Reverse::GetAudio(void* buf, int64_t start, int64_t count, IScriptEnvironment* env)
 {
   child->GetAudio(buf, vi.num_audio_samples - start - count, count, env);
-  int x = vi.BytesPerAudioSample() - 1;
-  char* buf2 = (char*)buf;
-  const int count_bytes = (int)vi.BytesFromAudioSamples(count);
-  for (int i=0; i<(count_bytes>>1); ++i) {
-    char temp = buf2[i]; buf2[i] = buf2[count_bytes-1-(i^x)]; buf2[count_bytes-1-(i^x)] = temp;
+  const int bytes_per_sample = vi.BytesPerAudioSample(); // includes all channels
+  const int bytes_per_channel_sample = vi.BytesPerChannelSample();
+  const int nch = vi.AudioChannels();
+  uint8_t* buf2 = reinterpret_cast<uint8_t*>(buf);
+
+  switch (bytes_per_channel_sample) {
+  case 1: // 8-bit
+    for (int64_t i = 0; i < count / 2; ++i) {
+      uint8_t* a_ptr = buf2 + i * bytes_per_sample;
+      uint8_t* b_ptr = buf2 + (count - 1 - i) * bytes_per_sample;
+      for (int c = 0; c < nch; ++c) {
+        std::swap(a_ptr[c], b_ptr[c]);
+      }
+    }
+    break;
+  case 2: // 16-bit
+    for (int64_t i = 0; i < count / 2; ++i) {
+      int16_t* a_ptr = reinterpret_cast<int16_t*>(buf2 + i * bytes_per_sample);
+      int16_t* b_ptr = reinterpret_cast<int16_t*>(buf2 + (count - 1 - i) * bytes_per_sample);
+      for (int c = 0; c < nch; ++c) {
+        std::swap(a_ptr[c], b_ptr[c]);
+      }
+    }
+    break;
+  case 3: // 24-bit, keep brute force
+    for (int64_t i = 0; i < count / 2; ++i) {
+      uint8_t* a_ptr = buf2 + i * bytes_per_sample;
+      uint8_t* b_ptr = buf2 + (count - 1 - i) * bytes_per_sample;
+      for (int c = 0; c < nch; ++c) {
+        uint8_t* a_chan = a_ptr + c * 3;
+        uint8_t* b_chan = b_ptr + c * 3;
+        for (int j = 0; j < 3; ++j) {
+          std::swap(a_chan[j], b_chan[j]);
+        }
+      }
+    }
+    break;
+  case 4: // 32-bit int or float, separate because of swap templates
+    if (vi.IsSampleType(SAMPLE_FLOAT)) {
+      for (int64_t i = 0; i < count / 2; ++i) {
+        float* a_ptr = reinterpret_cast<float*>(buf2 + i * bytes_per_sample);
+        float* b_ptr = reinterpret_cast<float*>(buf2 + (count - 1 - i) * bytes_per_sample);
+        for (int c = 0; c < nch; ++c) {
+          std::swap(a_ptr[c], b_ptr[c]);
+        }
+      }
+    }
+    else {
+      for (int64_t i = 0; i < count / 2; ++i) {
+        int32_t* a_ptr = reinterpret_cast<int32_t*>(buf2 + i * bytes_per_sample);
+        int32_t* b_ptr = reinterpret_cast<int32_t*>(buf2 + (count - 1 - i) * bytes_per_sample);
+        for (int c = 0; c < nch; ++c) {
+          std::swap(a_ptr[c], b_ptr[c]);
+        }
+      }
+    }
+    break;
+  default: // generic case, no such sample size though
+    for (int64_t i = 0; i < count / 2; ++i) {
+      uint8_t* a_ptr = buf2 + i * bytes_per_sample;
+      uint8_t* b_ptr = buf2 + (count - 1 - i) * bytes_per_sample;
+      for (int c = 0; c < nch; ++c) {
+        uint8_t* a_chan = a_ptr + c * bytes_per_channel_sample;
+        uint8_t* b_chan = b_ptr + c * bytes_per_channel_sample;
+        for (int j = 0; j < bytes_per_channel_sample; ++j) {
+          std::swap(a_chan[j], b_chan[j]);
+        }
+      }
+    }
+    break;
   }
 }
 
