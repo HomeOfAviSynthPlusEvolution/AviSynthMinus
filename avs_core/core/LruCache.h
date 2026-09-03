@@ -204,29 +204,11 @@ public:
       {
         *g = LruGhostEntry(key, 0);
       }
-      else if (g->ghosted > 0) 
+      else if (g->ghosted > 1)
       {
-#ifdef CACHE_GROWTH_INFINITELY_TEST
-        // FIXME note! See Issue #270
-        // Inifinite cache growth when the requested frame number pattern from 
-        // source filter is something like that:
-        //   0,0, 0,1, 1,2, 1,3, 2,4, 2,5, 3,6, 3,7, 4,8,...
-        // Sample script:
-        //   ConvertToY8()
-        //   org = last
-        //   Bob()
-        //   Merge(last, org)
-        // The problem is caused by SeparateFields when it is actually requesting 
-        // the (n/2)th frame from source filter which is then combined with Nth frame.
-        // When changing: g->ghosted > 0 to 1: the leak/cache growth is stopped.
-        // We reach here again and again when Bob() because it is found in "ghosted"
-        // So when the sample script results in getting frame n and n/2
-        // alternately, then a ghost always exists (g->ghosted > 0, really it is 1)
-        // and the cache will grow continously, after each GetFrame
-        // Solution?: registering a cache hit rate?
-#endif
         if (mode != CACHE_NO_RESIZE) {
 #ifdef CACHE_GROWTH_INFINITELY_TEST
+          // When the above (g->ghosted > 1) was (g->ghosted > 0)
           _RPT1(0, "Not in cache but in ghost! g->ghosted > 0 => resize! MainCache.capacity()=%d -> += 1", MainCache.capacity() + 1);
 #endif
           MainCache.resize(MainCache.capacity() + 1);
