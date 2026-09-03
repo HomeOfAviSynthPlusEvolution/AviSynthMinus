@@ -462,6 +462,8 @@ static AVSValue __cdecl Create_BlankClip(AVSValue args, void*, IScriptEnvironmen
       if (!args[13].IsArray())
         env->ThrowError("BlankClip: colors must be an array");
       int color_count = args[13].ArraySize();
+      if (color_count > 4)
+        env->ThrowError("BlankClip: 'colors' size %d cannot exceed 4 components", color_count);
       if (color_count < vi.NumComponents())
         env->ThrowError("BlankClip: 'colors' size %d is less than component count %d", color_count, vi.NumComponents());
       int pixelsize = vi.ComponentSize();
