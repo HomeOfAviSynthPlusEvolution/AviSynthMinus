@@ -311,6 +311,9 @@ public:
   virtual CacheMode __stdcall GetCacheMode() = 0;
 	virtual bool& __stdcall GetSupressCaching() = 0;
 
+  // useful to detect chainedCtor
+  virtual size_t __stdcall GetInvokeStackSize() = 0;
+
   virtual void __stdcall SetDeviceOpt(DeviceOpt mode, int val) = 0;
 
   virtual void __stdcall UpdateFunctionExports(const char* funcName, const char* funcParams, const char *exportVar) = 0;

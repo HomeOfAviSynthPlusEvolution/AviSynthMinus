@@ -621,7 +621,7 @@ CacheGuard::CacheGuard(const PClip& child, const char *name, IScriptEnvironment*
 CacheGuard::~CacheGuard()
 { }
 
-PClip CacheGuard::GetCache(IScriptEnvironment* env_)
+PClip CacheGuard::GetCache(IScriptEnvironment* env_, bool use_child_if_notfound, PClip child)
 {
   std::unique_lock<std::mutex> global_lock(mutex);
 
@@ -634,6 +634,10 @@ PClip CacheGuard::GetCache(IScriptEnvironment* env_)
       return entry.second;
     }
   }
+
+  // not found for current device, creation may not be good (e.g. GetFrame(0) from an Invoke)
+  if (use_child_if_notfound)
+    return child;
 
   // not found for current device, create it
   AvsCache* cache = new AvsCache(child, device, /*ref*/mutex, static_cast<InternalEnvironment*>(globalEnv));
@@ -678,7 +682,11 @@ PVideoFrame __stdcall CacheGuard::GetFrame(int n, IScriptEnvironment* env_)
   if (!name.empty())
     _RPT2(0, "CacheGuard::GetFrame call further GetFrame: %s %d\n", name.c_str(), n);
   */
-  return GetCache(env)->GetFrame(n, env);
+
+  // do not create cache from inside Invoke (e.g. when calling GetFrame(0) from constructor during instantation)
+  const bool chainedCtor = IEnv->GetInvokeStackSize() > 0;
+
+  return GetCache(env, chainedCtor, child)->GetFrame(n, env);
 }
 
 void __stdcall CacheGuard::GetAudio(void* buf, int64_t start, int64_t count, IScriptEnvironment* env_)
@@ -687,7 +695,10 @@ void __stdcall CacheGuard::GetAudio(void* buf, int64_t start, int64_t count, ISc
   IScriptEnvironment* env = static_cast<IScriptEnvironment*>(IEnv);
 
   ScopedCounter getframe_counter(IEnv->GetFrameRecursiveCount());
-  return GetCache(env)->GetAudio(buf, start, count, env);
+
+  // do not create cache from inside Invoke (e.g. when calling GetFrame(0) from constructor during instantation)
+  const bool chainedCtor = IEnv->GetInvokeStackSize() > 0;
+  return GetCache(env, chainedCtor, child)->GetAudio(buf, start, count, env);
 }
 
 const VideoInfo& __stdcall CacheGuard::GetVideoInfo()

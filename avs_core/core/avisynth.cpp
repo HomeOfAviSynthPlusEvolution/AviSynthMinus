@@ -878,6 +878,7 @@ public:
   void SetCacheMode(CacheMode mode) { cacheMode = mode; }
   CacheMode GetCacheMode() { return cacheMode; }
   void SetDeviceOpt(DeviceOpt opt, int val);
+  size_t GetInvokeStackSize() { return invoke_stack.size(); }
 
   void UpdateFunctionExports(const char* funcName, const char* funcParams, const char* exportVar);
 
@@ -2229,6 +2230,11 @@ public:
   bool& __stdcall GetSupressCaching()
   {
     return DISPATCH(supressCaching);
+  }
+
+  size_t __stdcall GetInvokeStackSize()
+  {
+    return core->GetInvokeStackSize();
   }
 
   void __stdcall SetDeviceOpt(DeviceOpt opt, int val)
