@@ -188,7 +188,7 @@ TEST(ExprFormatOverride, PreservesRgbaPlaneOrderForCopiedYuvaOutput) {
   expect_source_unchanged(source, "B10 copied RGBA to YUVA");
 }
 
-TEST(ExprSqrt, PreservesNegativeFloatDomainAcrossScalarAndSse2) {
+TEST(ExprSqrt, ClampsNegativeFloatInputAcrossScalarAndSse2) {
   AviSynthEnvironment environment;
   if ((environment.get()->GetCPUFlags() & CPUF_SSE2) == 0) {
     GTEST_SKIP() << "B10 Expr SSE2 JIT requires CPUF_SSE2";
@@ -211,8 +211,8 @@ TEST(ExprSqrt, PreservesNegativeFloatDomainAcrossScalarAndSse2) {
   const auto* scalar_row = reinterpret_cast<const float*>(scalar_output->GetReadPtr(PLANAR_Y));
   const auto* sse2_row = reinterpret_cast<const float*>(sse2_output->GetReadPtr(PLANAR_Y));
   for (int x = 0; x < source.video_info.width; ++x) {
-    ASSERT_TRUE(std::isnan(scalar_row[x])) << "B10 scalar sqrt column=" << x;
-    ASSERT_TRUE(std::isnan(sse2_row[x]))
+    ASSERT_EQ(scalar_row[x], 0.0F) << "B10 scalar sqrt column=" << x;
+    ASSERT_EQ(sse2_row[x], 0.0F)
         << "B10 SSE2 sqrt column=" << x << " value=" << sse2_row[x];
   }
   EXPECT_NE(scalar_output->CheckMemory(), 1);
