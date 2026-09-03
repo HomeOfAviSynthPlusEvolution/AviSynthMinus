@@ -49,13 +49,22 @@ struct MTGuardChildFilter {
   std::mutex mutex;
 };
 
-MTGuard::MTGuard(PClip firstChild, MtMode mtmode, std::unique_ptr<const FilterConstructor>&& funcCtor, InternalEnvironment* env) :
+#ifdef AVS_WINDOWS
+MTGuard::MTGuard(PClip firstChild, MtMode mtmode, std::unique_ptr<const FilterConstructor>&& funcCtor, const wchar_t* current_directory, InternalEnvironment* env) :
+#else
+MTGuard::MTGuard(PClip firstChild, MtMode mtmode, std::unique_ptr<const FilterConstructor>&& funcCtor, const char* current_directory, InternalEnvironment* env) :
+#endif
   Env(env),
   nThreads(1),
 #ifndef OLD_PREFETCH
   mt_enabled(false),
 #endif
   FilterCtor(std::move(funcCtor)),
+#ifdef AVS_WINDOWS
+  CurrentDirectory(current_directory ? current_directory : L""),
+#else
+  CurrentDirectory(current_directory ? current_directory : ""),
+#endif
   MTMode(mtmode)
 {
   assert( ((int)mtmode > (int)MT_INVALID) && ((int)mtmode < (int)MT_MODE_COUNT) );
@@ -105,9 +114,21 @@ void MTGuard::EnableMT(size_t nThreads)
         for (size_t i = 0; i < this->nThreads; ++i) {
           newchilds[i].filter = ChildFilters[i].filter;
         }
-        // create the rest
-        for (size_t i = this->nThreads; i < nThreads; ++i) {
-          newchilds[i].filter = FilterCtor->InstantiateFilter().AsClip();
+        if (CurrentDirectory.empty()) {
+          // create the rest
+          for (size_t i = this->nThreads; i < nThreads; ++i) {
+            newchilds[i].filter = FilterCtor->InstantiateFilter().AsClip();
+          }
+        }
+        else {
+          // switch to the original CurrentDirectory to instantiate the threaded filters
+          // in order to their constructor to be able to see the original current directory
+          CWDChanger change_cwd(CurrentDirectory.c_str()); // wstring on Windows, string on Linux
+
+          // create the rest
+          for (size_t i = this->nThreads; i < nThreads; ++i) {
+            newchilds[i].filter = FilterCtor->InstantiateFilter().AsClip();
+          }
         }
         ChildFilters = std::move(newchilds);
       }
@@ -324,7 +345,11 @@ bool __stdcall MTGuard::IsMTGuard(const PClip& p)
   return ((p->GetVersion() >= 5) && (p->SetCacheHints(CACHE_IS_MTGUARD_REQ, 0) == CACHE_IS_MTGUARD_ANS));
 }
 
-PClip MTGuard::Create(MtMode mode, PClip filterInstance, std::unique_ptr<const FilterConstructor> funcCtor, InternalEnvironment* env)
+#ifdef AVS_WINDOWS
+PClip MTGuard::Create(MtMode mode, PClip filterInstance, std::unique_ptr<const FilterConstructor> funcCtor, const wchar_t* current_directory, InternalEnvironment* env)
+#else
+PClip MTGuard::Create(MtMode mode, PClip filterInstance, std::unique_ptr<const FilterConstructor> funcCtor, const char* current_directory, InternalEnvironment* env)
+#endif
 {
     switch (mode)
     {
@@ -335,13 +360,13 @@ PClip MTGuard::Create(MtMode mode, PClip filterInstance, std::unique_ptr<const F
     }
     case MT_MULTI_INSTANCE: // Fall-through intentional
     {
-        return new MTGuard(filterInstance, mode, std::move(funcCtor), env);
+        return new MTGuard(filterInstance, mode, std::move(funcCtor), current_directory, env);
         // args2 and args3 are not valid after this point anymore
     }
     case MT_SERIALIZED:
     {
         // FIXME 2021: probably MT_SERIALIZED do not need this one, after USE_MT_GUARDEXIT concept failed...
-        return new MTGuard(filterInstance, mode, NULL, env);
+        return new MTGuard(filterInstance, mode, nullptr, nullptr, env);
         // args2 and args3 are not valid after this point anymore
     }
     default:
@@ -349,7 +374,7 @@ PClip MTGuard::Create(MtMode mode, PClip filterInstance, std::unique_ptr<const F
         // return garbage for SetCacheHints(). However, this case should be recognized and
         // handled earlier, so we can never get to this default-branch. If we do, assume the worst.
         assert(0);
-        return new MTGuard(filterInstance, MT_SERIALIZED, NULL, env);
+        return new MTGuard(filterInstance, MT_SERIALIZED, nullptr, nullptr, env);
     }
 }
 

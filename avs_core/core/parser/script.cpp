@@ -417,6 +417,35 @@ void ScriptFunction::Delete(void* self, IScriptEnvironment*)
  **********************************/
 
 #ifdef AVS_WINDOWS
+
+std::wstring CWDChanger::GetCurrentWorkingDirectory() {
+  DWORD length = GetCurrentDirectoryW(0, nullptr);
+  if (length == 0) return {};
+
+  std::wstring buffer(length, L'\0');
+  if (GetCurrentDirectoryW(length, &buffer[0]) == 0) return {};
+
+  // Remove trailing null character if present
+  if (!buffer.empty() && buffer.back() == L'\0') {
+    buffer.pop_back();
+  }
+
+  return buffer;
+}
+
+#else
+
+std::string CWDChanger::GetCurrentWorkingDirectory() {
+  char buffer[FILENAME_MAX];
+  if (getcwd(buffer, sizeof(buffer)) == nullptr) return {};
+
+  return std::string(buffer);
+}
+
+#endif
+
+
+#ifdef AVS_WINDOWS
 void CWDChanger::Init(const wchar_t* new_cwd)
 {
   // works in unicode internally
