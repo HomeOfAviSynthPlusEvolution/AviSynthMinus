@@ -1590,7 +1590,7 @@ int calculate_sad_sse2(const BYTE* cur_ptr, const BYTE* other_ptr, int cur_pitch
     }
     if (mod16_width != rowsize) {
       if (packedRGB3264)
-        for (size_t x = mod16_width / 4; x < rowsize / 4; x += 4) {
+        for (size_t x = mod16_width / 4; x < rowsize / 4; ++x) {
           result += std::abs(cur_ptr[x*4+0] - other_ptr[x*4+0]) +
             std::abs(cur_ptr[x*4+1] - other_ptr[x*4+1]) +
             std::abs(cur_ptr[x*4+2] - other_ptr[x*4+2]);
@@ -1681,7 +1681,7 @@ int64_t calculate_sad_8_or_16_sse2(const BYTE* cur_ptr, const BYTE* other_ptr, i
     // rest
     if (mod16_width != rowsize) {
       if (packedRGB3264)
-        for (size_t x = mod16_width / sizeof(pixel_t) / 4; x < rowsize / sizeof(pixel_t) / 4; x += 4) {
+        for (size_t x = mod16_width / sizeof(pixel_t) / 4; x < rowsize / sizeof(pixel_t) / 4; ++x) {
           rowsum += std::abs(reinterpret_cast<const pixel_t *>(cur_ptr)[x*4+0] - reinterpret_cast<const pixel_t *>(other_ptr)[x*4+0]) +
             std::abs(reinterpret_cast<const pixel_t *>(cur_ptr)[x*4+1] - reinterpret_cast<const pixel_t *>(other_ptr)[x*4+1]) +
             std::abs(reinterpret_cast<const pixel_t *>(cur_ptr)[x*4+2] - reinterpret_cast<const pixel_t *>(other_ptr)[x*4+2]);

@@ -72,6 +72,23 @@ std::vector<SadWideCase> sad_wide_cases() {
 
 class PixelSumKernels : public ::testing::TestWithParam<SumCase> {};
 
+TEST(SadRgbTails, CountsEveryPixelAndIgnoresAlphaAcrossVectorBoundaries) {
+  if (!CpuFeatures::detect().supports(IsaRequirement::Sse2))
+    GTEST_SKIP() << "host does not support sse2";
+
+  for (std::size_t width = 1; width <= 12; ++width) {
+    SCOPED_TRACE(width);
+    run_sad_int_case(make_sad_int_case("PackedRgb32", true, width * 4, 3, 64, 80,
+        Variant<SadIntFunction>{"sse2", calculate_sad_sse2<true>, IsaRequirement::Sse2}));
+    run_sad_wide_case<std::uint8_t>(make_sad_wide_case("PackedRgb32", 1, true, width * 4, 3, 64, 80,
+        Variant<SadWideFunction>{"sse2", calculate_sad_8_or_16_sse2<std::uint8_t, true>,
+                                 IsaRequirement::Sse2}));
+    run_sad_wide_case<std::uint16_t>(make_sad_wide_case("PackedRgb64", 2, true, width * 4, 3, 128, 144,
+        Variant<SadWideFunction>{"sse2", calculate_sad_8_or_16_sse2<std::uint16_t, true>,
+                                 IsaRequirement::Sse2}));
+  }
+}
+
 TEST_P(PixelSumKernels, MatchesIndependentSum) {
   const auto& test_case = GetParam();
   if (!variant_supported(test_case.variant, CpuFeatures::detect())) {
