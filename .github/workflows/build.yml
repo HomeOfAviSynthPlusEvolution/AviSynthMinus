@@ -130,7 +130,9 @@ jobs:
 
   build-xp:
     name: ${{ matrix.name }}
-    runs-on: windows-2025-vs2026
+    # Keep the modern builds on VS2026, but use the supported VS2022 host for
+    # the legacy v141_xp component.
+    runs-on: windows-2022
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -148,11 +150,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install Windows XP build toolset
+      - name: Install and verify Windows XP build toolset
         shell: pwsh
         run: |
           $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\setup.exe'
-          $installPath = & vswhere.exe -latest -products '*' -requires Microsoft.Component.MSBuild -property installationPath
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path $vswhere)) { throw "vswhere.exe was not found at $vswhere." }
+
+          $installPath = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -property installationPath
           if (-not $installPath) { throw 'No Visual Studio installation with MSBuild was found.' }
           if (-not (Test-Path $installer)) { throw "Visual Studio Installer was not found at $installer." }
 
@@ -165,14 +170,41 @@ jobs:
             '--norestart'
           )
           $process = Start-Process -FilePath $installer -ArgumentList $installerArgs -Wait -PassThru -WindowStyle Hidden
+          Write-Host "Visual Studio Installer exit code: $($process.ExitCode)"
           if ($process.ExitCode -notin 0, 3010) {
             throw "Visual Studio Installer failed with exit code $($process.ExitCode)."
           }
 
+          $xpInstallPath = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.WinXP -property installationPath
+          if (-not $xpInstallPath) {
+            throw 'Visual Studio Installer completed, but vswhere cannot find Microsoft.VisualStudio.Component.WinXP.'
+          }
+          if ((Resolve-Path -LiteralPath $xpInstallPath).Path -ine (Resolve-Path -LiteralPath $installPath).Path) {
+            throw "The XP component was registered for a different Visual Studio instance: $xpInstallPath"
+          }
+
+          $platform = '${{ matrix.architecture }}'
+          $toolsetsRoot = Join-Path $installPath 'MSBuild\Microsoft\VC'
+          if (-not (Test-Path $toolsetsRoot)) { throw "MSBuild VC targets were not found at $toolsetsRoot." }
+          $platformPattern = [regex]::Escape($platform)
+          $toolsetProps = @(
+            Get-ChildItem -Path $toolsetsRoot -Filter Toolset.props -File -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match "\\Platforms\\$platformPattern\\PlatformToolsets\\v141_xp\\Toolset\.props$" }
+          )
+          if (-not $toolsetProps) {
+            $discoveredToolsets = @(Get-ChildItem -Path $toolsetsRoot -Filter v141_xp -Directory -Recurse -ErrorAction SilentlyContinue)
+            if ($discoveredToolsets) {
+              Write-Host 'Unexpected v141_xp toolset locations:'
+              $discoveredToolsets | Select-Object -ExpandProperty FullName
+            }
+            throw "The v141_xp toolset is not registered for platform $platform."
+          }
+          $toolsetProps | Select-Object -ExpandProperty FullName
+
       - name: Configure (Windows XP)
         shell: pwsh
         run: >
-          cmake -S . -B build -G "Visual Studio 18 2026"
+          cmake -S . -B build -G "Visual Studio 17 2022"
           -A ${{ matrix.architecture }} -T v141_xp
           -DBUILD_SHARED_LIBS=ON
           -DENABLE_TESTS=OFF
