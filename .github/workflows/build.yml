@@ -133,18 +133,15 @@ jobs:
     # Keep the modern builds on VS2026, but use the supported VS2022 host for
     # the legacy v141_xp component.
     runs-on: windows-2022
-    timeout-minutes: 60
+    # This temporary probe intentionally serializes compilation to attribute
+    # v141_xp compiler time to individual translation units.
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Windows XP v141_xp x86
-            architecture: Win32
-            msvc_cpu_arch: SSE
-            artifact_name: avisynth-windows-xp-v141-xp-x86
-          - name: Windows XP v141_xp x64
+          - name: Windows XP v141_xp x64 diagnostics
             architecture: x64
-            msvc_cpu_arch: SSE2
             artifact_name: avisynth-windows-xp-v141-xp-x64
 
     steps:
@@ -212,11 +209,12 @@ jobs:
           -DENABLE_CUDA=OFF
           -DENABLE_GIT_VERSIONING=OFF
           -DWINXP_SUPPORT=ON
-          -DMSVC_CPU_ARCH=${{ matrix.msvc_cpu_arch }}
+          -DENABLE_MSVC_MULTIPROCESSOR_COMPILATION=OFF
+          -DENABLE_MSVC_COMPILER_TIMING=ON
 
-      - name: Build (Windows XP)
+      - name: Build (Windows XP, serialized diagnostics)
         shell: pwsh
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build --config Release -- /m:1
 
       - name: Stage shared library (Windows XP)
         shell: pwsh

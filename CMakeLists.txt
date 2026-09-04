@@ -181,7 +181,15 @@ endif()
     # Needed to properly handle __has_include(<filesystem>) in avs_core/filesystem.h
     # See note in filesystem/README.md
     add_definitions("/Zc:__cplusplus")
-    add_compile_options("/utf-8" "/MP")
+    option(ENABLE_MSVC_MULTIPROCESSOR_COMPILATION "Enable MSVC /MP compilation" ON)
+    option(ENABLE_MSVC_COMPILER_TIMING "Emit MSVC /Bt+ compiler timing diagnostics" OFF)
+    add_compile_options("/utf-8")
+    if(ENABLE_MSVC_MULTIPROCESSOR_COMPILATION)
+      add_compile_options("/MP")
+    endif()
+    if(ENABLE_MSVC_COMPILER_TIMING)
+      add_compile_options("/Bt+")
+    endif()
 
     IF(MSVC_IDE)
       message("MSVC_IDE support found, reported CMAKE_GENERATOR_TOOLSET is: ${CMAKE_GENERATOR_TOOLSET}")
