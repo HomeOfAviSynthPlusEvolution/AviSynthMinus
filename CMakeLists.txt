@@ -6,6 +6,7 @@
 # "Visual Studio 16 2019" optional platform generator Win32 and x64. optional toolset "v141_xp"
 # "Visual Studio 17 2022" optional platform generator Win32 and x64. optional toolset "v141_xp"
 # "Visual Studio 17 2022" optional platform generator Win32 and x64. optional toolset "clangcl"
+# "Visual Studio 18 2026" optional platform generator Win32, x64 and ARM64
 
 # Intel C++ Compilers
 # Minimum Cmake version for Intel C++ Compiler 2023: 3.22.3 (Win) 3.20 (Linux)
@@ -101,9 +102,16 @@ if(CMAKE_VERSION VERSION_GREATER 3.7)
 endif()
 
   # Detect Intel processors and turn Intel SIMD on or off automatically.
+  # Prefer the generator target over the host processor when cross-compiling.
   message("-- Detected target processor as: ${CMAKE_SYSTEM_PROCESSOR}")
   string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" ARCHID)
-  if( ("${ARCHID}" STREQUAL "x86") OR
+  string(TOLOWER "${CMAKE_GENERATOR_PLATFORM}" GENERATOR_ARCHID)
+  if(("${GENERATOR_ARCHID}" STREQUAL "arm64") OR
+     ("${GENERATOR_ARCHID}" STREQUAL "aarch64") OR
+     ("${ARCHID}" STREQUAL "arm64") OR
+     ("${ARCHID}" STREQUAL "aarch64"))
+    set(INTEL_SIMD "OFF")
+  elseif( ("${ARCHID}" STREQUAL "x86") OR
       ("${ARCHID}" STREQUAL "x64") OR
       ("${ARCHID}" STREQUAL "i686") OR
       ("${ARCHID}" STREQUAL "amd64") OR
@@ -148,17 +156,18 @@ endif()
     #1920-1929 = VS 16.0 (v142 toolset) Visual Studio 2019
     #1930-1939 = VS 17.0 (v143 toolset) Visual Studio 2022
 
-    # detect if the target is for x86
+    # Supported MSVC target platforms.
     string(TOLOWER "${CMAKE_VS_PLATFORM_NAME}" PLATFORMID)
     if(("${PLATFORMID}" STREQUAL "win32") OR
-       ("${PLATFORMID}" STREQUAL "x64"  ))
+       ("${PLATFORMID}" STREQUAL "x64"  ) OR
+       ("${PLATFORMID}" STREQUAL "arm64"))
         set(NON_X86_PLATFORM "OFF")
     else()
         set(NON_X86_PLATFORM "ON")
     endif()
 
     if(NON_X86_PLATFORM)
-        message(FATAL_ERROR "MSVC/ClangCL only supported on x86(-64). Use MinGW (llvm-mingw or gcc).")
+        message(FATAL_ERROR "MSVC/ClangCL only supported on Win32, x64, or ARM64. Use MinGW (llvm-mingw or gcc).")
     endif()
 
     IF( MSVC_VERSION VERSION_LESS 1910 )

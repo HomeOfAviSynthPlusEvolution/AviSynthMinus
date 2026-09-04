@@ -128,7 +128,7 @@
 #  endif
 #endif
 
-#if defined(MSVC) && !defined(AVS_WINDOWS_X86)
+#if defined(MSVC) && !defined(AVS_WINDOWS_X86) && !(defined(AVS_WINDOWS_ARM) && defined(ARM64))
 #    error Unsupported combination of compiler, operating system, and machine architecture.
 #endif
 
