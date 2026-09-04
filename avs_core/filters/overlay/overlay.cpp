@@ -166,6 +166,9 @@ GenericVideoFilter(_child) {
     env->ThrowError("Overlay: input and overlay clip must have the same bit depths!");
   }
 
+  if (bits_per_pixel == 32 && (of_mode == OF_Add || of_mode == OF_Subtract))
+    env->ThrowError("Overlay: mode '%s' does not support float input.", name);
+
   // already filled vi = child->GetVideoInfo();
   // parse and check output format override vi
   output_pixel_format_override = args[ARG_OUTPUT].AsString(nullptr);

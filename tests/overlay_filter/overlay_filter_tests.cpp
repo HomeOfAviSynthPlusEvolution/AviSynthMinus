@@ -599,7 +599,7 @@ TEST(OverlayFilter, UsesBaseFramePropertiesForBlendOutput) {
 
 class OverlayFilterArithmeticTest : public ::testing::TestWithParam<OverlayArithmeticCase> {};
 
-TEST_P(OverlayFilterArithmeticTest, MatchesIndependentArithmeticReference) {
+TEST_P(OverlayFilterArithmeticTest, MatchesReferenceOrRejectsUnsupportedFloatInput) {
   const auto& test_case = GetParam();
   AviSynthEnvironment environment;
   const auto vi = make_video_info(
@@ -633,6 +633,17 @@ TEST_P(OverlayFilterArithmeticTest, MatchesIndependentArithmeticReference) {
   args[5] = test_case.opacity;
   if (planar_rgb) {
     args[11] = false;
+  }
+  if (vi.ComponentSize() == 4) {
+    try {
+      Overlay filter(base, AVSValue(args.data(), static_cast<int>(args.size())), environment.get());
+      FAIL() << "Floating-point Add/Subtract must be rejected before rendering";
+    } catch (const AvisynthError& error) {
+      EXPECT_NE(std::string(error.msg).find("does not support float input"), std::string::npos);
+    }
+    EXPECT_TRUE(base_impl->frame_requests().empty());
+    EXPECT_TRUE(overlay_impl->frame_requests().empty());
+    return;
   }
   Overlay filter(base, AVSValue(args.data(), static_cast<int>(args.size())), environment.get());
   EXPECT_EQ(filter.GetVideoInfo().pixel_type, vi.pixel_type);
