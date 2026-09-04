@@ -403,6 +403,31 @@ TEST(TweakFilter, KeepsSixteenBitDitherWithinOneEightBitStep) {
 
 class FloatDitherTweakTest : public ::testing::TestWithParam<bool> {};
 
+TEST_P(FloatDitherTweakTest, ZeroStrengthPreservesAllPlanes) {
+  AviSynthEnvironment environment;
+  const auto vi = make_video_info(
+      VideoInfoSpec{16, 16, VideoInfo::CS_YUV444PS, 1, 25, 1});
+  PVideoFrame source = environment.get()->NewVideoFrame(vi);
+  for (const int plane : {PLANAR_Y, PLANAR_U, PLANAR_V}) {
+    write_frame_plane<float>(source, plane, [plane](int, int) {
+      return plane == PLANAR_Y ? 0.5F : (plane == PLANAR_U ? 0.125F : -0.125F);
+    });
+  }
+  const PClip clip(new StaticFrameClip(vi, source));
+  Tweak filter(clip, 0.0, 1.0, 0.0, 1.0, GetParam(), 0.0, 360.0, 150.0, 0.0, 0.0,
+               true, false, 0.0, environment.get());
+  const PVideoFrame output = filter.GetFrame(0, environment.get());
+  for (const int plane : {PLANAR_Y, PLANAR_U, PLANAR_V}) {
+    const float expected = plane == PLANAR_Y ? 0.5F : (plane == PLANAR_U ? 0.125F : -0.125F);
+    for (int y = 0; y < vi.height; ++y) {
+      const auto* row = reinterpret_cast<const float*>(
+          output->GetReadPtr(plane) + y * output->GetPitch(plane));
+      for (int x = 0; x < vi.width; ++x)
+        EXPECT_EQ(row[x], expected) << "plane=" << plane << " x=" << x << " y=" << y;
+    }
+  }
+}
+
 TEST_P(FloatDitherTweakTest, AppliesOrderedDitherWithRangeClipping) {
   const bool coring = GetParam();
   AviSynthEnvironment environment;

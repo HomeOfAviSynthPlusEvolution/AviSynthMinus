@@ -1646,7 +1646,7 @@ Tweak::Tweak(PClip _child, double _hue, double _sat, double _bright, double _con
     // lut scale settings
     scale_dither_luma = 256; // lower 256 is dither value
     divisor_dither_luma *= 256;
-    bias_dither_luma = -(256.0f * dither_strength - 1) / 2;
+    bias_dither_luma = pixelsize == 4 ? -127.5f * dither_strength : -(256.0f * dither_strength - 1) / 2;
     // original bias: -127.5 or -(256.0f * dither_strength - 1) / 2;
     // dither strength =1 = (1 << (8-8))
     // dither min: int( (0*1-127.5)/256+0.5) = -0.498046875 + 0.5 = 0,001953125
@@ -1660,7 +1660,8 @@ Tweak::Tweak(PClip _child, double _hue, double _sat, double _bright, double _con
 
     scale_dither_chroma = 16; // lower 16 is dither value
     divisor_dither_chroma *= 16;
-    bias_dither_chroma = -(16.0f * dither_strength - (pixelsize==4 ? 1/256.0f : 1)) / 2; // -7.5
+    // Float dither must remain centered on zero at every strength.
+    bias_dither_chroma = pixelsize == 4 ? -7.5f * dither_strength : -(16.0f * dither_strength - 1) / 2;
   }
 
   // Flag to skip special processing if doing all pixels
