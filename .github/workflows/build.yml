@@ -1,30 +1,127 @@
-name: Build AviSynth+
+name: Build shared libraries
 
-on: [push]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-    name: ${{ matrix.config.name }}
-    runs-on: ${{ matrix.config.os }}
+  build-core:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
-        config:
-        - {name: "Windows Latest x64", os: windows-latest, cmake-parameters: "-A x64"}
-        - {name: "Windows Latest x86", os: windows-latest, cmake-parameters: "-A Win32"}
-        - {name: "Ubuntu 22.04 x64", os: ubuntu-22.04}
-        - {name: "Ubuntu 24.04 x64", os: ubuntu-24.04}
-        - {name: "macOS Latest x64", os: macos-latest}
+        include:
+          - name: Ubuntu 26.04 x64
+            runner: ubuntu-26.04
+            family: linux
+            artifact_name: avisynth-ubuntu-26.04-x64
+            artifact_path: stage/**/*.so*
+          - name: Ubuntu 26.04 arm64
+            runner: ubuntu-26.04-arm
+            family: linux
+            artifact_name: avisynth-ubuntu-26.04-arm64
+            artifact_path: stage/**/*.so*
+          - name: macOS 15 Intel x64
+            runner: macos-15-intel
+            family: macos
+            artifact_name: avisynth-macos-15-x64
+            artifact_path: stage/**/*.dylib
+          - name: macOS 15 Apple Silicon arm64
+            runner: macos-15
+            family: macos
+            artifact_name: avisynth-macos-15-arm64
+            artifact_path: stage/**/*.dylib
+          - name: Windows VS2026 x64
+            runner: windows-2025-vs2026
+            family: windows
+            architecture: x64
+            artifact_name: avisynth-windows-vs2026-x64
+            artifact_path: stage/**/*.dll
+          - name: Windows VS2026 arm64
+            runner: windows-11-vs2026-arm
+            family: windows
+            architecture: ARM64
+            artifact_name: avisynth-windows-vs2026-arm64
+            artifact_path: stage/**/*.dll
 
     steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: ${{ matrix.config.checkout-submodules }}
-        fetch-depth: 0
+      - uses: actions/checkout@v6
 
-    - name: configure
-      run: |
-        cmake -S . -B avisynth-build ${{ matrix.config.cmake-parameters }}
+      - name: Configure (POSIX)
+        if: matrix.family == 'linux' || matrix.family == 'macos'
+        shell: bash
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DENABLE_TESTS=OFF \
+            -DENABLE_PLUGINS=OFF \
+            -DENABLE_CUDA=OFF \
+            -DENABLE_GIT_VERSIONING=OFF
 
-    - name: build
-      run: |
-        cmake --build avisynth-build --config Release -j 2
+      - name: Configure (Windows)
+        if: matrix.family == 'windows'
+        shell: pwsh
+        run: >
+          cmake -S . -B build -G "Visual Studio 18 2026"
+          -A ${{ matrix.architecture }} -T v145
+          -DBUILD_SHARED_LIBS=ON
+          -DENABLE_TESTS=OFF
+          -DENABLE_PLUGINS=OFF
+          -DENABLE_CUDA=OFF
+          -DENABLE_GIT_VERSIONING=OFF
+
+      - name: Build (POSIX)
+        if: matrix.family == 'linux' || matrix.family == 'macos'
+        shell: bash
+        run: cmake --build build --parallel
+
+      - name: Build (Windows)
+        if: matrix.family == 'windows'
+        shell: pwsh
+        run: cmake --build build --config Release --parallel
+
+      - name: Stage shared library (POSIX)
+        if: matrix.family == 'linux' || matrix.family == 'macos'
+        shell: bash
+        run: cmake --install build --prefix "$PWD/stage"
+
+      - name: Stage shared library (Windows)
+        if: matrix.family == 'windows'
+        shell: pwsh
+        run: cmake --install build --config Release --prefix "$PWD/stage"
+
+      - name: Verify shared library (Linux)
+        if: matrix.family == 'linux'
+        shell: bash
+        run: |
+          find stage -type f -name 'libavisynth.so*' -print
+          test -n "$(find stage -type f -name 'libavisynth.so*' -print -quit)"
+
+      - name: Verify shared library (macOS)
+        if: matrix.family == 'macos'
+        shell: bash
+        run: |
+          find stage -type f -name 'libavisynth*.dylib' -print
+          test -n "$(find stage -type f -name 'libavisynth*.dylib' -print -quit)"
+
+      - name: Verify shared library (Windows)
+        if: matrix.family == 'windows'
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem -Path stage -Filter AviSynth.dll -Recurse -File
+          if (-not $dll) { throw 'AviSynth.dll was not installed.' }
+          $dll | Select-Object -ExpandProperty FullName
+
+      - name: Upload shared library
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
