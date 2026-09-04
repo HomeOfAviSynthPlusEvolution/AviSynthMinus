@@ -133,16 +133,31 @@ jobs:
     # Keep the modern builds on VS2026, but use the supported VS2022 host for
     # the legacy v141_xp component.
     runs-on: windows-2022
-    # This temporary probe intentionally serializes compilation to attribute
-    # v141_xp compiler time to individual translation units.
+    # Keep target-level MSBuild parallelism fixed while comparing the old
+    # compiler's /MP behavior and the cost of the Expr implementation itself.
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Windows XP v141_xp x64 diagnostics
+          - name: Windows XP v141_xp x64 /MP timings
             architecture: x64
-            artifact_name: avisynth-windows-xp-v141-xp-x64
+            artifact_name: avisynth-windows-xp-v141-xp-x64-mp-timings
+            compiler_multiprocessor: "ON"
+            exprfilter_diagnostic_stub: "OFF"
+            exprfilter_compile_speed_optimization: "OFF"
+          - name: Windows XP v141_xp x64 Expr /O1 /Ob1 timings
+            architecture: x64
+            artifact_name: avisynth-windows-xp-v141-xp-x64-exprfilter-o1-ob1-timings
+            compiler_multiprocessor: "OFF"
+            exprfilter_diagnostic_stub: "OFF"
+            exprfilter_compile_speed_optimization: "ON"
+          - name: Windows XP v141_xp x64 Expr stub timings
+            architecture: x64
+            artifact_name: avisynth-windows-xp-v141-xp-x64-exprfilter-stub-not-for-use
+            compiler_multiprocessor: "OFF"
+            exprfilter_diagnostic_stub: "ON"
+            exprfilter_compile_speed_optimization: "OFF"
 
     steps:
       - uses: actions/checkout@v6
@@ -209,10 +224,12 @@ jobs:
           -DENABLE_CUDA=OFF
           -DENABLE_GIT_VERSIONING=OFF
           -DWINXP_SUPPORT=ON
-          -DENABLE_MSVC_MULTIPROCESSOR_COMPILATION=OFF
+          -DENABLE_MSVC_MULTIPROCESSOR_COMPILATION=${{ matrix.compiler_multiprocessor }}
           -DENABLE_MSVC_COMPILER_TIMING=ON
+          -DENABLE_EXPRFILTER_DIAGNOSTIC_STUB=${{ matrix.exprfilter_diagnostic_stub }}
+          -DENABLE_EXPRFILTER_COMPILE_SPEED_OPTIMIZATION=${{ matrix.exprfilter_compile_speed_optimization }}
 
-      - name: Build (Windows XP, serialized diagnostics)
+      - name: Build (Windows XP diagnostics)
         shell: pwsh
         run: cmake --build build --config Release -- /m:1
 

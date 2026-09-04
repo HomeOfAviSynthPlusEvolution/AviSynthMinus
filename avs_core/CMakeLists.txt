@@ -12,7 +12,21 @@ endif()
 
 # Create library
 project("AvsCore" VERSION "${PROJECT_VERSION}" LANGUAGES CXX)
+option(ENABLE_EXPRFILTER_DIAGNOSTIC_STUB
+  "Replace Expr with a non-functional stub for compiler-timing diagnostics" OFF)
+option(ENABLE_EXPRFILTER_COMPILE_SPEED_OPTIMIZATION
+  "Use /O1 /Ob1 for Expr compiler-timing diagnostics (MSVC only)" OFF)
 Include("Files.cmake")
+if(ENABLE_EXPRFILTER_DIAGNOSTIC_STUB)
+  list(REMOVE_ITEM AvsCore_Sources "filters/exprfilter/exprfilter.cpp")
+else()
+  list(REMOVE_ITEM AvsCore_Sources "filters/exprfilter/exprfilter_stub.cpp")
+  if(MSVC AND ENABLE_EXPRFILTER_COMPILE_SPEED_OPTIMIZATION)
+    # Keep /Ob1 after /O1: /O1 would otherwise select /Ob2 by default.
+    set_source_files_properties(filters/exprfilter/exprfilter.cpp
+      PROPERTIES COMPILE_FLAGS " /O1 /Ob1")
+  endif()
+endif()
 add_library("AvsCore" ${AvsCore_Sources})
 set_target_properties("AvsCore" PROPERTIES "OUTPUT_NAME" "${CoreName}")
 if (NOT WIN32)
