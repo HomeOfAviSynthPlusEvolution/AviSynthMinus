@@ -3138,11 +3138,7 @@ size_t  ScriptEnvironment::GetEnvProperty(AvsEnvProperty prop)
   case AEP_THREADPOOL_THREADS:
     return thread_pool->NumThreads();
   case AEP_VERSION:
-#ifdef RELEASE_TARBALL
-    return 0;
-#else
     return AVS_SEQREV;
-#endif
   case AEP_HOST_SYSTEM_ENDIANNESS:
     return (uintptr_t)AVS_ENDIANNESS;
   case AEP_INTERFACE_VERSION:
@@ -5823,4 +5819,3 @@ AVSC_API(IScriptEnvironment2*, CreateScriptEnvironment2)(int version)
 }
 
 ///////////////
-

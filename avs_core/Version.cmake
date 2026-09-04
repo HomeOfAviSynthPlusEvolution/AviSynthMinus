@@ -1,50 +1,66 @@
-FIND_PACKAGE(Git)
-if (EXISTS "${REPO}/.git" AND GIT_FOUND)
-EXECUTE_PROCESS(
-    COMMAND "${GIT}" --git-dir=${REPO}/.git  rev-list --count HEAD
-    OUTPUT_VARIABLE AVS_SEQREV
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-EXECUTE_PROCESS(
-    COMMAND "${GIT}" --git-dir=${REPO}/.git  rev-parse --abbrev-ref HEAD
-    OUTPUT_VARIABLE AVS_BRANCH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+# Source numbers select the fork's series; compatibility numbers are separate.
+# Accepted release tags: 0.1.1 or minus-v0.1.1 (also with -rc.1, etc.).
+file(READ "${SRC}" version_template)
+foreach(component MAJOR MINOR BUGFIX)
+  string(REGEX MATCH "#define[ \t]+AVS_MINUS_${component}_VER[ \t]+([0-9]+)" match "${version_template}")
+  if(NOT match)
+    message(FATAL_ERROR "Missing AVS_MINUS_${component}_VER in ${SRC}")
+  endif()
+  set(minus_${component} "${CMAKE_MATCH_1}")
+endforeach()
+set(AVS_MINUS_VERSION "${minus_MAJOR}.${minus_MINOR}.${minus_BUGFIX}-dev+unknown")
+set(AVS_DEV_REVDATE unknown)
 
-# find the newest created tag, which will hopefully only be relevant to
-# release tags (which themselves only apply to the release branches)
-EXECUTE_PROCESS(
-    COMMAND "${GIT}" --git-dir=${REPO}/.git  describe --tags --abbrev=0
-    OUTPUT_VARIABLE AVS_NEWEST_TAG
-)
-string(STRIP ${AVS_NEWEST_TAG} AVS_NEWEST_TAG)
-
-# count the number of commits since the most recently created tag.
-# if an older-than-tag commit has been checked out as HEAD, then this
-# will report '0', which shouldn't be a problem because this is entirely
-# intended for the purposes of current development and not as an
-# arbitrary meter between release tags.
-EXECUTE_PROCESS(
-    COMMAND "${GIT}" --git-dir=${REPO}/.git  rev-list --count ${AVS_NEWEST_TAG}..HEAD
-    OUTPUT_VARIABLE AVS_DEVNEXT_REV
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-# date of last git commit to branch
-EXECUTE_PROCESS(
-    COMMAND "${GIT}" --git-dir=${REPO}/.git  log -1 HEAD --format=%cd --date=unix
-    OUTPUT_VARIABLE AVS_DEV_REVDATE
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-set(ENV{SOURCE_DATE_EPOCH} ${AVS_DEV_REVDATE})
-string(TIMESTAMP AVS_DEV_REVDATE %Y-%m-%d UTC)
-unset(ENV{SOURCE_DATE_EPOCH})
-
-# abbreviated git commit hash
-EXECUTE_PROCESS(
-    COMMAND "${GIT}" --git-dir=${REPO}/.git  describe --tags
-    OUTPUT_VARIABLE AVS_DEV_GITHASH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+if(NOT GIT OR NOT EXISTS "${GIT}")
+  find_package(Git QUIET)
+  set(GIT "${GIT_EXECUTABLE}")
 endif()
-CONFIGURE_FILE(${SRC} ${DST} @ONLY)
+
+# -C also supports .git pointer files in worktrees and submodules.
+function(read_git output)
+  execute_process(COMMAND "${GIT}" -C "${REPO}" ${ARGN}
+    RESULT_VARIABLE result OUTPUT_VARIABLE value
+    OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+  if(result EQUAL 0)
+    set(${output} "${value}" PARENT_SCOPE)
+  else()
+    set(${output} "" PARENT_SCOPE)
+  endif()
+endfunction()
+
+if(EXISTS "${REPO}/.git" AND EXISTS "${GIT}")
+  read_git(commit_hash rev-parse --verify HEAD)
+  if(commit_hash)
+    read_git(short_hash rev-parse --short=8 HEAD)
+    read_git(AVS_DEV_REVDATE log -1 --format=%cs HEAD)
+    set(AVS_MINUS_VERSION "${minus_MAJOR}.${minus_MINOR}.${minus_BUGFIX}-dev-g${short_hash}")
+
+    # Exclude upstream tags and other series, even after a branch merge.
+    read_git(tags tag --list)
+    string(REPLACE "\n" ";" tags "${tags}")
+    set(tag_args)
+    foreach(tag IN LISTS tags)
+      if(tag MATCHES "^(minus-v)?${minus_MAJOR}\\.${minus_MINOR}\\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$")
+        list(APPEND tag_args --match "${tag}")
+      endif()
+    endforeach()
+    if(tag_args)
+      read_git(description describe --tags --first-parent --long --abbrev=8 ${tag_args} HEAD)
+      if(description MATCHES "^(.*)-([0-9]+)-g([0-9a-f]+)$")
+        set(release_tag "${CMAKE_MATCH_1}")
+        set(commits_since_tag "${CMAKE_MATCH_2}")
+        string(REGEX REPLACE "^minus-v" "" AVS_MINUS_VERSION "${release_tag}")
+        if(commits_since_tag GREATER 0)
+          set(AVS_MINUS_VERSION "${AVS_MINUS_VERSION}+${commits_since_tag}-g${short_hash}")
+        endif()
+      endif()
+    endif()
+
+  endif()
+endif()
+
+# Windows fixed version fields require four integers. Derive the base from
+# the selected tag rather than potentially stale source patch numbers.
+string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" numeric_version "${AVS_MINUS_VERSION}")
+set(AVS_MINUS_FILEVERSION "${CMAKE_MATCH_1},${CMAKE_MATCH_2},${CMAKE_MATCH_3},0")
+configure_file("${SRC}" "${DST}" @ONLY)

@@ -52,6 +52,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Configure (POSIX)
         if: matrix.family == 'linux' || matrix.family == 'macos'
@@ -62,8 +64,7 @@ jobs:
             -DBUILD_SHARED_LIBS=ON \
             -DENABLE_TESTS=OFF \
             -DENABLE_PLUGINS=OFF \
-            -DENABLE_CUDA=OFF \
-            -DENABLE_GIT_VERSIONING=OFF
+            -DENABLE_CUDA=OFF
 
       - name: Configure (Windows)
         if: matrix.family == 'windows'
@@ -75,7 +76,6 @@ jobs:
           -DENABLE_TESTS=OFF
           -DENABLE_PLUGINS=OFF
           -DENABLE_CUDA=OFF
-          -DENABLE_GIT_VERSIONING=OFF
 
       - name: Build (POSIX)
         if: matrix.family == 'linux' || matrix.family == 'macos'
@@ -147,6 +147,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Install and verify Windows XP build toolset
         shell: pwsh
@@ -208,7 +210,6 @@ jobs:
           -DENABLE_TESTS=OFF
           -DENABLE_PLUGINS=OFF
           -DENABLE_CUDA=OFF
-          -DENABLE_GIT_VERSIONING=OFF
           -DWINXP_SUPPORT=ON
           -DMSVC_CPU_ARCH=${{ matrix.msvc_cpu_arch }}
 

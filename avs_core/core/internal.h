@@ -55,13 +55,7 @@
 #endif
 #endif
 
-#if AVS_DEVNEXT_REV > 0
-#define AVS_DEVELOPMENT_BUILD "\nNext Version Development Build: " AVS_PPSTR(AVS_DEV_REVDATE)
-#define AVS_DEVELOPMENT_BUILD_GIT "\nGit: " AVS_PPSTR(AVS_DEV_GITHASH)
-#else
-#define AVS_DEVELOPMENT_BUILD
-#define AVS_DEVELOPMENT_BUILD_GIT
-#endif
+#define AVS_VERSION_DATE "\nCommit date: " AVS_PPSTR(AVS_DEV_REVDATE)
 
 // !! precision problems 2.60f < 2.60. Extra care for scripts where the version checking occurs like "IsAvs26 = VersionNumber()>=2.60"
 #define AVS_VERSION 3.75  // Note: Used by VersionNumber() script function
