@@ -57,12 +57,12 @@ std::vector<GreyscaleRgb64Case> greyscale_rgb64_cases() {
     cases.push_back(make_greyscale_rgb64_case(
         std::get<0>(item), std::get<1>(item), std::get<2>(item), std::get<3>(item), 8, 5, 64,
         Variant<GreyscaleRgb64FuncPtr>{"sse41", greyscale_rgb64_sse41, IsaRequirement::Sse41},
-        std::get<2>(item) == rec601 ? "8e86848b4bcc9fb5" : "5a58fd5f9ff4b1ac"));
+        std::get<2>(item) == rec601 ? "88f2ace9f9aa62d0" : "5a58fd5f9ff4b1ac"));
   }
   cases.push_back(make_greyscale_rgb64_case(
       "Rec601", "Limited", rec601, limited, 10, 7, 80,
       Variant<GreyscaleRgb64FuncPtr>{"sse41", greyscale_rgb64_sse41, IsaRequirement::Sse41},
-      "efb79d6177cc1897", 0xF30A5B04U));
+      "66e5c8a4d20b7011", 0xF30A5B04U));
   cases.push_back(make_greyscale_rgb64_case(
       "Rec709", "Full", rec709, full, 10, 7, 80,
       Variant<GreyscaleRgb64FuncPtr>{"sse41", greyscale_rgb64_sse41, IsaRequirement::Sse41},
