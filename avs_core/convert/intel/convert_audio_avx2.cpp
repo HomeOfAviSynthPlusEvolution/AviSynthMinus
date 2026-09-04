@@ -9,6 +9,7 @@
 #include <avs/types.h>
 #include <avs/config.h>
 #include <immintrin.h> // AVX2 at most
+#include <cmath>
 
 // Easy: 32-16, 16-32
 // Float: 8/16/32-FLT, FLT-8/16/32
@@ -90,7 +91,8 @@ void convertFLTTo8_AVX2(void* inbuf, void* outbuf, int count) {
   for (int i = c_loop; i < count; i++) {
     float val = in[i] * multiplier;
     uint8_t result;
-    if (val >= max8) result = 255;
+    if (std::isnan(val)) result = 128;
+    else if (val >= max8) result = 255;
     else if (val <= min8) result = 0;
     else result = static_cast<int8_t>(val) + 128;
     out[i] = result;
@@ -102,6 +104,8 @@ void convertFLTTo8_AVX2(void* inbuf, void* outbuf, int count) {
   for (int i = 0; i < c_loop; i += 16) {
     __m256 infl_lo = _mm256_loadu_ps(in); in += 8;
     __m256 infl_hi = _mm256_loadu_ps(in); in += 8;
+    infl_lo = _mm256_and_ps(infl_lo, _mm256_cmp_ps(infl_lo, infl_lo, _CMP_ORD_Q));
+    infl_hi = _mm256_and_ps(infl_hi, _mm256_cmp_ps(infl_hi, infl_hi, _CMP_ORD_Q));
     __m256 outfl_lo = _mm256_max_ps(minv, _mm256_min_ps(maxv, _mm256_mul_ps(infl_lo, mulv)));
     __m256 outfl_hi = _mm256_max_ps(minv, _mm256_min_ps(maxv, _mm256_mul_ps(infl_hi, mulv)));
     __m256i out32_lo = _mm256_cvttps_epi32(outfl_lo);
@@ -149,7 +153,8 @@ void convertFLTTo16_AVX2(void* inbuf, void* outbuf, int count) {
   for (int i = c_loop; i < count; i++) {
     float val = in[i] * multiplier;
     int16_t result;
-    if (val >= max16) result = 32767;
+    if (std::isnan(val)) result = 0;
+    else if (val >= max16) result = 32767;
     else if (val <= min16) result = (int16_t)-32768;
     else result = static_cast<int16_t>(val);
     out[i] = result;
@@ -160,6 +165,7 @@ void convertFLTTo16_AVX2(void* inbuf, void* outbuf, int count) {
   __m256 minv = _mm256_set1_ps(min16);
   for (int i = 0; i < c_loop; i += 8) {
     __m256 infl = _mm256_loadu_ps(in); in += 8;
+    infl = _mm256_and_ps(infl, _mm256_cmp_ps(infl, infl, _CMP_ORD_Q)); // NaN becomes silence.
     __m256 outfl = _mm256_max_ps(minv, _mm256_min_ps(maxv, _mm256_mul_ps(infl, mulv)));
     __m256i out32 = _mm256_cvttps_epi32(outfl);
     __m256i out16 = _mm256_packs_epi32(out32, out32);
@@ -203,7 +209,8 @@ void convertFLTTo32_AVX2(void *inbuf, void *outbuf, int count) {
   for (int i = c_loop; i < count; i++) {
     float val = in[i] * multiplier;
     int32_t result;
-    if (val >= max32) result = 0x7FFFFFFF; // 2147483647
+    if (std::isnan(val)) result = 0;
+    else if (val >= max32) result = 0x7FFFFFFF; // 2147483647
     else if (val <= min32) result = 0x80000000; // -2147483648
     else result = static_cast<int32_t>(val);
     out[i] = result;
@@ -216,6 +223,7 @@ void convertFLTTo32_AVX2(void *inbuf, void *outbuf, int count) {
   __m256i minv_i = _mm256_set1_epi32(0x80000000); // -2147483648
   for (int i = 0; i < c_loop; i += 8) {
     __m256 infl = _mm256_loadu_ps(in); in += 8;
+    infl = _mm256_and_ps(infl, _mm256_cmp_ps(infl, infl, _CMP_ORD_Q));
     __m256 outfl = _mm256_mul_ps(infl, mulv);
     __m256i cmphigh = _mm256_castps_si256(_mm256_cmp_ps(outfl, maxv, _CMP_GE_OS));
     __m256i cmplow = _mm256_castps_si256(_mm256_cmp_ps(minv, outfl, _CMP_GE_OS));

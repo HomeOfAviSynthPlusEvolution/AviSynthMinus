@@ -124,6 +124,44 @@ INSTANTIATE_TEST_SUITE_P(B1, ConvertAudioNonFinite, ::testing::ValuesIn(audio_no
                            return info.param.name;
                          });
 
+TEST_P(ConvertAudioNonFinite, SilencesNanAndSaturatesInfinityAcrossVectorBoundaries) {
+  const auto& test_case = GetParam();
+  const auto features = CpuFeatures::detect();
+  std::vector<AudioConvertFunction> implementations{test_case.scalar};
+  if (features.supports(test_case.bytes_per_sample == 4 ? IsaRequirement::Sse41 : IsaRequirement::Sse2))
+    implementations.push_back(test_case.sse);
+  if (features.supports(IsaRequirement::Avx2))
+    implementations.push_back(test_case.avx2);
+
+  for (const int count : {1, 3, 4, 7, 8, 15, 16, 17, 31, 32, 33}) {
+    SCOPED_TRACE(count);
+    std::vector<float> source(count);
+    std::vector<std::uint8_t> expected(count * test_case.bytes_per_sample);
+    for (int i = 0; i < count; ++i) {
+      source[i] = i % 3 == 0 ? std::numeric_limits<float>::quiet_NaN() :
+                  i % 3 == 1 ? std::numeric_limits<float>::infinity() :
+                               -std::numeric_limits<float>::infinity();
+      if (test_case.bytes_per_sample == 1) {
+        expected[i] = i % 3 == 0 ? 128 : i % 3 == 1 ? 255 : 0;
+      } else if (test_case.bytes_per_sample == 2) {
+        const std::int16_t value = i % 3 == 0 ? 0 : i % 3 == 1 ? 32767 : -32768;
+        std::memcpy(expected.data() + i * sizeof(value), &value, sizeof(value));
+      } else {
+        const std::int32_t value = i % 3 == 0 ? 0 : i % 3 == 1 ?
+            std::numeric_limits<std::int32_t>::max() : std::numeric_limits<std::int32_t>::min();
+        std::memcpy(expected.data() + i * sizeof(value), &value, sizeof(value));
+      }
+    }
+    for (const auto implementation : implementations) {
+      std::vector<std::uint8_t> output(expected.size() + 32, 0xa5);
+      implementation(source.data(), output.data() + 16, count);
+      EXPECT_TRUE(std::equal(expected.begin(), expected.end(), output.begin() + 16));
+      EXPECT_TRUE(std::all_of(output.begin(), output.begin() + 16, [](auto v) { return v == 0xa5; }));
+      EXPECT_TRUE(std::all_of(output.end() - 16, output.end(), [](auto v) { return v == 0xa5; }));
+    }
+  }
+}
+
 float next_float_steps(float value, int direction, int steps) {
   const float destination = direction < 0 ? -std::numeric_limits<float>::infinity()
                                           : std::numeric_limits<float>::infinity();

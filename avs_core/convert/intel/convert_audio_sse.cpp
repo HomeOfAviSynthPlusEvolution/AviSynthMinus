@@ -9,6 +9,7 @@
 #include <avs/types.h>
 #include <avs/config.h>
 #include <smmintrin.h> // SSE4.1 at most
+#include <cmath>
 
 #if defined(GCC) || defined(CLANG)
   #define SSE2 __attribute__((__target__("sse2")))
@@ -550,7 +551,8 @@ SSE2 void convertFLTTo8_SSE2(void* inbuf, void* outbuf, int count) {
   for (int i = c_loop; i < count; i++) {
     float val = in[i] * multiplier;
     uint8_t result;
-    if (val >= max8) result = 255;
+    if (std::isnan(val)) result = 128;
+    else if (val >= max8) result = 255;
     else if (val <= min8) result = 0;
     else result = static_cast<int8_t>(val) + 128;
     out[i] = result;
@@ -561,6 +563,7 @@ SSE2 void convertFLTTo8_SSE2(void* inbuf, void* outbuf, int count) {
   __m128 minv = _mm_set1_ps(min8);
   for (int i = 0; i < c_loop; i += 4) {
     __m128 infl = _mm_loadu_ps(in); in += 4;
+    infl = _mm_and_ps(infl, _mm_cmpord_ps(infl, infl)); // NaN becomes silence.
     __m128 outfl = _mm_max_ps(minv, _mm_min_ps(maxv,_mm_mul_ps(infl, mulv)));
     __m128i out32 = _mm_cvttps_epi32(outfl);
     __m128i out16 = _mm_packs_epi32(out32, out32);
@@ -601,7 +604,8 @@ SSE2 void convertFLTTo16_SSE2(void* inbuf, void* outbuf, int count) {
   for (int i = c_loop; i < count; i++) {
     float val = in[i] * multiplier;
     int16_t result;
-    if (val >= max16) result = 32767;
+    if (std::isnan(val)) result = 0;
+    else if (val >= max16) result = 32767;
     else if (val <= min16) result = (int16_t)-32768;
     else result = static_cast<int16_t>(val);
     out[i] = result;
@@ -612,6 +616,7 @@ SSE2 void convertFLTTo16_SSE2(void* inbuf, void* outbuf, int count) {
   __m128 minv = _mm_set1_ps(min16);
   for (int i = 0; i < c_loop; i += 4) {
     __m128 infl = _mm_loadu_ps(in); in += 4;
+    infl = _mm_and_ps(infl, _mm_cmpord_ps(infl, infl));
     __m128 outfl = _mm_max_ps(minv, _mm_min_ps(maxv, _mm_mul_ps(infl, mulv)));
     __m128i out32 = _mm_cvttps_epi32(outfl);
     __m128i out16 = _mm_packs_epi32(out32, out32);
@@ -650,7 +655,8 @@ SSE41 void convertFLTTo32_SSE41(void *inbuf, void *outbuf, int count) {
   for (int i = c_loop; i < count; i++) {
     float val = in[i] * multiplier;
     int32_t result;
-    if (val >= max32) result = 0x7FFFFFFF; // 2147483647
+    if (std::isnan(val)) result = 0;
+    else if (val >= max32) result = 0x7FFFFFFF; // 2147483647
     else if (val <= min32) result = 0x80000000; // -2147483648
     else result = static_cast<int32_t>(val);
     out[i] = result;
@@ -663,6 +669,7 @@ SSE41 void convertFLTTo32_SSE41(void *inbuf, void *outbuf, int count) {
   __m128i minv_i = _mm_set1_epi32(0x80000000); // -2147483648
   for (int i = 0; i < c_loop; i += 4) {
     __m128 infl = _mm_loadu_ps(in); in += 4;
+    infl = _mm_and_ps(infl, _mm_cmpord_ps(infl, infl));
     __m128 outfl = _mm_mul_ps(infl, mulv);
     __m128i cmphigh = _mm_castps_si128(_mm_cmpge_ps(outfl, maxv));
     __m128i cmplow = _mm_castps_si128(_mm_cmpge_ps(minv, outfl));

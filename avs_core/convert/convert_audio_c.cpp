@@ -7,6 +7,7 @@
 // Copyright (c) 2020 Xinyue Lu, (c) 2021 pinterf
 
 #include <avs/types.h>
+#include <cmath>
 
 /* Supported fast route conversions:
  *
@@ -184,7 +185,8 @@ void convertFLTTo8(void* inbuf, void* outbuf, int count) {
   for (int i = 0; i < count; i++) {
     float val = in[i] * multiplier;
     uint8_t result;
-    if (val >= max8) result = 255;
+    if (std::isnan(val)) result = 128; // NaN becomes silence.
+    else if (val >= max8) result = 255;
     else if (val <= min8) result = 0;
     else result = static_cast<int8_t>(val) + 128;
     out[i] = result;
@@ -210,7 +212,8 @@ void convertFLTTo16(void* inbuf, void* outbuf, int count) {
   for (int i = 0; i < count; i++) {
     float val = in[i] * multiplier;
     int16_t result;
-    if (val >= max16) result = 32767;
+    if (std::isnan(val)) result = 0;
+    else if (val >= max16) result = 32767;
     else if (val <= min16) result = (int16_t)-32768;
     else result = static_cast<int16_t>(val);
     out[i] = result;
@@ -269,7 +272,8 @@ void convertFLTTo32(void *inbuf, void *outbuf, int count) {
   for (int i = 0; i < count; i++) {
     float val = in[i] * multiplier;
     int32_t result;
-    if (val >= max32) result = 0x7FFFFFFF; // 2147483647
+    if (std::isnan(val)) result = 0;
+    else if (val >= max32) result = 0x7FFFFFFF; // 2147483647
     else if (val <= min32) result = 0x80000000; // -2147483648
     else result = static_cast<int32_t>(val);
     out[i] = result;
