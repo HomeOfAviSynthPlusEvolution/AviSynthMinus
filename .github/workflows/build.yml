@@ -125,3 +125,111 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_path }}
           if-no-files-found: error
+
+  build-xp:
+    name: ${{ matrix.name }}
+    # Keep the modern builds on VS2026, but use the supported VS2022 host for
+    # the legacy v141_xp component.
+    runs-on: windows-2022
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows XP v141_xp x86
+            architecture: Win32
+            msvc_cpu_arch: SSE
+            artifact_name: avisynth-windows-xp-v141-xp-x86
+          - name: Windows XP v141_xp x64
+            architecture: x64
+            msvc_cpu_arch: SSE2
+            artifact_name: avisynth-windows-xp-v141-xp-x64
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install and verify Windows XP build toolset
+        shell: pwsh
+        run: |
+          $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\setup.exe'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path $vswhere)) { throw "vswhere.exe was not found at $vswhere." }
+
+          $installPath = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -property installationPath
+          if (-not $installPath) { throw 'No Visual Studio installation with MSBuild was found.' }
+          if (-not (Test-Path $installer)) { throw "Visual Studio Installer was not found at $installer." }
+
+          $installerArgs = @(
+            'modify'
+            "--installPath `"$installPath`""
+            '--add Microsoft.VisualStudio.Component.VC.v141.x86.x64'
+            '--add Microsoft.VisualStudio.Component.WinXP'
+            '--quiet'
+            '--norestart'
+          )
+          $process = Start-Process -FilePath $installer -ArgumentList $installerArgs -Wait -PassThru -WindowStyle Hidden
+          Write-Host "Visual Studio Installer exit code: $($process.ExitCode)"
+          if ($process.ExitCode -notin 0, 3010) {
+            throw "Visual Studio Installer failed with exit code $($process.ExitCode)."
+          }
+
+          $xpInstallPath = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.WinXP -property installationPath
+          if (-not $xpInstallPath) {
+            throw 'Visual Studio Installer completed, but vswhere cannot find Microsoft.VisualStudio.Component.WinXP.'
+          }
+          if ((Resolve-Path -LiteralPath $xpInstallPath).Path -ine (Resolve-Path -LiteralPath $installPath).Path) {
+            throw "The XP component was registered for a different Visual Studio instance: $xpInstallPath"
+          }
+
+          $platform = '${{ matrix.architecture }}'
+          $toolsetsRoot = Join-Path $installPath 'MSBuild\Microsoft\VC'
+          if (-not (Test-Path $toolsetsRoot)) { throw "MSBuild VC targets were not found at $toolsetsRoot." }
+          $platformPattern = [regex]::Escape($platform)
+          $toolsetProps = @(
+            Get-ChildItem -Path $toolsetsRoot -Filter Toolset.props -File -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match "\\Platforms\\$platformPattern\\PlatformToolsets\\v141_xp\\Toolset\.props$" }
+          )
+          if (-not $toolsetProps) {
+            $discoveredToolsets = @(Get-ChildItem -Path $toolsetsRoot -Filter v141_xp -Directory -Recurse -ErrorAction SilentlyContinue)
+            if ($discoveredToolsets) {
+              Write-Host 'Unexpected v141_xp toolset locations:'
+              $discoveredToolsets | Select-Object -ExpandProperty FullName
+            }
+            throw "The v141_xp toolset is not registered for platform $platform."
+          }
+          $toolsetProps | Select-Object -ExpandProperty FullName
+
+      - name: Configure (Windows XP)
+        shell: pwsh
+        run: >
+          cmake -S . -B build -G "Visual Studio 17 2022"
+          -A ${{ matrix.architecture }} -T v141_xp
+          -DBUILD_SHARED_LIBS=ON
+          -DENABLE_TESTS=OFF
+          -DENABLE_PLUGINS=OFF
+          -DENABLE_CUDA=OFF
+          -DENABLE_GIT_VERSIONING=OFF
+          -DWINXP_SUPPORT=ON
+          -DMSVC_CPU_ARCH=${{ matrix.msvc_cpu_arch }}
+
+      - name: Build (Windows XP)
+        shell: pwsh
+        run: cmake --build build --config Release --parallel
+
+      - name: Stage shared library (Windows XP)
+        shell: pwsh
+        run: cmake --install build --config Release --prefix "$PWD/stage"
+
+      - name: Verify shared library (Windows XP)
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem -Path stage -Filter AviSynth.dll -Recurse -File
+          if (-not $dll) { throw 'AviSynth.dll was not installed.' }
+          $dll | Select-Object -ExpandProperty FullName
+
+      - name: Upload Windows XP shared library
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: stage/**/*.dll
+          if-no-files-found: error
