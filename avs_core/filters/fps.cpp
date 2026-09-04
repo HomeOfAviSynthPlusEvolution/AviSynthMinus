@@ -275,6 +275,11 @@ AVSValue __cdecl ContinuedCreate(AVSValue args, void* key, IScriptEnvironment* e
 {
   uint32_t num, den;
 
+  if (args[1].IsInt() && args[1].AsInt() <= 0)
+    env->ThrowError("ContinuedFraction: Denominator must be positive.");
+  if (args[2].AsInt(1001) <= 0)
+    env->ThrowError("ContinuedFraction: Limit must be positive.");
+
   if (args[1].IsInt()) { // num, den[, limit] form
     if (args[0].IsInt()) {
       num = args[0].AsInt();
@@ -507,8 +512,10 @@ AVSValue __cdecl AssumeFPS::CreateFromClip(AVSValue args, void*, IScriptEnvironm
 ChangeFPS::ChangeFPS(PClip _child, unsigned new_numerator, unsigned new_denominator, bool _linear, IScriptEnvironment* env)
   : GenericVideoFilter(_child), linear(_linear)
 {
-  if (new_denominator == 0)
-    env->ThrowError("ChangeFPS: Denominator cannot be 0 (zero).");
+  if (new_numerator == 0 || new_denominator == 0)
+    env->ThrowError("ChangeFPS: Numerator and denominator must be positive.");
+  if (vi.fps_numerator == 0 || vi.fps_denominator == 0)
+    env->ThrowError("ChangeFPS: Source frame rate must be positive.");
 
   a = int64_t(vi.fps_numerator) * new_denominator;
   b = int64_t(vi.fps_denominator) * new_numerator;
@@ -551,6 +558,8 @@ bool __stdcall ChangeFPS::GetParity(int n)
 
 AVSValue __cdecl ChangeFPS::Create(AVSValue args, void*, IScriptEnvironment* env)
 {
+  if (args[1].AsInt() <= 0 || args[2].AsInt(1) <= 0)
+    env->ThrowError("ChangeFPS: Numerator and denominator must be positive.");
   return new ChangeFPS(args[0].AsClip(), args[1].AsInt(), args[2].AsInt(1), args[3].AsBool(true), env);
 }
 
@@ -598,6 +607,11 @@ ConvertFPS::ConvertFPS(PClip _child, unsigned new_numerator, unsigned new_denomi
   int _vbi, IScriptEnvironment* env)
   : GenericVideoFilter(_child), zone(_zone), vbi(_vbi), lps(0)
 {
+  if (new_numerator == 0 || new_denominator == 0)
+    env->ThrowError("ConvertFPS: Numerator and denominator must be positive.");
+  if (vi.fps_numerator == 0 || vi.fps_denominator == 0)
+    env->ThrowError("ConvertFPS: Source frame rate must be positive.");
+
   if (zone >= 0 && !vi.IsYUY2()) // Tritical Jan 2006
     env->ThrowError("ConvertFPS: zone >= 0 requires YUY2 input");
 
@@ -776,6 +790,8 @@ bool __stdcall ConvertFPS::GetParity(int n)
 
 AVSValue __cdecl ConvertFPS::Create(AVSValue args, void*, IScriptEnvironment* env)
 {
+  if (args[1].AsInt() <= 0 || args[2].AsInt(1) <= 0)
+    env->ThrowError("ConvertFPS: Numerator and denominator must be positive.");
   return new ConvertFPS( args[0].AsClip(), args[1].AsInt(), args[2].AsInt(1),
                          args[3].AsInt(-1), args[4].AsInt(0), env );
 }

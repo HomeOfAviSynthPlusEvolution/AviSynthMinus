@@ -1,5 +1,6 @@
 add_executable(core_tests
   script_tests.cpp
+  fps_tests.cpp
   config_tests.cpp
   c_api_tests.cpp
   environment_tests.cpp
