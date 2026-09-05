@@ -13,6 +13,15 @@ AviSynth+ using vendored Google Highway 1.4.0 (`third_party/highway`).
 3. **Dedicated C Fallback**: When `SetMaxCPU("none")` is specified or when no SIMD target is viable, the policy returns `TARGET_C_FALLBACK` (0). The module's resolver returns its own standard C/C++ function pointer rather than relying on Highway's scalar emulation.
 4. **Decoupled from `ENABLE_INTEL_SIMD`**: The legacy `ENABLE_INTEL_SIMD` CMake option manages legacy x86 intrinsics only. Highway SIMD targets are governed by toolchain capabilities and architecture detection.
 
+## Compiled target enumeration
+
+`avs_simd/targets.inc` is a repeatable X-macro include. After including
+`hwy/highway.h`, define `AVS_SIMD_TARGET(target, choose)`, include the file,
+and undefine the macro. It enumerates compiled SIMD targets using the current
+translation unit's `HWY_TARGETS`; each `choose` macro maps a function name to
+its target-specific pointer. Consumers own their function tables and C fallback.
+`HWY_SCALAR` and `HWY_EMU128` are intentionally omitted.
+
 ## Target Mapping Table (x86 / x86_64)
 
 | Highway Target | Bit Value | Required AviSynth CPU Flags | Highway Hardware Detection Responsible For | Fallback |
