@@ -42,6 +42,7 @@
 #include <avs/alignment.h>
 #include "audio_convert/factory.h"
 #include "kernels.h"
+#include "kernels_highway.h"
 
 #if defined(AVS_BSD) || defined(AVS_MACOS)
   #include <stdlib.h>
@@ -117,12 +118,6 @@ ConvertAudio::ConvertAudio(PClip _clip, int _sample_type)
   }
   #ifdef INTEL_INTRINSICS
     switch(PAIR(src_format, dst_format)) {
-      case PAIR(SAMPLE_INT32, SAMPLE_INT16): convert_sse2  = convert32To16_SSE2;  convert_avx2 = convert32To16_AVX2;  break;
-      case PAIR(SAMPLE_INT16, SAMPLE_INT32): convert_sse2  = convert16To32_SSE2;  convert_avx2 = convert16To32_AVX2;  break;
-      case PAIR(SAMPLE_INT32, SAMPLE_INT8 ): convert_sse2  = convert32To8_SSE2;   break;
-      case PAIR(SAMPLE_INT8 , SAMPLE_INT32): convert_sse2  = convert8To32_SSE2;   break;
-      case PAIR(SAMPLE_INT16, SAMPLE_INT8 ): convert_sse2  = convert16To8_SSE2;   break;
-      case PAIR(SAMPLE_INT8 , SAMPLE_INT16): convert_sse2  = convert8To16_SSE2;   break;
       case PAIR(SAMPLE_FLOAT, SAMPLE_INT24):
       case PAIR(SAMPLE_INT32, SAMPLE_INT24): convert_ssse3 = convert32To24_SSSE3; break;
       case PAIR(SAMPLE_INT24, SAMPLE_FLOAT):
@@ -182,32 +177,35 @@ void __stdcall ConvertAudio::GetAudio(void *buf, int64_t start, int64_t count, I
   child->GetAudio(tempbuffer, start, count, env);
 
   if (convert == nullptr) {
-    convert = convert_c;
-    convert_float = src_format == SAMPLE_FLOAT ? convertFLTTo32 : convert32ToFLT; // for two-stage
-    #ifdef INTEL_INTRINSICS
-      int cpu_flags = env->GetCPUFlags();
-      if ((cpu_flags & CPUF_SSE2)) {
-        if (convert_sse2)
-          convert = convert_sse2;
-        if (src_format != SAMPLE_FLOAT)
-          convert_float = convert32ToFLT_SSE2;
-      }
-      if ((cpu_flags & CPUF_SSSE3)) {
-        if (convert_ssse3)
-          convert = convert_ssse3;
-      }
-      if ((cpu_flags & CPUF_SSE4_1)) {
-        if (convert_sse41)
-          convert = convert_sse41;
-        if (src_format == SAMPLE_FLOAT)
-          convert_float = convertFLTTo32_SSE41;
-      }
-      if ((cpu_flags & CPUF_AVX2)) {
-        if (convert_avx2)
-          convert = convert_avx2;
-        convert_float = src_format == SAMPLE_FLOAT ? convertFLTTo32_AVX2 : convert32ToFLT_AVX2;
-      }
-    #endif
+    const int cpu_flags = env->GetCPUFlags();
+    convert = ResolveHighwayAudioConvert(src_format, dst_format, cpu_flags);
+    if (convert == nullptr) {
+      convert = convert_c;
+      convert_float = src_format == SAMPLE_FLOAT ? convertFLTTo32 : convert32ToFLT; // for two-stage
+      #ifdef INTEL_INTRINSICS
+        if ((cpu_flags & CPUF_SSE2)) {
+          if (convert_sse2)
+            convert = convert_sse2;
+          if (src_format != SAMPLE_FLOAT)
+            convert_float = convert32ToFLT_SSE2;
+        }
+        if ((cpu_flags & CPUF_SSSE3)) {
+          if (convert_ssse3)
+            convert = convert_ssse3;
+        }
+        if ((cpu_flags & CPUF_SSE4_1)) {
+          if (convert_sse41)
+            convert = convert_sse41;
+          if (src_format == SAMPLE_FLOAT)
+            convert_float = convertFLTTo32_SSE41;
+        }
+        if ((cpu_flags & CPUF_AVX2)) {
+          if (convert_avx2)
+            convert = convert_avx2;
+          convert_float = src_format == SAMPLE_FLOAT ? convertFLTTo32_AVX2 : convert32ToFLT_AVX2;
+        }
+      #endif
+    }
   }
 
   int sample_count = static_cast<int>(count * channels);

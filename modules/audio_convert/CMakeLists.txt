@@ -1,5 +1,6 @@
 set(AudioConvertKernels_Sources
   "${CMAKE_CURRENT_LIST_DIR}/src/kernels_scalar.cpp"
+  "${CMAKE_CURRENT_LIST_DIR}/src/kernels_highway.cpp"
 )
 
 if(ENABLE_INTEL_SIMD)
@@ -39,6 +40,7 @@ set_target_properties(AudioConvertKernelObjects PROPERTIES
 foreach(audio_target AudioConvertKernelObjects AudioConvertKernels)
   target_include_directories(${audio_target} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/avs_core/include>
   )
 
@@ -46,6 +48,9 @@ foreach(audio_target AudioConvertKernelObjects AudioConvertKernels)
     target_compile_definitions(${audio_target} PUBLIC INTEL_INTRINSICS)
   endif()
 endforeach()
+
+target_link_libraries(AudioConvertKernelObjects PRIVATE AvsSimd)
+target_link_libraries(AudioConvertKernels PUBLIC AvsSimd)
 
 # Adapters into AvsCore
 if(TARGET AvsCore)

@@ -134,7 +134,14 @@ elseif(NOT MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     list(APPEND SYSLIB "c++")
 endif()
 
-target_link_libraries("AvsCore" ${SYSLIB})
+target_link_libraries("AvsCore" ${SYSLIB} AvsSimd)
+
+if(TARGET AvsSimd AND TARGET hwy)
+  target_sources("AvsCore" PRIVATE
+    $<TARGET_OBJECTS:AvsSimd>
+    $<TARGET_OBJECTS:hwy>
+  )
+endif()
 
 add_subdirectory("${CMAKE_SOURCE_DIR}/modules/audio_convert" "${CMAKE_CURRENT_BINARY_DIR}/modules/audio_convert")
 

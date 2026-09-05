@@ -12,52 +12,7 @@
 #include <immintrin.h> // AVX2 at most
 #include <cmath>
 
-// Easy: 32-16, 16-32
 // Float: 8/16/32-FLT, FLT-8/16/32
-
-void convert32To16_AVX2(void *inbuf, void *outbuf, int count) {
-  auto in = reinterpret_cast<int32_t *>(inbuf);
-  auto in16 = reinterpret_cast<int16_t *>(inbuf);
-  auto out = reinterpret_cast<int16_t *>(outbuf);
-
-  const int c_loop = count & ~15;
-
-  for (int i = c_loop; i < count; i++)
-    out[i] = in16[i * 2 + 1];
-
-  for (int i = 0; i < c_loop; i += 16) {
-    __m256i in32a = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(in)); in += 8;
-    __m256i in32b = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(in)); in += 8;
-    __m256i in16a = _mm256_srai_epi32(in32a, 16);
-    __m256i in16b = _mm256_srai_epi32(in32b, 16);
-    __m256i out16 = _mm256_packs_epi32(in16a, in16b);
-    out16 = _mm256_permute4x64_epi64(out16, 216);
-    _mm256_storeu_si256(reinterpret_cast<__m256i *>(out), out16); out += 16;
-  }
-}
-
-void convert16To32_AVX2(void *inbuf, void *outbuf, int count) {
-  auto in = reinterpret_cast<int16_t *>(inbuf);
-  auto out = reinterpret_cast<int32_t *>(outbuf);
-  auto out16 = reinterpret_cast<int16_t *>(outbuf);
-
-  const int c_loop = count & ~15;
-
-  for (int i = c_loop; i < count; i++) {
-    out16[i * 2] = 0;
-    out16[i * 2 + 1] = in[i];
-  }
-
-  __m256i zero = _mm256_set1_epi16(0);
-  for (int i = 0; i < c_loop; i += 16) {
-    __m256i in16 = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(in)); in += 16;
-    in16 = _mm256_permute4x64_epi64(in16, 216);
-    __m256i out32a = _mm256_unpacklo_epi16(zero, in16);
-    __m256i out32b = _mm256_unpackhi_epi16(zero, in16);
-    _mm256_storeu_si256(reinterpret_cast<__m256i *>(out), out32a); out += 8;
-    _mm256_storeu_si256(reinterpret_cast<__m256i *>(out), out32b); out += 8;
-  }
-}
 
 void convert8ToFLT_AVX2(void* inbuf, void* outbuf, int count) {
   auto in = reinterpret_cast<uint8_t*>(inbuf);

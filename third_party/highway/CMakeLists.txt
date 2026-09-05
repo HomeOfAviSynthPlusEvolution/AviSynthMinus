@@ -527,9 +527,11 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 
 # Copy-cat "add_library" logic + add override.
-set(HWY_LIBRARY_TYPE "SHARED")
-if (NOT BUILD_SHARED_LIBS OR HWY_FORCE_STATIC_LIBS)
-  set(HWY_LIBRARY_TYPE "STATIC")
+if (NOT DEFINED HWY_LIBRARY_TYPE)
+  set(HWY_LIBRARY_TYPE "SHARED")
+  if (NOT BUILD_SHARED_LIBS OR HWY_FORCE_STATIC_LIBS)
+    set(HWY_LIBRARY_TYPE "STATIC")
+  endif()
 endif()
 
 # This preprocessor define will drive the build, also used in the *.pc files:

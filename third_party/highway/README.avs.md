@@ -28,13 +28,14 @@ there is no `hwy/tests/`, `hwy/examples/`, `hwy/contrib/`, `.github/`,
 
 ## Local CMake changes
 
-The vendored `CMakeLists.txt` has three small changes so the removed test
-sources are never referenced when tests are disabled:
+The vendored `CMakeLists.txt` has four small changes so the removed test
+sources are never referenced when tests are disabled and the runtime can be consumed as an object library:
 
 1. `HWY_ENABLE_TOOLS` was added, defaulting to `OFF`, and gates the
    `hwy_list_targets` executable.
 2. `HWY_TEST_SOURCES` is declared only when `HWY_ENABLE_TESTS` is enabled.
 3. The `hwy_test` target is created only when `HWY_ENABLE_TESTS` is enabled.
+4. `HWY_LIBRARY_TYPE` checks `IF(NOT DEFINED HWY_LIBRARY_TYPE)` so callers can configure it as `OBJECT`.
 
 No Highway source or header implementation was changed. To update this copy,
 replace it manually with a fixed upstream release, repeat the same pragmatic
