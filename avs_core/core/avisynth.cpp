@@ -2873,6 +2873,13 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
   for (int i = 0; i < len; i++)
     s[i] = tolower(features[i]);
 
+#if !defined(X86_32) && !defined(X86_64)
+  // Non-x86 has no x86 feature levels: only explicit "none" disables SIMD.
+  // CPUF_FORCE is the native non-x86 value returned by the CPU probe.
+  cpuFlags = trim(s) == "none" ? 0 : CPUF_FORCE;
+  return;
+#endif
+
   int cpu_flags = GetCPUFlags();
 
   std::vector<std::string> tokens;

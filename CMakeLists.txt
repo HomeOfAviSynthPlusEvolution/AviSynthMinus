@@ -380,6 +380,7 @@ endif()
 
   ENDIF()
 
+  add_subdirectory("modules/simd")
   add_subdirectory("avs_core")
   if(ENABLE_PLUGINS)
     add_subdirectory("plugins")
