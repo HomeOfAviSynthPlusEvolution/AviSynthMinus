@@ -170,20 +170,10 @@ void __stdcall ConvertAudio::GetAudio(void *buf, int64_t start, int64_t count, I
   if (convert == nullptr) {
     const int cpu_flags = env->GetCPUFlags();
     convert = avs_audio_convert::ResolveHighwayAudioConvert(src_format, dst_format, cpu_flags);
-#if defined(INTEL_INTRINSICS) && defined(_MSC_VER) && !defined(__clang__)
-    // The native MSVC F32 -> S24 kernel still loses to the old composition.
-    // Retain just this route until its performance gate passes.
-    const bool retain_float_to_s24 = src_format == SAMPLE_FLOAT &&
-        dst_format == SAMPLE_INT24 && (cpu_flags & CPUF_AVX2) && (cpu_flags & CPUF_SSSE3);
-    if (retain_float_to_s24) convert = nullptr;
-#endif
     if (convert != nullptr) {
       two_stage = false;
     } else {
       convert = convert_c;
-#if defined(INTEL_INTRINSICS) && defined(_MSC_VER) && !defined(__clang__)
-      if (retain_float_to_s24) convert = convert32To24_SSSE3;
-#endif
       if (two_stage) {
         convert_float = src_format == SAMPLE_FLOAT ? convertFLTTo32 : convert32ToFLT; // for two-stage
         #ifdef INTEL_INTRINSICS

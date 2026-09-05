@@ -27,8 +27,6 @@ CONVERT_DECLARE(convert32ToFLT);
 CONVERT_DECLARE(convertFLTTo32);
 
 #ifdef INTEL_INTRINSICS
-  // Retained for the MSVC F32 -> S24 performance fallback.
-  CONVERT_DECLARE(convert32To24_SSSE3);
   CONVERT_DECLARE(convert8ToFLT_SSE41);
   CONVERT_DECLARE(convertFLTTo8_SSE2);
   CONVERT_DECLARE(convert16ToFLT_SSE41);

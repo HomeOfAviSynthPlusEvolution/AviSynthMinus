@@ -226,12 +226,10 @@ HWY_INLINE PackedVector LoadTypedVector(const T* in) {
 template<class T, size_t... K>
 HWY_INLINE void PackBlock(const T* in, const PackedVector* masks, uint8_t* out, std::index_sequence<K...>) {
   PackedVector input[sizeof(T)];
-#if HWY_MAX_BYTES >= 32 && (!defined(_MSC_VER) || defined(__clang__))
+#if HWY_MAX_BYTES >= 32
   if constexpr (std::is_same_v<T, float>) {
     // Quantize eight samples at once, then reuse the packed-byte mapping.
     // Explicit widths also keep wider Highway targets within this block.
-    // MSVC's baseline-ISA TU spills these mixed-width values, so it uses
-    // the 128-bit path below until it can generate comparable code here.
     const hn::FixedTag<float, 8> df;
     const hn::FixedTag<int32_t, 4> di;
     const auto lo = QuantizeForPacked24(df, hn::LoadU(df, in));
