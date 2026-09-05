@@ -1,4 +1,7 @@
-add_executable(audio_filter_tests audio_filter_tests.cpp)
+add_executable(audio_filter_tests
+  audio_filter_tests.cpp
+  convert_audio_api_tests.cpp
+)
 target_compile_definitions(audio_filter_tests PRIVATE INTEL_INTRINSICS)
 target_include_directories(audio_filter_tests PRIVATE
   ${PROJECT_SOURCE_DIR}/tests
