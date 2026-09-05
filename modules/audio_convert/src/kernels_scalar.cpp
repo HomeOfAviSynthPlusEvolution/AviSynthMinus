@@ -6,6 +6,7 @@
 // Convert Audio helper functions (Pure C)
 // Copyright (c) 2020 Xinyue Lu, (c) 2021 pinterf
 
+#include "kernels.h"
 #include <avs/types.h>
 #include <cmath>
 

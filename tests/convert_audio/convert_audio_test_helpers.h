@@ -1,8 +1,6 @@
 #pragma once
 
-#include <avisynth.h>
-
-#include "convert/convert_audio.h"
+#include "kernels.h"
 
 #include "support/comparators.h"
 #include "support/cpu_features.h"

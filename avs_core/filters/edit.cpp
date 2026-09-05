@@ -33,7 +33,7 @@
 // import and export plugins, or graphical user interfaces.
 
 #include "edit.h"
-#include "../convert/convert_audio.h"
+#include "audio_convert/factory.h"
 #include "../core/internal.h"
 #include "merge.h"
 #include <climits>
@@ -494,10 +494,10 @@ Splice::Splice(PClip _child1, PClip _child2, bool realign_sound, bool _passCache
   // Check Audio
   if (vi.HasAudio()) {
     // If sample types do not match they are both converted to float samples to avoid loss of precision.
-    child2 = ConvertAudio::Create(child2, vi.SampleType(), SAMPLE_FLOAT);  // Clip 1 is check to be same type as clip 1, if not, convert to float samples.
+    child2 = avs_audio_convert::EnsureAudioFormat(child2, vi.SampleType(), SAMPLE_FLOAT);  // Clip 1 is check to be same type as clip 1, if not, convert to float samples.
     vi2 = child2->GetVideoInfo();
 
-    child = ConvertAudio::Create(child, vi2.SampleType(), vi2.SampleType());  // Clip 1 is now be same type as clip 2.
+    child = avs_audio_convert::EnsureAudioFormat(child, vi2.SampleType(), vi2.SampleType());  // Clip 1 is now be same type as clip 2.
     vi = child->GetVideoInfo();
 
     if (vi.AudioChannels() != vi2.AudioChannels())
@@ -643,7 +643,7 @@ Dissolve::~Dissolve()
 }
 
 Dissolve::Dissolve(PClip _child1, PClip _child2, int _overlap, double fps, IScriptEnvironment* env)
- : GenericVideoFilter(ConvertAudio::Create(_child1,SAMPLE_INT16|SAMPLE_FLOAT,SAMPLE_FLOAT)),
+ : GenericVideoFilter(avs_audio_convert::EnsureAudioFormat(_child1,SAMPLE_INT16|SAMPLE_FLOAT,SAMPLE_FLOAT)),
    child2(_child2),
    overlap(_overlap),
    audbuffer(0),
@@ -660,10 +660,10 @@ Dissolve::Dissolve(PClip _child1, PClip _child2, int _overlap, double fps, IScri
     env->ThrowError("Dissolve: Cannot dissolve if overlap is less than zero");
 
   if (vi.HasAudio()) {
-    child2 = ConvertAudio::Create(child2, vi.SampleType(), SAMPLE_FLOAT);  // Clip 1 is check to be same type as clip 1, if not, convert to float samples.
+    child2 = avs_audio_convert::EnsureAudioFormat(child2, vi.SampleType(), SAMPLE_FLOAT);  // Clip 1 is check to be same type as clip 1, if not, convert to float samples.
     vi2 = child2->GetVideoInfo();
 
-    child = ConvertAudio::Create(child, vi2.SampleType(), vi2.SampleType());  // Clip 1 is now be same type as clip 2.
+    child = avs_audio_convert::EnsureAudioFormat(child, vi2.SampleType(), vi2.SampleType());  // Clip 1 is now be same type as clip 2.
     vi = child->GetVideoInfo();
 
     if (vi.AudioChannels() != vi2.AudioChannels())

@@ -42,7 +42,7 @@
 #include "../core/info.h"
 #include "../core/internal.h"
 #include "../convert/convert_planar.h"
-#include "../convert/convert_audio.h"
+#include "audio_convert/factory.h"
 #include "../convert/convert_helper.h"
 
 #ifdef AVS_WINDOWS
@@ -225,7 +225,7 @@ Histogram::Histogram(PClip _child, Mode _mode, AVSValue _option, int _show_bits,
       env->ThrowError("Histogram: Stereo mode only works on two audio channels.");
     }
 
-     aud_clip = ConvertAudio::Create(child,SAMPLE_INT16,SAMPLE_INT16);
+     aud_clip = avs_audio_convert::EnsureAudioFormat(child, SAMPLE_INT16, SAMPLE_INT16);
   }
 
   if (mode == ModeAudioLevels) {
@@ -243,7 +243,7 @@ Histogram::Histogram(PClip _child, Mode _mode, AVSValue _option, int _show_bits,
     if (vi.width < minimum_width)
       env->ThrowError("Histogram: AudioLevels width is too small for all audio bars");
 
-    aud_clip = ConvertAudio::Create(child, SAMPLE_INT16, SAMPLE_INT16);
+    aud_clip = avs_audio_convert::EnsureAudioFormat(child, SAMPLE_INT16, SAMPLE_INT16);
   }
 
   if (!optionValid && option.Defined())

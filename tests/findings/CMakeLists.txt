@@ -20,11 +20,13 @@ target_include_directories(finding_tests PRIVATE
   ${PROJECT_SOURCE_DIR}/avs_core/include
   ${PROJECT_SOURCE_DIR}/avs_core
   ${PROJECT_BINARY_DIR}/avs_core
+  ${CMAKE_SOURCE_DIR}/modules/audio_convert/include
 )
 target_compile_definitions(finding_tests PRIVATE INTEL_INTRINSICS VS_TARGET_CPU_X86)
 target_link_libraries(finding_tests PRIVATE
   GTest::gtest_main
   AvsCoreExternal
+  AudioConvertKernels
 )
 
 include(GoogleTest)

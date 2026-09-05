@@ -136,6 +136,8 @@ endif()
 
 target_link_libraries("AvsCore" ${SYSLIB})
 
+add_subdirectory("${CMAKE_SOURCE_DIR}/modules/audio_convert" "${CMAKE_CURRENT_BINARY_DIR}/modules/audio_convert")
+
 if(ENABLE_CUDA)
   if(${CMAKE_VERSION} VERSION_LESS "3.19.5")
     # deprecated since 3.10 but works

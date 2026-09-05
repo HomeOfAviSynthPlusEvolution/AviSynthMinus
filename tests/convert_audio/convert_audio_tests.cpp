@@ -10,6 +10,12 @@
 namespace avsut::test {
 namespace {
 
+#ifdef INTEL_INTRINSICS
+#define AUDIO_SIMD_KERNEL(function) function
+#else
+#define AUDIO_SIMD_KERNEL(function) static_cast<AudioConvertFunction>(nullptr)
+#endif
+
 template <typename Function>
 void add_integer_variants(std::vector<AudioIntegerCase>& cases, AudioFormat source,
                           AudioFormat destination, std::size_t count, const char* expected_hash,
@@ -18,9 +24,11 @@ void add_integer_variants(std::vector<AudioIntegerCase>& cases, AudioFormat sour
   cases.push_back(make_audio_integer_case(
       source, destination, count,
       Variant<AudioConvertFunction>{"c", c_function, IsaRequirement::Scalar}, expected_hash));
-  cases.push_back(make_audio_integer_case(
-      source, destination, count,
-      Variant<AudioConvertFunction>{"sse2", sse2_function, IsaRequirement::Sse2}, expected_hash));
+  if (sse2_function != nullptr) {
+    cases.push_back(make_audio_integer_case(
+        source, destination, count,
+        Variant<AudioConvertFunction>{"sse2", sse2_function, IsaRequirement::Sse2}, expected_hash));
+  }
   if (avx2_function != nullptr) {
     cases.push_back(make_audio_integer_case(
         source, destination, count,
@@ -52,17 +60,17 @@ std::vector<AudioIntegerCase> audio_integer_cases() {
   for (std::size_t index = 0; index < counts.size(); ++index) {
     const auto count = counts[index];
     add_integer_variants(cases, AudioFormat::S32, AudioFormat::S16, count, s32_to_s16[index],
-                         convert32To16, convert32To16_SSE2, convert32To16_AVX2);
+                         convert32To16, AUDIO_SIMD_KERNEL(convert32To16_SSE2), AUDIO_SIMD_KERNEL(convert32To16_AVX2));
     add_integer_variants(cases, AudioFormat::S16, AudioFormat::S32, count, s16_to_s32[index],
-                         convert16To32, convert16To32_SSE2, convert16To32_AVX2);
+                         convert16To32, AUDIO_SIMD_KERNEL(convert16To32_SSE2), AUDIO_SIMD_KERNEL(convert16To32_AVX2));
     add_integer_variants(cases, AudioFormat::S32, AudioFormat::U8, count, s32_to_u8[index],
-                         convert32To8, convert32To8_SSE2);
+                         convert32To8, AUDIO_SIMD_KERNEL(convert32To8_SSE2));
     add_integer_variants(cases, AudioFormat::U8, AudioFormat::S32, count, u8_to_s32[index],
-                         convert8To32, convert8To32_SSE2);
+                         convert8To32, AUDIO_SIMD_KERNEL(convert8To32_SSE2));
     add_integer_variants(cases, AudioFormat::S16, AudioFormat::U8, count, s16_to_u8[index],
-                         convert16To8, convert16To8_SSE2);
+                         convert16To8, AUDIO_SIMD_KERNEL(convert16To8_SSE2));
     add_integer_variants(cases, AudioFormat::U8, AudioFormat::S16, count, u8_to_s16[index],
-                         convert8To16, convert8To16_SSE2);
+                         convert8To16, AUDIO_SIMD_KERNEL(convert8To16_SSE2));
   }
   return cases;
 }
@@ -88,50 +96,62 @@ std::vector<AudioIntegerCase> audio_packed_24_cases() {
         AudioFormat::S32, AudioFormat::S24, count,
         Variant<AudioConvertFunction>{"c", convert32To24, IsaRequirement::Scalar},
         s32_to_s24[index]));
+#ifdef INTEL_INTRINSICS
     cases.push_back(make_audio_integer_case(
         AudioFormat::S32, AudioFormat::S24, count,
-        Variant<AudioConvertFunction>{"ssse3", convert32To24_SSSE3, IsaRequirement::Ssse3},
+        Variant<AudioConvertFunction>{"ssse3", AUDIO_SIMD_KERNEL(convert32To24_SSSE3), IsaRequirement::Ssse3},
         s32_to_s24[index]));
+#endif
     cases.push_back(make_audio_integer_case(
         AudioFormat::S24, AudioFormat::S32, count,
         Variant<AudioConvertFunction>{"c", convert24To32, IsaRequirement::Scalar},
         s24_to_s32[index]));
+#ifdef INTEL_INTRINSICS
     cases.push_back(make_audio_integer_case(
         AudioFormat::S24, AudioFormat::S32, count,
-        Variant<AudioConvertFunction>{"ssse3", convert24To32_SSSE3, IsaRequirement::Ssse3},
+        Variant<AudioConvertFunction>{"ssse3", AUDIO_SIMD_KERNEL(convert24To32_SSSE3), IsaRequirement::Ssse3},
         s24_to_s32[index]));
+#endif
     cases.push_back(make_audio_integer_case(
         AudioFormat::S24, AudioFormat::S16, count,
         Variant<AudioConvertFunction>{"c", convert24To16, IsaRequirement::Scalar},
         s24_to_s16[index]));
+#ifdef INTEL_INTRINSICS
     cases.push_back(make_audio_integer_case(
         AudioFormat::S24, AudioFormat::S16, count,
-        Variant<AudioConvertFunction>{"ssse3", convert24To16_SSSE3, IsaRequirement::Ssse3},
+        Variant<AudioConvertFunction>{"ssse3", AUDIO_SIMD_KERNEL(convert24To16_SSSE3), IsaRequirement::Ssse3},
         s24_to_s16[index]));
+#endif
     cases.push_back(make_audio_integer_case(
         AudioFormat::S16, AudioFormat::S24, count,
         Variant<AudioConvertFunction>{"c", convert16To24, IsaRequirement::Scalar},
         s16_to_s24[index]));
+#ifdef INTEL_INTRINSICS
     cases.push_back(make_audio_integer_case(
         AudioFormat::S16, AudioFormat::S24, count,
-        Variant<AudioConvertFunction>{"ssse3", convert16To24_SSSE3, IsaRequirement::Ssse3},
+        Variant<AudioConvertFunction>{"ssse3", AUDIO_SIMD_KERNEL(convert16To24_SSSE3), IsaRequirement::Ssse3},
         s16_to_s24[index]));
+#endif
     cases.push_back(make_audio_integer_case(
         AudioFormat::S24, AudioFormat::U8, count,
         Variant<AudioConvertFunction>{"c", convert24To8, IsaRequirement::Scalar},
         s24_to_u8[index]));
+#ifdef INTEL_INTRINSICS
     cases.push_back(make_audio_integer_case(
         AudioFormat::S24, AudioFormat::U8, count,
-        Variant<AudioConvertFunction>{"ssse3", convert24To8_SSSE3, IsaRequirement::Ssse3},
+        Variant<AudioConvertFunction>{"ssse3", AUDIO_SIMD_KERNEL(convert24To8_SSSE3), IsaRequirement::Ssse3},
         s24_to_u8[index]));
+#endif
     cases.push_back(make_audio_integer_case(
         AudioFormat::U8, AudioFormat::S24, count,
         Variant<AudioConvertFunction>{"c", convert8To24, IsaRequirement::Scalar},
         u8_to_s24[index]));
+#ifdef INTEL_INTRINSICS
     cases.push_back(make_audio_integer_case(
         AudioFormat::U8, AudioFormat::S24, count,
-        Variant<AudioConvertFunction>{"ssse3", convert8To24_SSSE3, IsaRequirement::Ssse3},
+        Variant<AudioConvertFunction>{"ssse3", AUDIO_SIMD_KERNEL(convert8To24_SSSE3), IsaRequirement::Ssse3},
         u8_to_s24[index]));
+#endif
   }
   return cases;
 }
@@ -144,12 +164,16 @@ void add_audio_float_variants(std::vector<AudioFloatCase>& cases, AudioFormat so
   cases.push_back(make_audio_float_case(
       source, destination, count,
       Variant<AudioConvertFunction>{"c", c_function, IsaRequirement::Scalar}, expected_hash));
-  cases.push_back(make_audio_float_case(
-      source, destination, count,
-      Variant<AudioConvertFunction>{sse_name, sse_function, sse_requirement}, expected_hash));
-  cases.push_back(make_audio_float_case(
-      source, destination, count,
-      Variant<AudioConvertFunction>{"avx2", avx2_function, IsaRequirement::Avx2}, expected_hash));
+  if (sse_function != nullptr) {
+    cases.push_back(make_audio_float_case(
+        source, destination, count,
+        Variant<AudioConvertFunction>{sse_name, sse_function, sse_requirement}, expected_hash));
+  }
+  if (avx2_function != nullptr) {
+    cases.push_back(make_audio_float_case(
+        source, destination, count,
+        Variant<AudioConvertFunction>{"avx2", avx2_function, IsaRequirement::Avx2}, expected_hash));
+  }
 }
 
 std::vector<AudioFloatCase> audio_float_cases() {
@@ -170,23 +194,23 @@ std::vector<AudioFloatCase> audio_float_cases() {
   for (std::size_t index = 0; index < counts.size(); ++index) {
     const auto count = counts[index];
     add_audio_float_variants(cases, AudioFormat::U8, AudioFormat::F32, count, "sse4.1",
-                             IsaRequirement::Sse41, convert8ToFLT, convert8ToFLT_SSE41,
-                             convert8ToFLT_AVX2);
+                             IsaRequirement::Sse41, convert8ToFLT, AUDIO_SIMD_KERNEL(convert8ToFLT_SSE41),
+                             AUDIO_SIMD_KERNEL(convert8ToFLT_AVX2));
     add_audio_float_variants(cases, AudioFormat::F32, AudioFormat::U8, count, "sse2",
-                             IsaRequirement::Sse2, convertFLTTo8, convertFLTTo8_SSE2,
-                             convertFLTTo8_AVX2, f32_to_u8[index]);
+                             IsaRequirement::Sse2, convertFLTTo8, AUDIO_SIMD_KERNEL(convertFLTTo8_SSE2),
+                             AUDIO_SIMD_KERNEL(convertFLTTo8_AVX2), f32_to_u8[index]);
     add_audio_float_variants(cases, AudioFormat::S16, AudioFormat::F32, count, "sse4.1",
-                             IsaRequirement::Sse41, convert16ToFLT, convert16ToFLT_SSE41,
-                             convert16ToFLT_AVX2);
+                             IsaRequirement::Sse41, convert16ToFLT, AUDIO_SIMD_KERNEL(convert16ToFLT_SSE41),
+                             AUDIO_SIMD_KERNEL(convert16ToFLT_AVX2));
     add_audio_float_variants(cases, AudioFormat::F32, AudioFormat::S16, count, "sse2",
-                             IsaRequirement::Sse2, convertFLTTo16, convertFLTTo16_SSE2,
-                             convertFLTTo16_AVX2, f32_to_s16[index]);
+                             IsaRequirement::Sse2, convertFLTTo16, AUDIO_SIMD_KERNEL(convertFLTTo16_SSE2),
+                             AUDIO_SIMD_KERNEL(convertFLTTo16_AVX2), f32_to_s16[index]);
     add_audio_float_variants(cases, AudioFormat::S32, AudioFormat::F32, count, "sse2",
-                             IsaRequirement::Sse2, convert32ToFLT, convert32ToFLT_SSE2,
-                             convert32ToFLT_AVX2);
+                             IsaRequirement::Sse2, convert32ToFLT, AUDIO_SIMD_KERNEL(convert32ToFLT_SSE2),
+                             AUDIO_SIMD_KERNEL(convert32ToFLT_AVX2));
     add_audio_float_variants(cases, AudioFormat::F32, AudioFormat::S32, count, "sse4.1",
-                             IsaRequirement::Sse41, convertFLTTo32, convertFLTTo32_SSE41,
-                             convertFLTTo32_AVX2, f32_to_s32[index]);
+                             IsaRequirement::Sse41, convertFLTTo32, AUDIO_SIMD_KERNEL(convertFLTTo32_SSE41),
+                             AUDIO_SIMD_KERNEL(convertFLTTo32_AVX2), f32_to_s32[index]);
   }
   return cases;
 }
@@ -198,30 +222,32 @@ std::vector<AudioTwoStageCase> audio_two_stage_cases() {
                                                          "fde8884581bbcf19", "36cfd1c0483386f7"};
   const std::array<Variant<AudioConvertFunction>, 3> float_to_s32{
       Variant<AudioConvertFunction>{"c", convertFLTTo32, IsaRequirement::Scalar},
-      Variant<AudioConvertFunction>{"sse4.1", convertFLTTo32_SSE41, IsaRequirement::Sse41},
-      Variant<AudioConvertFunction>{"avx2", convertFLTTo32_AVX2, IsaRequirement::Avx2}};
+      Variant<AudioConvertFunction>{"sse4.1", AUDIO_SIMD_KERNEL(convertFLTTo32_SSE41), IsaRequirement::Sse41},
+      Variant<AudioConvertFunction>{"avx2", AUDIO_SIMD_KERNEL(convertFLTTo32_AVX2), IsaRequirement::Avx2}};
   const std::array<Variant<AudioConvertFunction>, 2> s32_to_s24{
       Variant<AudioConvertFunction>{"c", convert32To24, IsaRequirement::Scalar},
-      Variant<AudioConvertFunction>{"ssse3", convert32To24_SSSE3, IsaRequirement::Ssse3}};
+      Variant<AudioConvertFunction>{"ssse3", AUDIO_SIMD_KERNEL(convert32To24_SSSE3), IsaRequirement::Ssse3}};
   const std::array<Variant<AudioConvertFunction>, 2> s24_to_s32{
       Variant<AudioConvertFunction>{"c", convert24To32, IsaRequirement::Scalar},
-      Variant<AudioConvertFunction>{"ssse3", convert24To32_SSSE3, IsaRequirement::Ssse3}};
+      Variant<AudioConvertFunction>{"ssse3", AUDIO_SIMD_KERNEL(convert24To32_SSSE3), IsaRequirement::Ssse3}};
   const std::array<Variant<AudioConvertFunction>, 3> s32_to_float{
       Variant<AudioConvertFunction>{"c", convert32ToFLT, IsaRequirement::Scalar},
-      Variant<AudioConvertFunction>{"sse2", convert32ToFLT_SSE2, IsaRequirement::Sse2},
-      Variant<AudioConvertFunction>{"avx2", convert32ToFLT_AVX2, IsaRequirement::Avx2}};
+      Variant<AudioConvertFunction>{"sse2", AUDIO_SIMD_KERNEL(convert32ToFLT_SSE2), IsaRequirement::Sse2},
+      Variant<AudioConvertFunction>{"avx2", AUDIO_SIMD_KERNEL(convert32ToFLT_AVX2), IsaRequirement::Avx2}};
 
   std::vector<AudioTwoStageCase> cases;
   for (std::size_t index = 0; index < counts.size(); ++index) {
     const auto count = counts[index];
     for (const auto& first : float_to_s32) {
       for (const auto& second : s32_to_s24) {
+        if (!first.function || !second.function) continue;
         cases.push_back(make_audio_two_stage_case(AudioFormat::F32, AudioFormat::S24, count, first,
                                                   second, f32_to_s24_hashes[index]));
       }
     }
     for (const auto& first : s24_to_s32) {
       for (const auto& second : s32_to_float) {
+        if (!first.function || !second.function) continue;
         cases.push_back(
             make_audio_two_stage_case(AudioFormat::S24, AudioFormat::F32, count, first, second));
       }
@@ -229,6 +255,8 @@ std::vector<AudioTwoStageCase> audio_two_stage_cases() {
   }
   return cases;
 }
+
+#undef AUDIO_SIMD_KERNEL
 
 class AudioIntegerKernels : public ::testing::TestWithParam<AudioIntegerCase> {};
 

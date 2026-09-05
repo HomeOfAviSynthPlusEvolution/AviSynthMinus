@@ -6,7 +6,7 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_FINDING_UNDEF_AVS_UNUSED
 #endif
-#include "convert/convert_audio.h"
+#include "kernels.h"
 #include "convert/convert_bits.h"
 #include "convert/convert_helper.h"
 #include "convert/intel/convert_bits_avx2.h"

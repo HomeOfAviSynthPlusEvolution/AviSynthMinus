@@ -6,6 +6,7 @@
 // Convert Audio helper functions (SSE2/SSSE3)
 // Copyright (c) 2020 Xinyue Lu, (c) 2021 pinterf
 
+#include "../kernels.h"
 #include <avs/types.h>
 #include <avs/config.h>
 #include <smmintrin.h> // SSE4.1 at most

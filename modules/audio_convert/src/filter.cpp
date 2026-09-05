@@ -1,6 +1,6 @@
 // Avisynth v2.5.  Copyright 2002 Ben Rudiak-Gould et al.
 // http://avisynth.nl
-
+//
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation; either version 2 of the License, or
@@ -40,7 +40,9 @@
 
 #include <avisynth.h>
 #include <avs/alignment.h>
-#include "convert_audio.h"
+#include "audio_convert/factory.h"
+#include "kernels.h"
+
 #if defined(AVS_BSD) || defined(AVS_MACOS)
   #include <stdlib.h>
 #else
@@ -48,16 +50,33 @@
 #endif
 #include <limits>
 
-// There are two type parameters. Acceptable sample types and a prefered sample type.
-// If the current clip is already one of the defined types in sampletype, this will be returned.
-// If not, the current clip will be converted to the prefered type.
-PClip ConvertAudio::Create(PClip clip, int sample_type, int prefered_type) {
-  if ((!clip->GetVideoInfo().HasAudio()) || clip->GetVideoInfo().SampleType() & (sample_type | prefered_type)) {
-    // Sample type is already ok!
-    return clip;
-  } else
-    return new ConvertAudio(clip, prefered_type);
-}
+namespace {
+
+class ConvertAudio : public GenericVideoFilter {
+public:
+  ConvertAudio(PClip _clip, int prefered_format);
+  virtual ~ConvertAudio();
+  void __stdcall GetAudio(void* buf, int64_t start, int64_t count, IScriptEnvironment* env) override;
+  int __stdcall SetCacheHints(int cachehints, int frame_range) override;
+
+private:
+  int src_format;
+  int dst_format;
+  int src_bps;
+  int tempbuffer_size {0};
+  char *tempbuffer {nullptr};
+
+  bool two_stage {false};
+  convert_proc convert {nullptr};
+  convert_proc convert_float {nullptr};
+  convert_proc convert_c {nullptr};
+#ifdef INTEL_INTRINSICS
+  convert_proc convert_sse2 {nullptr};
+  convert_proc convert_ssse3 {nullptr};
+  convert_proc convert_sse41 {nullptr};
+  convert_proc convert_avx2 {nullptr};
+#endif
+};
 
 int __stdcall ConvertAudio::SetCacheHints(int cachehints, int frame_range) {
   // We do pass cache requests upwards, to the next filter.
@@ -212,3 +231,21 @@ void __stdcall ConvertAudio::GetAudio(void *buf, int64_t start, int64_t count, I
     return;
   }
 }
+
+}  // namespace
+
+namespace avs_audio_convert {
+
+// There are two type parameters. Acceptable sample types and a prefered sample type.
+// If the current clip is already one of the defined types in sampletype, this will be returned.
+// If not, the current clip will be converted to the prefered type.
+PClip EnsureAudioFormat(PClip clip, int accepted_formats, int preferred_format) {
+  if ((!clip->GetVideoInfo().HasAudio()) || (clip->GetVideoInfo().SampleType() & (accepted_formats | preferred_format))) {
+    // Sample type is already ok!
+    return clip;
+  } else {
+    return new ConvertAudio(clip, preferred_format);
+  }
+}
+
+}  // namespace avs_audio_convert

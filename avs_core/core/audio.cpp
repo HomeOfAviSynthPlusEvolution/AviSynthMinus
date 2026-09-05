@@ -44,7 +44,8 @@
 #include "internal.h"
 
 #include "audio.h"
-#include "../convert/convert_audio.h"
+#include "audio_convert/factory.h"
+#include "audio_convert_script.h"
 #include <cstdio>
 #include <cstdlib>
 #include <new>
@@ -351,51 +352,16 @@ extern const AVSFunction Audio_filters[] = {
                                 { "GetChannels", BUILTIN_FUNC_PREFIX, "ci+", GetChannel::Create_n },     // Alias to ease use!
                                 { "KillVideo", BUILTIN_FUNC_PREFIX, "c", KillVideo::Create },
                                 { "KillAudio", BUILTIN_FUNC_PREFIX, "c", KillAudio::Create },
-                                { "ConvertAudioTo16bit", BUILTIN_FUNC_PREFIX, "c", ConvertAudio::Create_16bit },   // in convertaudio.cpp
-                                { "ConvertAudioTo8bit", BUILTIN_FUNC_PREFIX, "c", ConvertAudio::Create_8bit },
-                                { "ConvertAudioTo24bit", BUILTIN_FUNC_PREFIX, "c", ConvertAudio::Create_24bit },
-                                { "ConvertAudioTo32bit", BUILTIN_FUNC_PREFIX, "c", ConvertAudio::Create_32bit },
-                                { "ConvertAudioToFloat", BUILTIN_FUNC_PREFIX, "c", ConvertAudio::Create_float },
-                                { "ConvertAudio", BUILTIN_FUNC_PREFIX, "cii", ConvertAudio::Create_Any }, // For plugins to Invoke()
+                                { "ConvertAudioTo16bit", BUILTIN_FUNC_PREFIX, "c", avs_audio_convert::Create16 },   // in convertaudio.cpp
+                                { "ConvertAudioTo8bit", BUILTIN_FUNC_PREFIX, "c", avs_audio_convert::Create8 },
+                                { "ConvertAudioTo24bit", BUILTIN_FUNC_PREFIX, "c", avs_audio_convert::Create24 },
+                                { "ConvertAudioTo32bit", BUILTIN_FUNC_PREFIX, "c", avs_audio_convert::Create32 },
+                                { "ConvertAudioToFloat", BUILTIN_FUNC_PREFIX, "c", avs_audio_convert::CreateFloat },
+                                { "ConvertAudio", BUILTIN_FUNC_PREFIX, "cii", avs_audio_convert::CreateAny }, // For plugins to Invoke()
                                 { "SetChannelMask", BUILTIN_FUNC_PREFIX, "cbi", SetChannelMask::Create },
                                 { "SetChannelMask", BUILTIN_FUNC_PREFIX, "cs", SetChannelMask::Create },
                                 { 0 }
                               };
-
-// Note - floats should not be clipped - they will be clipped, when they are converted back to ints.
-// Vdub can handle 8/16 bit, and reads 32bit, but cannot play/convert it. Floats doesn't make sense
-// in AVI. So for now convert back to 16 bit always.
-
-// Always! FIXME: Most int64's are often cropped to ints - count is ok to be int, but not start
-
-// For plugins to env->Invoke()
-
-AVSValue __cdecl ConvertAudio::Create_Any(AVSValue args, void*, IScriptEnvironment*) {
-  return Create(args[0].AsClip(), args[1].AsInt(), args[2].AsInt());
-}
-
-// For explicit conversions
-
-AVSValue __cdecl ConvertAudio::Create_16bit(AVSValue args, void*, IScriptEnvironment*) {
-  return Create(args[0].AsClip(), SAMPLE_INT16, SAMPLE_INT16);
-}
-
-AVSValue __cdecl ConvertAudio::Create_8bit(AVSValue args, void*, IScriptEnvironment*) {
-  return Create(args[0].AsClip(), SAMPLE_INT8, SAMPLE_INT8);
-}
-
-
-AVSValue __cdecl ConvertAudio::Create_32bit(AVSValue args, void*, IScriptEnvironment*) {
-  return Create(args[0].AsClip(), SAMPLE_INT32, SAMPLE_INT32);
-}
-
-AVSValue __cdecl ConvertAudio::Create_float(AVSValue args, void*, IScriptEnvironment*) {
-  return Create(args[0].AsClip(), SAMPLE_FLOAT, SAMPLE_FLOAT);
-}
-
-AVSValue __cdecl ConvertAudio::Create_24bit(AVSValue args, void*, IScriptEnvironment*) {
-  return Create(args[0].AsClip(), SAMPLE_INT24, SAMPLE_INT24);
-}
 
 
 #if defined(X86_32) && defined(MSVC) && !defined(__clang__)
@@ -431,7 +397,7 @@ AVSValue __cdecl AssumeRate::Create(AVSValue args, void*, IScriptEnvironment*) {
  *****************************************/
 
 ConvertToMono::ConvertToMono(PClip _clip) :
-  GenericVideoFilter(ConvertAudio::Create(_clip, SAMPLE_INT16 | SAMPLE_FLOAT, SAMPLE_FLOAT)),
+  GenericVideoFilter(avs_audio_convert::EnsureAudioFormat(_clip, SAMPLE_INT16 | SAMPLE_FLOAT, SAMPLE_FLOAT)),
   tempbuffer(NULL)
 {
   channels = vi.AudioChannels();
@@ -597,7 +563,7 @@ MergeChannels::MergeChannels(PClip _clip, int _num_children, PClip* _child_array
 
   for (int i = 1;i < num_children;i++) {
     PClip tclip = child_array[i];
-    child_array[i] = ConvertAudio::Create(tclip, vi.SampleType(), vi.SampleType());  // Clip 2 should now be same type as clip 1.
+    child_array[i] = avs_audio_convert::EnsureAudioFormat(tclip, vi.SampleType(), vi.SampleType());  // Clip 2 should now be same type as clip 1.
     const VideoInfo& vi2 = child_array[i]->GetVideoInfo();
 
     if (vi.audio_samples_per_second != vi2.audio_samples_per_second) {
@@ -996,7 +962,7 @@ AVSValue __cdecl DelayAudio::Create(AVSValue args, void*, IScriptEnvironment*) {
 
 
 Amplify::Amplify(PClip _child, float* _volumes, int* _i_v)
-    : GenericVideoFilter(ConvertAudio::Create(_child, SAMPLE_INT16 | SAMPLE_FLOAT | SAMPLE_INT32, SAMPLE_FLOAT)),
+    : GenericVideoFilter(avs_audio_convert::EnsureAudioFormat(_child, SAMPLE_INT16 | SAMPLE_FLOAT | SAMPLE_INT32, SAMPLE_FLOAT)),
 volumes(_volumes), i_v(_i_v) { }
 
 
@@ -1172,7 +1138,7 @@ AVSValue __cdecl Amplify::Create_dB(AVSValue args, void*, IScriptEnvironment*) {
  ******************************/
 
 Normalize::Normalize(PClip _child, float _max_factor, bool _showvalues) :
-  GenericVideoFilter(ConvertAudio::Create(_child, SAMPLE_INT16 | SAMPLE_FLOAT, SAMPLE_FLOAT)),
+  GenericVideoFilter(avs_audio_convert::EnsureAudioFormat(_child, SAMPLE_INT16 | SAMPLE_FLOAT, SAMPLE_FLOAT)),
   max_factor(_max_factor),
   max_volume(-1.0f),
   frameno(0),
@@ -1408,14 +1374,14 @@ AVSValue __cdecl Normalize::Create(AVSValue args, void*, IScriptEnvironment*) {
  ******************************/
 
 MixAudio::MixAudio(PClip _child, PClip _clip, double _track1_factor, double _track2_factor, IScriptEnvironment* env) :
-  GenericVideoFilter(ConvertAudio::Create(_child, SAMPLE_INT16 | SAMPLE_FLOAT, SAMPLE_FLOAT)),
+  GenericVideoFilter(avs_audio_convert::EnsureAudioFormat(_child, SAMPLE_INT16 | SAMPLE_FLOAT, SAMPLE_FLOAT)),
   tempbuffer(NULL),
   track1_factor(int(_track1_factor*131072.0 + 0.5)),
   track2_factor(int(_track2_factor*131072.0 + 0.5)),
   t1factor(float(_track1_factor)),
   t2factor(float(_track2_factor))
 {
-  clip = ConvertAudio::Create(_clip, vi.SampleType(), vi.SampleType());  // Clip 2 should now be same type as clip 1.
+  clip = avs_audio_convert::EnsureAudioFormat(_clip, vi.SampleType(), vi.SampleType());  // Clip 2 should now be same type as clip 1.
   const VideoInfo vi2 = clip->GetVideoInfo();
 
   if (vi.audio_samples_per_second != vi2.audio_samples_per_second)
@@ -1533,7 +1499,7 @@ static int Amasktab[Amask+1];
 static SFLOAT fAmasktab[Amask+1];
 
 ResampleAudio::ResampleAudio(PClip _child, int _target_rate_n, int _target_rate_d, IScriptEnvironment*)
-    : GenericVideoFilter(ConvertAudio::Create(_child, SAMPLE_INT16 | SAMPLE_FLOAT, SAMPLE_FLOAT)),
+    : GenericVideoFilter(avs_audio_convert::EnsureAudioFormat(_child, SAMPLE_INT16 | SAMPLE_FLOAT, SAMPLE_FLOAT)),
       factor(_target_rate_n / (double(_target_rate_d) * vi.audio_samples_per_second))
 {
   srcbuffer  = 0;

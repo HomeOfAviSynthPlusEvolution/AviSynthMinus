@@ -6,6 +6,7 @@
 // Convert Audio helper functions (AVX2)
 // Copyright (c) 2020 Xinyue Lu, (c) 2021 pinterf
 
+#include "../kernels.h"
 #include <avs/types.h>
 #include <avs/config.h>
 #include <immintrin.h> // AVX2 at most

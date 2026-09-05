@@ -6,7 +6,7 @@
 #endif
 #include "core/internal.h"
 #include "core/audio.h"
-#include "convert/convert_audio.h"
+#include "audio_convert/factory.h"
 #include "filters/edit.h"
 #include "filters/fps.h"
 #ifdef AVSUT_AUDIO_FILTER_UNDEF_AVS_UNUSED
@@ -89,16 +89,17 @@ TEST(ConvertAudioFilter, ConvertsSigned16ToFloatForRequestedInterleavedWindow) {
   PClip source(source_clip);
   const auto source_before = source_clip->audio();
 
-  ConvertAudio filter(source, SAMPLE_FLOAT);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, 1);
-  filter.GetAudio(output.data(), 1, 2, environment.get());
+  PClip filter = avs_audio_convert::EnsureAudioFormat(source, 0, SAMPLE_FLOAT);
+  ASSERT_TRUE(filter);
+  GuardedAudioBuffer output(filter->GetVideoInfo().BytesFromAudioSamples(2), 64, 64, 1);
+  filter->GetAudio(output.data(), 1, 2, environment.get());
 
   expect_float_audio(output, {-1.0F, 16384.0F / 32768.0F, -16384.0F / 32768.0F, 1.0F / 32768.0F});
-  EXPECT_EQ(filter.GetVideoInfo().SampleType(), SAMPLE_FLOAT);
-  EXPECT_EQ(filter.GetVideoInfo().AudioChannels(), 2);
+  EXPECT_EQ(filter->GetVideoInfo().SampleType(), SAMPLE_FLOAT);
+  EXPECT_EQ(filter->GetVideoInfo().AudioChannels(), 2);
   expect_audio_requests(*source_clip, {{1, 2}});
   expect_audio_source_unchanged(*source_clip, source_before);
-  EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), 0);
+  EXPECT_EQ(filter->SetCacheHints(CACHE_GET_MTMODE, 0), 0);
   EXPECT_TRUE(output.memory_intact());
 }
 
@@ -110,12 +111,13 @@ TEST(ConvertAudioFilter, ConvertsFloatToSigned16WithEndpointClamping) {
   PClip source(source_clip);
   const auto source_before = source_clip->audio();
 
-  ConvertAudio filter(source, SAMPLE_INT16);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(5), 64, 64, 1);
-  filter.GetAudio(output.data(), 0, 5, environment.get());
+  PClip filter = avs_audio_convert::EnsureAudioFormat(source, 0, SAMPLE_INT16);
+  ASSERT_TRUE(filter);
+  GuardedAudioBuffer output(filter->GetVideoInfo().BytesFromAudioSamples(5), 64, 64, 1);
+  filter->GetAudio(output.data(), 0, 5, environment.get());
 
   expect_exact_audio<std::int16_t>(output, {-32768, -32768, -16384, 16384, 32767});
-  EXPECT_EQ(filter.GetVideoInfo().SampleType(), SAMPLE_INT16);
+  EXPECT_EQ(filter->GetVideoInfo().SampleType(), SAMPLE_INT16);
   expect_audio_requests(*source_clip, {{0, 5}});
   expect_audio_source_unchanged(*source_clip, source_before);
   EXPECT_TRUE(output.memory_intact());
