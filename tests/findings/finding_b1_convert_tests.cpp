@@ -7,6 +7,7 @@
 #define AVSUT_FINDING_UNDEF_AVS_UNUSED
 #endif
 #include "kernels.h"
+#include "kernels_highway.h"
 #include "convert/convert_bits.h"
 #include "convert/convert_helper.h"
 #include "convert/intel/convert_bits_avx2.h"
@@ -41,8 +42,7 @@ struct AudioNonFiniteCase {
   std::string name;
   std::size_t bytes_per_sample;
   AudioConvertFunction scalar;
-  AudioConvertFunction sse;
-  AudioConvertFunction avx2;
+  AudioConvertFunction native;
 };
 
 void PrintTo(const AudioNonFiniteCase& test_case, std::ostream* stream) {
@@ -52,11 +52,11 @@ void PrintTo(const AudioNonFiniteCase& test_case, std::ostream* stream) {
 std::vector<AudioNonFiniteCase> audio_non_finite_cases() {
   return {
       {"ToUInt8_Count17_PatternQuietNanVectorAndTail", sizeof(std::uint8_t), convertFLTTo8,
-       convertFLTTo8_SSE2, convertFLTTo8_AVX2},
+       avs_audio_convert::ResolveHighwayAudioConvert(SAMPLE_FLOAT, SAMPLE_INT8, ~0)},
       {"ToInt16_Count17_PatternQuietNanVectorAndTail", sizeof(std::int16_t), convertFLTTo16,
-       convertFLTTo16_SSE2, convertFLTTo16_AVX2},
+       avs_audio_convert::ResolveHighwayAudioConvert(SAMPLE_FLOAT, SAMPLE_INT16, ~0)},
       {"ToInt32_Count17_PatternQuietNanVectorAndTail", sizeof(std::int32_t), convertFLTTo32,
-       convertFLTTo32_SSE41, convertFLTTo32_AVX2},
+       avs_audio_convert::ResolveHighwayAudioConvert(SAMPLE_FLOAT, SAMPLE_INT32, ~0)},
   };
 }
 
@@ -93,10 +93,7 @@ class ConvertAudioNonFinite : public ::testing::TestWithParam<AudioNonFiniteCase
 
 TEST_P(ConvertAudioNonFinite, MapsQuietNanConsistentlyAcrossAvailableImplementations) {
   const auto& test_case = GetParam();
-  const auto features = CpuFeatures::detect();
-  if (!features.supports(IsaRequirement::Sse2)) {
-    GTEST_SKIP() << "host does not support sse2";
-  }
+  ASSERT_NE(test_case.native, nullptr);
 
   auto source = non_finite_audio_input();
   const auto source_before = source;
@@ -105,18 +102,10 @@ TEST_P(ConvertAudioNonFinite, MapsQuietNanConsistentlyAcrossAvailableImplementat
       << "B1 float-to-" << test_case.name << " scalar modified input";
 
   source = source_before;
-  const auto sse = run_audio_conversion(test_case.sse, source, test_case.bytes_per_sample);
+  const auto native = run_audio_conversion(test_case.native, source, test_case.bytes_per_sample);
   EXPECT_TRUE(same_float_bits(source, source_before))
-      << "B1 float-to-" << test_case.name << " sse modified input";
-  expect_equal_audio_bytes(scalar, sse, test_case, "sse");
-
-  if (features.supports(IsaRequirement::Avx2)) {
-    source = source_before;
-    const auto avx2 = run_audio_conversion(test_case.avx2, source, test_case.bytes_per_sample);
-    EXPECT_TRUE(same_float_bits(source, source_before))
-        << "B1 float-to-" << test_case.name << " avx2 modified input";
-    expect_equal_audio_bytes(scalar, avx2, test_case, "avx2");
-  }
+      << "B1 float-to-" << test_case.name << " Highway modified input";
+  expect_equal_audio_bytes(scalar, native, test_case, "Highway");
 }
 
 INSTANTIATE_TEST_SUITE_P(B1, ConvertAudioNonFinite, ::testing::ValuesIn(audio_non_finite_cases()),
@@ -126,12 +115,8 @@ INSTANTIATE_TEST_SUITE_P(B1, ConvertAudioNonFinite, ::testing::ValuesIn(audio_no
 
 TEST_P(ConvertAudioNonFinite, SilencesNanAndSaturatesInfinityAcrossVectorBoundaries) {
   const auto& test_case = GetParam();
-  const auto features = CpuFeatures::detect();
-  std::vector<AudioConvertFunction> implementations{test_case.scalar};
-  if (features.supports(test_case.bytes_per_sample == 4 ? IsaRequirement::Sse41 : IsaRequirement::Sse2))
-    implementations.push_back(test_case.sse);
-  if (features.supports(IsaRequirement::Avx2))
-    implementations.push_back(test_case.avx2);
+  ASSERT_NE(test_case.native, nullptr);
+  const std::vector<AudioConvertFunction> implementations{test_case.scalar, test_case.native};
 
   for (const int count : {1, 3, 4, 7, 8, 15, 16, 17, 31, 32, 33}) {
     SCOPED_TRACE(count);

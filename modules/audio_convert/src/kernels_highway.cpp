@@ -318,6 +318,94 @@ void convertFLTTo24_HWY(void* inbuf, void* outbuf, int count) {
   PackS24(static_cast<const float*>(inbuf), static_cast<uint8_t*>(outbuf), static_cast<size_t>(count));
 }
 
+// U8/S16/S32 share normalization and quantization, while packed S24 keeps its
+// byte-layout helpers above. U8 has the same signed quantization with a 128 bias.
+template<class T>
+constexpr float AudioScale() {
+  return static_cast<float>(uint64_t{1} << (sizeof(T) * 8 - 1));
+}
+
+template<class T>
+void IntegerToFloat(void* inbuf, void* outbuf, int count) {
+  if (count <= 0) return;
+  const auto* in = static_cast<const T*>(inbuf);
+  auto* out = static_cast<float*>(outbuf);
+  // Wider promotion blocks regressed in the native benchmark. Cap only this
+  // inexpensive normalization loop; float quantization still uses full vectors.
+  const hn::CappedTag<float, 8> df;
+  const hn::Rebind<int32_t, decltype(df)> di;
+  const hn::Rebind<T, decltype(df)> ds;
+  const size_t n = hn::Lanes(df);
+  const size_t end = static_cast<size_t>(count) - static_cast<size_t>(count) % n;
+  size_t i = 0;
+  for (; i < end; i += n) {
+    auto value = hn::Zero(di);
+    if constexpr (std::is_same_v<T, int32_t>) value = hn::LoadU(di, in + i);
+    else value = hn::PromoteTo(di, hn::LoadU(ds, in + i));
+    if constexpr (std::is_same_v<T, uint8_t>) value = hn::Sub(value, hn::Set(di, 128));
+    hn::StoreU(hn::Mul(hn::ConvertTo(df, value), hn::Set(df, 1.0f / AudioScale<T>())), df, out + i);
+  }
+  for (; i < static_cast<size_t>(count); ++i) {
+    if constexpr (std::is_same_v<T, uint8_t>) out[i] = (int(in[i]) - 128) * (1.0f / AudioScale<T>());
+    else out[i] = in[i] * (1.0f / AudioScale<T>());
+  }
+}
+
+template<class T, class DF>
+HWY_INLINE auto QuantizeInteger(DF df, hn::Vec<DF> input) {
+  const hn::Rebind<int32_t, DF> di;
+  const auto scaled = hn::Mul(hn::IfThenElseZero(hn::Eq(input, input), input), hn::Set(df, AudioScale<T>()));
+  if constexpr (std::is_same_v<T, int32_t>) {
+    // Highway's saturating conversion preserves the exact INT32_MAX endpoint.
+    return hn::ConvertTo(di, scaled);
+  } else {
+    const auto bounded = hn::Max(hn::Set(df, -AudioScale<T>()),
+        hn::Min(hn::Set(df, AudioScale<T>() - 1.0f), scaled));
+    return hn::ConvertInRangeTo(di, bounded);
+  }
+}
+
+template<class T>
+void FloatToInteger(void* inbuf, void* outbuf, int count) {
+  if (count <= 0) return;
+  const auto* in = static_cast<const float*>(inbuf);
+  auto* out = static_cast<T*>(outbuf);
+  const hn::ScalableTag<float> df;
+  const hn::Rebind<T, decltype(df)> dd;
+  const size_t n = hn::Lanes(df);
+  constexpr size_t vectors = std::is_same_v<T, uint8_t> ? 2 : 1;
+  const size_t block = n * vectors;
+  const size_t end = static_cast<size_t>(count) - static_cast<size_t>(count) % block;
+  size_t i = 0;
+  for (; i < end; i += block) {
+    const auto value = QuantizeInteger<T>(df, hn::LoadU(df, in + i));
+    if constexpr (std::is_same_v<T, int32_t>) {
+      hn::StoreU(value, dd, out + i);
+    } else if constexpr (std::is_same_v<T, uint8_t>) {
+      const hn::Repartition<int16_t, decltype(df)> di16;
+      const hn::Rebind<uint8_t, decltype(di16)> du8;
+      const hn::Rebind<int8_t, decltype(di16)> di8;
+      const auto high = QuantizeInteger<T>(df, hn::LoadU(df, in + i + n));
+      const auto packed = hn::OrderedDemote2To(di16, value, high);
+      hn::StoreU(hn::Xor(hn::BitCast(du8, hn::DemoteTo(di8, packed)), hn::Set(du8, 0x80)), du8, out + i);
+    } else {
+      hn::StoreU(hn::DemoteTo(dd, value), dd, out + i);
+    }
+  }
+  for (; i < static_cast<size_t>(count); ++i) {
+    const float scaled = in[i] * AudioScale<T>();
+    int32_t value;
+    if (std::isnan(scaled)) value = 0;
+    else if (scaled >= AudioScale<T>() - 1.0f)
+      value = std::is_same_v<T, int32_t> ? INT32_MAX : int32_t(AudioScale<T>() - 1.0f);
+    else if (scaled <= -AudioScale<T>())
+      value = std::is_same_v<T, int32_t> ? INT32_MIN : -int32_t(AudioScale<T>());
+    else value = static_cast<int32_t>(scaled);
+    if constexpr (std::is_same_v<T, uint8_t>) out[i] = static_cast<T>(value + 128);
+    else out[i] = static_cast<T>(value);
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Non-S24 Basic Integer Conversions
 // -----------------------------------------------------------------------------
@@ -522,6 +610,12 @@ struct RouteTable {
 
   convert_proc s24_to_f32;
   convert_proc f32_to_s24;
+  convert_proc u8_to_f32;
+  convert_proc f32_to_u8;
+  convert_proc s16_to_f32;
+  convert_proc f32_to_s16;
+  convert_proc s32_to_f32;
+  convert_proc f32_to_s32;
 };
 
 static const RouteTable kTableC = {
@@ -541,6 +635,12 @@ static const RouteTable kTableC = {
 
   nullptr,
   nullptr,
+  convert8ToFLT,
+  convertFLTTo8,
+  convert16ToFLT,
+  convertFLTTo16,
+  convert32ToFLT,
+  convertFLTTo32,
 };
 
 #define MAKE_ROUTE_TABLE(TARGET_MACRO) \
@@ -558,7 +658,13 @@ static const RouteTable kTableC = {
     TARGET_MACRO(convert24To8_HWY),  \
     TARGET_MACRO(convert8To24_HWY),  \
     TARGET_MACRO(convert24ToFLT_HWY),\
-    TARGET_MACRO(convertFLTTo24_HWY) \
+    TARGET_MACRO(convertFLTTo24_HWY),\
+    TARGET_MACRO(IntegerToFloat<uint8_t>), \
+    TARGET_MACRO(FloatToInteger<uint8_t>), \
+    TARGET_MACRO(IntegerToFloat<int16_t>), \
+    TARGET_MACRO(FloatToInteger<int16_t>), \
+    TARGET_MACRO(IntegerToFloat<int32_t>), \
+    TARGET_MACRO(FloatToInteger<int32_t>) \
   }
 
 static const RouteTable* GetRouteTableForTarget(int64_t target) {
@@ -600,6 +706,12 @@ static RouteMember FindRoute(int src_format, int dst_format) {
 
     case (SAMPLE_INT24 << 16) | SAMPLE_FLOAT: return &RouteTable::s24_to_f32;
     case (SAMPLE_FLOAT << 16) | SAMPLE_INT24: return &RouteTable::f32_to_s24;
+    case (SAMPLE_INT8 << 16) | SAMPLE_FLOAT: return &RouteTable::u8_to_f32;
+    case (SAMPLE_FLOAT << 16) | SAMPLE_INT8: return &RouteTable::f32_to_u8;
+    case (SAMPLE_INT16 << 16) | SAMPLE_FLOAT: return &RouteTable::s16_to_f32;
+    case (SAMPLE_FLOAT << 16) | SAMPLE_INT16: return &RouteTable::f32_to_s16;
+    case (SAMPLE_INT32 << 16) | SAMPLE_FLOAT: return &RouteTable::s32_to_f32;
+    case (SAMPLE_FLOAT << 16) | SAMPLE_INT32: return &RouteTable::f32_to_s32;
 
     default: return nullptr;
   }

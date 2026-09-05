@@ -39,12 +39,6 @@ inline int to_avisynth_sample_type(AudioFormat format) {
   return 0;
 }
 
-#ifdef INTEL_INTRINSICS
-#define AUDIO_SIMD_KERNEL(function) function
-#else
-#define AUDIO_SIMD_KERNEL(function) static_cast<AudioConvertFunction>(nullptr)
-#endif
-
 template <typename Function>
 void add_integer_variants(std::vector<AudioIntegerCase>& cases, AudioFormat source,
                           AudioFormat destination, std::size_t count, const char* expected_hash,
@@ -66,7 +60,7 @@ void add_integer_variants(std::vector<AudioIntegerCase>& cases, AudioFormat sour
       Variant<AudioConvertFunction>{"hwy_native", hwy_native, IsaRequirement::Scalar}, expected_hash));
 }
 
-TEST(AudioHighwayDispatch, AllIntegerRoutesResolveToCOrNative) {
+TEST(AudioHighwayDispatch, AllRoutesResolveToCOrNative) {
   struct Route { int src; int dst; convert_proc scalar; };
   const Route routes[] = {
     {SAMPLE_INT8,  SAMPLE_INT16, convert8To16},
@@ -81,6 +75,12 @@ TEST(AudioHighwayDispatch, AllIntegerRoutesResolveToCOrNative) {
     {SAMPLE_INT16, SAMPLE_INT24, convert16To24},
     {SAMPLE_INT24, SAMPLE_INT8,  convert24To8},
     {SAMPLE_INT8,  SAMPLE_INT24, convert8To24},
+    {SAMPLE_INT8,  SAMPLE_FLOAT, convert8ToFLT},
+    {SAMPLE_FLOAT, SAMPLE_INT8, convertFLTTo8},
+    {SAMPLE_INT16, SAMPLE_FLOAT, convert16ToFLT},
+    {SAMPLE_FLOAT, SAMPLE_INT16, convertFLTTo16},
+    {SAMPLE_INT32, SAMPLE_FLOAT, convert32ToFLT},
+    {SAMPLE_FLOAT, SAMPLE_INT32, convertFLTTo32},
   };
   const auto target = avs_simd::ChooseTarget(~0, avs_audio_convert::GetHighwayAudioConvertCompiledTargets());
   EXPECT_EQ(avs_audio_convert::GetHighwayAudioConvertChosenTarget(~0), target);
@@ -114,13 +114,12 @@ TEST(AudioHighwayDispatch, AllIntegerRoutesResolveToCOrNative) {
     EXPECT_EQ(f32_to_s24_native, avs_audio_convert::ResolveHighwayAudioConvertForTarget(SAMPLE_FLOAT, SAMPLE_INT24, target));
   }
 
-  // Unsupported float routes return nullptr
-  EXPECT_EQ(avs_audio_convert::ResolveHighwayAudioConvert(SAMPLE_INT8, SAMPLE_FLOAT, ~0), nullptr);
-  EXPECT_EQ(avs_audio_convert::ResolveHighwayAudioConvert(SAMPLE_FLOAT, SAMPLE_INT8, ~0), nullptr);
-  EXPECT_EQ(avs_audio_convert::ResolveHighwayAudioConvert(SAMPLE_INT16, SAMPLE_FLOAT, ~0), nullptr);
-  EXPECT_EQ(avs_audio_convert::ResolveHighwayAudioConvert(SAMPLE_FLOAT, SAMPLE_INT16, ~0), nullptr);
-  EXPECT_EQ(avs_audio_convert::ResolveHighwayAudioConvert(SAMPLE_INT32, SAMPLE_FLOAT, ~0), nullptr);
-  EXPECT_EQ(avs_audio_convert::ResolveHighwayAudioConvert(SAMPLE_FLOAT, SAMPLE_INT32, ~0), nullptr);
+  for (int type : {SAMPLE_INT8, SAMPLE_INT16, SAMPLE_INT24, SAMPLE_INT32, SAMPLE_FLOAT}) {
+    EXPECT_FALSE(avs_audio_convert::IsHighwayAudioConvertSupportedRoute(type, type));
+    EXPECT_EQ(avs_audio_convert::ResolveHighwayAudioConvert(type, type, ~0), nullptr);
+  }
+  EXPECT_EQ(avs_audio_convert::ResolveHighwayAudioConvert(0, SAMPLE_FLOAT, ~0), nullptr);
+
 }
 
 std::vector<AudioIntegerCase> audio_integer_cases() {
@@ -227,23 +226,14 @@ std::vector<AudioIntegerCase> audio_packed_24_cases() {
 }
 
 void add_audio_float_variants(std::vector<AudioFloatCase>& cases, AudioFormat source,
-                              AudioFormat destination, std::size_t count, const char* sse_name,
-                              IsaRequirement sse_requirement, AudioConvertFunction c_function,
-                              AudioConvertFunction sse_function, AudioConvertFunction avx2_function,
-                              const char* expected_hash = "") {
-  cases.push_back(make_audio_float_case(
-      source, destination, count,
+                              AudioFormat destination, std::size_t count,
+                              AudioConvertFunction c_function, const char* expected_hash = "") {
+  cases.push_back(make_audio_float_case(source, destination, count,
       Variant<AudioConvertFunction>{"c", c_function, IsaRequirement::Scalar}, expected_hash));
-  if (sse_function != nullptr) {
-    cases.push_back(make_audio_float_case(
-        source, destination, count,
-        Variant<AudioConvertFunction>{sse_name, sse_function, sse_requirement}, expected_hash));
-  }
-  if (avx2_function != nullptr) {
-    cases.push_back(make_audio_float_case(
-        source, destination, count,
-        Variant<AudioConvertFunction>{"avx2", avx2_function, IsaRequirement::Avx2}, expected_hash));
-  }
+  const auto native = avs_audio_convert::ResolveHighwayAudioConvert(
+      to_avisynth_sample_type(source), to_avisynth_sample_type(destination), ~0);
+  cases.push_back(make_audio_float_case(source, destination, count,
+      Variant<AudioConvertFunction>{"hwy_native", native, IsaRequirement::Scalar}, expected_hash));
 }
 
 std::vector<AudioFloatCase> audio_float_cases() {
@@ -267,24 +257,12 @@ std::vector<AudioFloatCase> audio_float_cases() {
   std::vector<AudioFloatCase> cases;
   for (std::size_t index = 0; index < counts.size(); ++index) {
     const auto count = counts[index];
-    add_audio_float_variants(cases, AudioFormat::U8, AudioFormat::F32, count, "sse4.1",
-                             IsaRequirement::Sse41, convert8ToFLT, AUDIO_SIMD_KERNEL(convert8ToFLT_SSE41),
-                             AUDIO_SIMD_KERNEL(convert8ToFLT_AVX2));
-    add_audio_float_variants(cases, AudioFormat::F32, AudioFormat::U8, count, "sse2",
-                             IsaRequirement::Sse2, convertFLTTo8, AUDIO_SIMD_KERNEL(convertFLTTo8_SSE2),
-                             AUDIO_SIMD_KERNEL(convertFLTTo8_AVX2), f32_to_u8[index]);
-    add_audio_float_variants(cases, AudioFormat::S16, AudioFormat::F32, count, "sse4.1",
-                             IsaRequirement::Sse41, convert16ToFLT, AUDIO_SIMD_KERNEL(convert16ToFLT_SSE41),
-                             AUDIO_SIMD_KERNEL(convert16ToFLT_AVX2));
-    add_audio_float_variants(cases, AudioFormat::F32, AudioFormat::S16, count, "sse2",
-                             IsaRequirement::Sse2, convertFLTTo16, AUDIO_SIMD_KERNEL(convertFLTTo16_SSE2),
-                             AUDIO_SIMD_KERNEL(convertFLTTo16_AVX2), f32_to_s16[index]);
-    add_audio_float_variants(cases, AudioFormat::S32, AudioFormat::F32, count, "sse2",
-                             IsaRequirement::Sse2, convert32ToFLT, AUDIO_SIMD_KERNEL(convert32ToFLT_SSE2),
-                             AUDIO_SIMD_KERNEL(convert32ToFLT_AVX2));
-    add_audio_float_variants(cases, AudioFormat::F32, AudioFormat::S32, count, "sse4.1",
-                             IsaRequirement::Sse41, convertFLTTo32, AUDIO_SIMD_KERNEL(convertFLTTo32_SSE41),
-                             AUDIO_SIMD_KERNEL(convertFLTTo32_AVX2), f32_to_s32[index]);
+    add_audio_float_variants(cases, AudioFormat::U8, AudioFormat::F32, count, convert8ToFLT);
+    add_audio_float_variants(cases, AudioFormat::F32, AudioFormat::U8, count, convertFLTTo8, f32_to_u8[index]);
+    add_audio_float_variants(cases, AudioFormat::S16, AudioFormat::F32, count, convert16ToFLT);
+    add_audio_float_variants(cases, AudioFormat::F32, AudioFormat::S16, count, convertFLTTo16, f32_to_s16[index]);
+    add_audio_float_variants(cases, AudioFormat::S32, AudioFormat::F32, count, convert32ToFLT);
+    add_audio_float_variants(cases, AudioFormat::F32, AudioFormat::S32, count, convertFLTTo32, f32_to_s32[index]);
 
     const auto s24_to_f32_native = avs_audio_convert::ResolveHighwayAudioConvert(SAMPLE_INT24, SAMPLE_FLOAT, ~0);
     if (s24_to_f32_native) {
@@ -308,23 +286,15 @@ std::vector<AudioTwoStageCase> audio_two_stage_cases() {
   constexpr std::array<const char*, 6> f32_to_s24_hashes{"3856194f641f6364", "130bd615dd56e05c",
                                                          "1ace15baf02dfc76", "f31a61d307ad35b6",
                                                          "fde8884581bbcf19", "36cfd1c0483386f7"};
-  const auto s32_to_s24_hwy = avs_audio_convert::ResolveHighwayAudioConvert(SAMPLE_INT32, SAMPLE_INT24, ~0);
-  const auto s24_to_s32_hwy = avs_audio_convert::ResolveHighwayAudioConvert(SAMPLE_INT24, SAMPLE_INT32, ~0);
-
-  const std::array<Variant<AudioConvertFunction>, 3> float_to_s32{
-      Variant<AudioConvertFunction>{"c", convertFLTTo32, IsaRequirement::Scalar},
-      Variant<AudioConvertFunction>{"sse4.1", AUDIO_SIMD_KERNEL(convertFLTTo32_SSE41), IsaRequirement::Sse41},
-      Variant<AudioConvertFunction>{"avx2", AUDIO_SIMD_KERNEL(convertFLTTo32_AVX2), IsaRequirement::Avx2}};
-  const std::array<Variant<AudioConvertFunction>, 2> s32_to_s24{
-      Variant<AudioConvertFunction>{"c", convert32To24, IsaRequirement::Scalar},
-      Variant<AudioConvertFunction>{"hwy_native", s32_to_s24_hwy, IsaRequirement::Scalar}};
-  const std::array<Variant<AudioConvertFunction>, 2> s24_to_s32{
-      Variant<AudioConvertFunction>{"c", convert24To32, IsaRequirement::Scalar},
-      Variant<AudioConvertFunction>{"hwy_native", s24_to_s32_hwy, IsaRequirement::Scalar}};
-  const std::array<Variant<AudioConvertFunction>, 3> s32_to_float{
-      Variant<AudioConvertFunction>{"c", convert32ToFLT, IsaRequirement::Scalar},
-      Variant<AudioConvertFunction>{"sse2", AUDIO_SIMD_KERNEL(convert32ToFLT_SSE2), IsaRequirement::Sse2},
-      Variant<AudioConvertFunction>{"avx2", AUDIO_SIMD_KERNEL(convert32ToFLT_AVX2), IsaRequirement::Avx2}};
+  // Only ordinary C uses the two-stage path in production.
+  const std::array<Variant<AudioConvertFunction>, 1> float_to_s32{
+      Variant<AudioConvertFunction>{"c", convertFLTTo32, IsaRequirement::Scalar}};
+  const std::array<Variant<AudioConvertFunction>, 1> s32_to_s24{
+      Variant<AudioConvertFunction>{"c", convert32To24, IsaRequirement::Scalar}};
+  const std::array<Variant<AudioConvertFunction>, 1> s24_to_s32{
+      Variant<AudioConvertFunction>{"c", convert24To32, IsaRequirement::Scalar}};
+  const std::array<Variant<AudioConvertFunction>, 1> s32_to_float{
+      Variant<AudioConvertFunction>{"c", convert32ToFLT, IsaRequirement::Scalar}};
 
   std::vector<AudioTwoStageCase> cases;
   for (std::size_t index = 0; index < counts.size(); ++index) {
@@ -346,8 +316,6 @@ std::vector<AudioTwoStageCase> audio_two_stage_cases() {
   }
   return cases;
 }
-
-#undef AUDIO_SIMD_KERNEL
 
 class AudioIntegerKernels : public ::testing::TestWithParam<AudioIntegerCase> {};
 
@@ -443,8 +411,78 @@ TEST(AudioPacked24Float, MatchesComposedCAtQuantizationBoundaries) {
   }
 }
 
+TEST(AudioFloatConversion, PreservesQuantizationAtBoundariesAndRandomFloatBits) {
+  const float inf = std::numeric_limits<float>::infinity();
+  struct Route { int format; size_t bytes; convert_proc scalar; float scale; };
+  for (const auto& route : {Route{SAMPLE_INT8, 1, convertFLTTo8, 128.0f},
+                            Route{SAMPLE_INT16, 2, convertFLTTo16, 32768.0f},
+                            Route{SAMPLE_INT32, 4, convertFLTTo32, 2147483648.0f}}) {
+    const auto native = avs_audio_convert::ResolveHighwayAudioConvert(SAMPLE_FLOAT, route.format, ~0);
+    ASSERT_NE(native, nullptr);
+    std::vector<float> seeds{0.0f, -0.0f, inf, -inf,
+        std::numeric_limits<float>::denorm_min(), -std::numeric_limits<float>::denorm_min()};
+    for (float boundary : {-1.0f, -1.0f / route.scale, 1.0f / route.scale,
+                           (route.scale - 1.0f) / route.scale, 1.0f}) {
+      seeds.push_back(std::nextafter(boundary, -inf));
+      seeds.push_back(boundary);
+      seeds.push_back(std::nextafter(boundary, inf));
+    }
+    for (uint32_t bits : {0x7fc00001u, 0xffc00001u, 0x7f800001u, 0xff800001u}) {
+      float value;
+      std::memcpy(&value, &bits, sizeof(value));
+      seeds.push_back(value);
+    }
+    for (int count : {0, 1, 3, 7, 8, 15, 16, 17, 31, 32, 33, 63, 64, 65, 257, 4097}) {
+      SCOPED_TRACE(::testing::Message() << route.format << " count=" << count);
+      for (size_t offset = 0; offset < seeds.size(); ++offset) {
+        std::vector<float> input(count);
+        for (int i = 0; i < count; ++i) {
+          if (i % 2 == 0) input[i] = seeds[(i / 2 + offset) % seeds.size()];
+          else {
+            const uint32_t bits = uint32_t(i + offset * 4099) * 2654435761u;
+            std::memcpy(&input[i], &bits, sizeof(bits));
+          }
+        }
+        const auto before = input;
+        std::vector<uint8_t> expected(count * route.bytes), actual(expected.size());
+        route.scalar(input.data(), expected.data(), count);
+        native(input.data(), actual.data(), count);
+        EXPECT_EQ(actual, expected) << "offset " << offset;
+        if (count) EXPECT_EQ(std::memcmp(input.data(), before.data(), count * sizeof(float)), 0);
+      }
+    }
+  }
+}
+
+TEST(AudioFloatConversion, NormalizesIntegerDomainExactly) {
+  struct Route { int format; size_t bytes; convert_proc scalar; };
+  for (const auto& route : {Route{SAMPLE_INT8, 1, convert8ToFLT},
+                            Route{SAMPLE_INT16, 2, convert16ToFLT},
+                            Route{SAMPLE_INT32, 4, convert32ToFLT}}) {
+    const auto native = avs_audio_convert::ResolveHighwayAudioConvert(route.format, SAMPLE_FLOAT, ~0);
+    ASSERT_NE(native, nullptr);
+    // Exhaust U8 and S16; use deterministic S32 bit patterns including endpoints.
+    const int count = route.bytes == 1 ? 256 : 65536;
+    std::vector<uint8_t> input(count * route.bytes);
+    for (int i = 0; i < count; ++i) {
+      if (route.bytes == 1) input[i] = uint8_t(i);
+      else if (route.bytes == 2) write_u16_le(input.data() + i * 2, uint16_t(i));
+      else write_u32_le(input.data() + i * 4, uint32_t(i) * 2654435761u);
+    }
+    if (route.bytes == 4) {
+      write_u32_le(input.data(), 0x7fffffffu);
+      write_u32_le(input.data() + 4, 0x80000000u);
+      write_u32_le(input.data() + 8, 0xffffffffu);
+    }
+    std::vector<float> expected(count), actual(count);
+    route.scalar(input.data(), expected.data(), count);
+    native(input.data(), actual.data(), count);
+    EXPECT_EQ(std::memcmp(actual.data(), expected.data(), count * sizeof(float)), 0) << route.format;
+  }
+}
+
 #ifdef _WIN32
-TEST(AudioPacked24Boundary, NoAccessPastInputOrOutputBufferEnd) {
+TEST(AudioConversionBoundary, NoAccessPastInputOrOutputBufferEnd) {
   SYSTEM_INFO si;
   GetSystemInfo(&si);
   const size_t page_size = si.dwPageSize;
@@ -459,21 +497,22 @@ TEST(AudioPacked24Boundary, NoAccessPastInputOrOutputBufferEnd) {
   DWORD old_protect;
   ASSERT_TRUE(VirtualProtect(input.get() + page_size, page_size, PAGE_NOACCESS, &old_protect));
   ASSERT_TRUE(VirtualProtect(output.get() + page_size, page_size, PAGE_NOACCESS, &old_protect));
-  for (int format : {SAMPLE_INT8, SAMPLE_INT16, SAMPLE_INT32, SAMPLE_FLOAT}) {
-    const size_t width = format == SAMPLE_INT8 ? 1 : format == SAMPLE_INT16 ? 2 : 4;
-    for (bool pack : {false, true}) {
-      const auto convert = avs_audio_convert::ResolveHighwayAudioConvert(
-          pack ? format : SAMPLE_INT24, pack ? SAMPLE_INT24 : format, ~0);
-      if (format == SAMPLE_FLOAT && avs_audio_convert::GetHighwayAudioConvertChosenTarget(~0) == 0) {
-        EXPECT_EQ(convert, nullptr);
-        continue;
-      }
+  const int formats[] = {SAMPLE_INT8, SAMPLE_INT16, SAMPLE_INT24, SAMPLE_INT32, SAMPLE_FLOAT};
+  const auto width = [](int format) -> size_t {
+    return format == SAMPLE_INT8 ? 1 : format == SAMPLE_INT16 ? 2 : format == SAMPLE_INT24 ? 3 : 4;
+  };
+  for (int src : formats) {
+    for (int dst : formats) {
+      if (src == dst) continue;
+      const auto convert = avs_audio_convert::ResolveHighwayAudioConvert(src, dst, ~0);
+      if (!convert && avs_audio_convert::GetHighwayAudioConvertChosenTarget(~0) == 0 &&
+          ((src == SAMPLE_INT24 && dst == SAMPLE_FLOAT) || (src == SAMPLE_FLOAT && dst == SAMPLE_INT24))) continue;
       ASSERT_NE(convert, nullptr);
-      for (size_t count : {0, 1, 2, 3, 4, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65}) {
-        SCOPED_TRACE(::testing::Message() << format << " pack=" << pack << " count=" << count);
-        auto* in = input.get() + page_size - count * (pack ? width : 3);
-        auto* out = output.get() + page_size - count * (pack ? 3 : width);
-        std::memset(in, 0x5A, count * (pack ? width : 3));
+      for (size_t count : {0, 1, 2, 3, 4, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 129, 257}) {
+        SCOPED_TRACE(::testing::Message() << src << " -> " << dst << " count=" << count);
+        auto* in = input.get() + page_size - count * width(src);
+        auto* out = output.get() + page_size - count * width(dst);
+        std::memset(in, 0x5A, count * width(src));
         convert(in, out, int(count));
       }
     }

@@ -221,36 +221,6 @@ void convertFLTTo16(void* inbuf, void* outbuf, int count) {
   }
 }
 
-// not yet used directly, 24 bit has 32 bit 2nd stage
-void convert24ToFLT(void* inbuf, void* outbuf, int count) {
-  auto in = reinterpret_cast<uint8_t*>(inbuf);
-  auto out = reinterpret_cast<SFLOAT*>(outbuf);
-  constexpr float divisor = 1.0f / 8388608.f; // 1 << 23
-
-  for (int i = 0; i < count; i++)
-    out[i] = (in[i * 3] | (in[i * 3 + 1] << 8) | (in[i * 3 + 2] << 16)) * divisor;
-}
-
-// not yet used directly, 24 bit has 32 bit 2nd stage
-void convertFLTTo24(void* inbuf, void* outbuf, int count) {
-  auto in = reinterpret_cast<SFLOAT*>(inbuf);
-  auto out = reinterpret_cast<uint8_t*>(outbuf);
-  constexpr float multiplier = 8388608.f;
-  constexpr float max24 = 8388607.f;
-  constexpr float min24 = -8388608.f;
-
-  for (int i = 0; i < count; i++) {
-    float val = in[i] * multiplier;
-    int32_t result;
-    if (val >= max24) result = 0x7FFFFF; // 8388607
-    else if (val <= min24) result = 0x800000; // -8388608
-    else result = static_cast<int32_t>(val);
-    out[i * 3 + 0] = result & 0xFF;
-    out[i * 3 + 1] = (result >> 8) & 0xFF;
-    out[i * 3 + 2] = (result >> 16) & 0xFF;
-  }
-}
-
 // note for 32 bit conversions: 32 bit integer cannot be represented in float
 // 2147483647.0f is 2147483648.0f in reality
 

@@ -70,12 +70,6 @@ private:
   bool two_stage {false};
   convert_proc convert {nullptr};
   convert_proc convert_float {nullptr};
-  convert_proc convert_c {nullptr};
-#ifdef INTEL_INTRINSICS
-  convert_proc convert_sse2 {nullptr};
-  convert_proc convert_sse41 {nullptr};
-  convert_proc convert_avx2 {nullptr};
-#endif
 };
 
 int __stdcall ConvertAudio::SetCacheHints(int cachehints, int frame_range) {
@@ -87,45 +81,12 @@ ConvertAudio::ConvertAudio(PClip _clip, int _sample_type)
     : GenericVideoFilter(_clip) {
   dst_format = _sample_type;
   src_format = vi.SampleType();
-  // Set up convertion matrix
   src_bps = vi.BytesPerChannelSample(); // Store old size
   vi.sample_type = dst_format;
   tempbuffer_size = 0;
 
-  #define PAIR(src, dst) ((src << 16) | dst)
-  switch(PAIR(src_format, dst_format)) {
-    case PAIR(SAMPLE_INT32, SAMPLE_INT16): convert_c = convert32To16; break;
-    case PAIR(SAMPLE_INT16, SAMPLE_INT32): convert_c = convert16To32; break;
-    case PAIR(SAMPLE_INT32, SAMPLE_INT8 ): convert_c = convert32To8; break;
-    case PAIR(SAMPLE_INT8 , SAMPLE_INT32): convert_c = convert8To32; break;
-    case PAIR(SAMPLE_INT16, SAMPLE_INT8 ): convert_c = convert16To8; break;
-    case PAIR(SAMPLE_INT8 , SAMPLE_INT16): convert_c = convert8To16; break;
-    case PAIR(SAMPLE_FLOAT, SAMPLE_INT24): two_stage = true; // no-break;
-    case PAIR(SAMPLE_INT32, SAMPLE_INT24): convert_c = convert32To24; break;
-    case PAIR(SAMPLE_INT24, SAMPLE_FLOAT): two_stage = true; // no-break;
-    case PAIR(SAMPLE_INT24, SAMPLE_INT32): convert_c = convert24To32; break;
-    case PAIR(SAMPLE_INT24, SAMPLE_INT16): convert_c = convert24To16; break;
-    case PAIR(SAMPLE_INT16, SAMPLE_INT24): convert_c = convert16To24; break;
-    case PAIR(SAMPLE_INT24, SAMPLE_INT8 ): convert_c = convert24To8; break;
-    case PAIR(SAMPLE_INT8 , SAMPLE_INT24): convert_c = convert8To24; break;
-    case PAIR(SAMPLE_INT8 , SAMPLE_FLOAT): convert_c = convert8ToFLT; break;
-    case PAIR(SAMPLE_FLOAT, SAMPLE_INT8): convert_c = convertFLTTo8; break;
-    case PAIR(SAMPLE_INT16, SAMPLE_FLOAT): convert_c = convert16ToFLT; break;
-    case PAIR(SAMPLE_FLOAT, SAMPLE_INT16): convert_c = convertFLTTo16; break;
-    case PAIR(SAMPLE_INT32, SAMPLE_FLOAT): convert_c = convert32ToFLT; break;
-    case PAIR(SAMPLE_FLOAT, SAMPLE_INT32): convert_c = convertFLTTo32; break;
-  }
-  #ifdef INTEL_INTRINSICS
-    switch(PAIR(src_format, dst_format)) {
-      case PAIR(SAMPLE_INT8 , SAMPLE_FLOAT): convert_sse41 = convert8ToFLT_SSE41; convert_avx2 = convert8ToFLT_AVX2; break;
-      case PAIR(SAMPLE_FLOAT, SAMPLE_INT8) : convert_sse2 = convertFLTTo8_SSE2; convert_avx2 = convertFLTTo8_AVX2; break;
-      case PAIR(SAMPLE_INT16, SAMPLE_FLOAT): convert_sse41 = convert16ToFLT_SSE41; convert_avx2 = convert16ToFLT_AVX2; break;
-      case PAIR(SAMPLE_FLOAT, SAMPLE_INT16): convert_sse2 = convertFLTTo16_SSE2; convert_avx2 = convertFLTTo16_AVX2; break;
-      case PAIR(SAMPLE_INT32, SAMPLE_FLOAT): convert_sse2  = convert32ToFLT_SSE2; convert_avx2 = convert32ToFLT_AVX2; break;
-      case PAIR(SAMPLE_FLOAT, SAMPLE_INT32): convert_sse41 = convertFLTTo32_SSE41; convert_avx2 = convertFLTTo32_AVX2; break;
-    }
-  #endif
-  #undef PAIR
+  two_stage = (src_format == SAMPLE_FLOAT && dst_format == SAMPLE_INT24) ||
+              (src_format == SAMPLE_INT24 && dst_format == SAMPLE_FLOAT);
 }
 
 ConvertAudio::~ConvertAudio() {
@@ -173,37 +134,11 @@ void __stdcall ConvertAudio::GetAudio(void *buf, int64_t start, int64_t count, I
     if (convert != nullptr) {
       two_stage = false;
     } else {
-      convert = convert_c;
-      if (two_stage) {
-        convert_float = src_format == SAMPLE_FLOAT ? convertFLTTo32 : convert32ToFLT; // for two-stage
-        #ifdef INTEL_INTRINSICS
-          if ((cpu_flags & CPUF_SSE2)) {
-            if (src_format != SAMPLE_FLOAT)
-              convert_float = convert32ToFLT_SSE2;
-          }
-          if ((cpu_flags & CPUF_SSE4_1)) {
-            if (src_format == SAMPLE_FLOAT)
-              convert_float = convertFLTTo32_SSE41;
-          }
-          if ((cpu_flags & CPUF_AVX2)) {
-            convert_float = src_format == SAMPLE_FLOAT ? convertFLTTo32_AVX2 : convert32ToFLT_AVX2;
-          }
-        #endif
-      }
-      #ifdef INTEL_INTRINSICS
-        if ((cpu_flags & CPUF_SSE2)) {
-          if (convert_sse2)
-            convert = convert_sse2;
-        }
-        if ((cpu_flags & CPUF_SSE4_1)) {
-          if (convert_sse41)
-            convert = convert_sse41;
-        }
-        if ((cpu_flags & CPUF_AVX2)) {
-          if (convert_avx2)
-            convert = convert_avx2;
-        }
-      #endif
+      // Only S24 <-> F32 has a composed ordinary C fallback.
+      if (!two_stage)
+        env->ThrowError("ConvertAudio: unsupported audio conversion.");
+      convert = src_format == SAMPLE_FLOAT ? convert32To24 : convert24To32;
+      convert_float = src_format == SAMPLE_FLOAT ? convertFLTTo32 : convert32ToFLT;
     }
   }
 

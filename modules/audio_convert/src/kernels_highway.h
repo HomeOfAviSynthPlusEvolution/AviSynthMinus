@@ -5,8 +5,8 @@
 
 namespace avs_audio_convert {
 
-// Resolves an optimized Highway or fallback C audio conversion routine for the twelve
-// basic integer conversions between U8, S16, S24, and S32, and direct S24 <-> F32.
+// Resolves any of the twenty conversions between U8, S16, S24, S32 and F32.
+// SIMD targets use Highway; the fallback selects ordinary C.
 //
 // src_format and dst_format are AviSynth sample type bitmasks (e.g. SAMPLE_INT8,
 // SAMPLE_INT16, SAMPLE_INT24, SAMPLE_INT32, SAMPLE_FLOAT from avisynth.h).
