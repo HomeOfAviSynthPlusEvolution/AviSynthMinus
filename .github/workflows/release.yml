@@ -1,0 +1,320 @@
+name: Release builds
+run-name: Release build ${{ inputs.tag }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag (for example 0.1.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate-tag:
+    name: Validate release tag
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    outputs:
+      commit: ${{ steps.release.outputs.commit }}
+    steps:
+      - name: Validate tag format
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^(minus-v)?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]] || {
+            echo "::error::Use an existing Minus release tag, e.g. 0.1.1 or 0.1.1-rc.1."
+            exit 1
+          }
+
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+
+      - name: Pin commit and verify embedded version
+        id: release
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          commit=$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")
+          test "$(git rev-parse HEAD)" = "$commit"
+          header="$RUNNER_TEMP/release-version.h"
+          cmake -D "SRC=$PWD/avs_core/core/version.h.in" -D "DST=$header" \
+            -D "REPO=$PWD" -D "GIT=$(command -v git)" -P avs_core/Version.cmake
+          actual=$(sed -n 's/^#define[[:space:]]*AVS_MINUS_VERSION[[:space:]]*"\([^"]*\)".*/\1/p' "$header")
+          expected="${RELEASE_TAG#minus-v}"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::Tag requests $expected but source generates $actual."
+            exit 1
+          fi
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          printf 'Release tag: %s\n\nSource commit: %s\n' "$RELEASE_TAG" "$commit" >> "$GITHUB_STEP_SUMMARY"
+          jq -n --arg tag "$RELEASE_TAG" --arg commit "$commit" \
+            --arg run "$GITHUB_RUN_ID" --arg workflow "$GITHUB_WORKFLOW_SHA" \
+            '{tag: $tag, commit: $commit, run_id: $run, workflow_commit: $workflow}' > release-source.json
+
+      - name: Upload release provenance
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-source
+          path: release-source.json
+          if-no-files-found: error
+
+  build-core:
+    needs: validate-tag
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu 26.04 x64
+            runner: ubuntu-26.04
+            family: linux
+            artifact_name: avisynth-ubuntu-26.04-x64
+            artifact_path: stage/**/*.so*
+          - name: Ubuntu 26.04 arm64
+            runner: ubuntu-26.04-arm
+            family: linux
+            artifact_name: avisynth-ubuntu-26.04-arm64
+            artifact_path: stage/**/*.so*
+          - name: macOS 15 Intel x64
+            runner: macos-15-intel
+            family: macos
+            artifact_name: avisynth-macos-15-x64
+            artifact_path: stage/**/*.dylib
+          - name: macOS 15 Apple Silicon arm64
+            runner: macos-15
+            family: macos
+            artifact_name: avisynth-macos-15-arm64
+            artifact_path: stage/**/*.dylib
+          - name: Windows VS2026 x86
+            runner: windows-2025-vs2026
+            family: windows
+            architecture: Win32
+            artifact_name: avisynth-windows-vs2026-x86
+            artifact_path: stage/**/*.dll
+          - name: Windows VS2026 x64
+            runner: windows-2025-vs2026
+            family: windows
+            architecture: x64
+            artifact_name: avisynth-windows-vs2026-x64
+            artifact_path: stage/**/*.dll
+          - name: Windows VS2026 arm64
+            runner: windows-11-vs2026-arm
+            family: windows
+            architecture: ARM64
+            artifact_name: avisynth-windows-vs2026-arm64
+            artifact_path: stage/**/*.dll
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate-tag.outputs.commit }}
+          fetch-depth: 0
+
+      - name: Verify release tag still identifies the pinned source
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_COMMIT: ${{ needs.validate-tag.outputs.commit }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+          test "$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
+
+      - name: Configure (POSIX)
+        if: matrix.family == 'linux' || matrix.family == 'macos'
+        shell: bash
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DENABLE_TESTS=OFF \
+            -DENABLE_PLUGINS=OFF \
+            -DENABLE_CUDA=OFF
+
+      - name: Configure (Windows)
+        if: matrix.family == 'windows'
+        shell: pwsh
+        run: >
+          cmake -S . -B build -G "Visual Studio 18 2026"
+          -A ${{ matrix.architecture }} -T v145
+          -DBUILD_SHARED_LIBS=ON
+          -DENABLE_TESTS=OFF
+          -DENABLE_PLUGINS=OFF
+          -DENABLE_CUDA=OFF
+
+      - name: Build (POSIX)
+        if: matrix.family == 'linux' || matrix.family == 'macos'
+        shell: bash
+        run: cmake --build build --parallel
+
+      - name: Build (Windows)
+        if: matrix.family == 'windows'
+        shell: pwsh
+        run: cmake --build build --config Release --parallel
+
+      - name: Stage shared library (POSIX)
+        if: matrix.family == 'linux' || matrix.family == 'macos'
+        shell: bash
+        run: cmake --install build --prefix "$PWD/stage"
+
+      - name: Stage shared library (Windows)
+        if: matrix.family == 'windows'
+        shell: pwsh
+        run: cmake --install build --config Release --prefix "$PWD/stage"
+
+      - name: Verify shared library (Linux)
+        if: matrix.family == 'linux'
+        shell: bash
+        run: |
+          find stage -type f -name 'libavisynth.so*' -print
+          test -n "$(find stage -type f -name 'libavisynth.so*' -print -quit)"
+
+      - name: Verify shared library (macOS)
+        if: matrix.family == 'macos'
+        shell: bash
+        run: |
+          find stage -type f -name 'libavisynth*.dylib' -print
+          test -n "$(find stage -type f -name 'libavisynth*.dylib' -print -quit)"
+
+      - name: Verify shared library (Windows)
+        if: matrix.family == 'windows'
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem -Path stage -Filter AviSynth.dll -Recurse -File
+          if (-not $dll) { throw 'AviSynth.dll was not installed.' }
+          $dll | Select-Object -ExpandProperty FullName
+
+      - name: Upload shared library
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
+
+  build-xp:
+    needs: validate-tag
+    name: ${{ matrix.name }}
+    # Keep the modern builds on VS2026, but use the supported VS2022 host for
+    # the legacy v141_xp component.
+    runs-on: windows-2022
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows XP v141_xp x86
+            architecture: Win32
+            msvc_cpu_arch: SSE
+            artifact_name: avisynth-windows-xp-v141-xp-x86
+          - name: Windows XP v141_xp x64
+            architecture: x64
+            msvc_cpu_arch: SSE2
+            artifact_name: avisynth-windows-xp-v141-xp-x64
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate-tag.outputs.commit }}
+          fetch-depth: 0
+
+      - name: Verify release tag still identifies the pinned source
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_COMMIT: ${{ needs.validate-tag.outputs.commit }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+          test "$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
+
+      - name: Install and verify Windows XP build toolset
+        shell: pwsh
+        run: |
+          $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\setup.exe'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path $vswhere)) { throw "vswhere.exe was not found at $vswhere." }
+
+          $installPath = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -property installationPath
+          if (-not $installPath) { throw 'No Visual Studio installation with MSBuild was found.' }
+          if (-not (Test-Path $installer)) { throw "Visual Studio Installer was not found at $installer." }
+
+          $installerArgs = @(
+            'modify'
+            "--installPath `"$installPath`""
+            '--add Microsoft.VisualStudio.Component.VC.v141.x86.x64'
+            '--add Microsoft.VisualStudio.Component.WinXP'
+            '--quiet'
+            '--norestart'
+          )
+          $process = Start-Process -FilePath $installer -ArgumentList $installerArgs -Wait -PassThru -WindowStyle Hidden
+          Write-Host "Visual Studio Installer exit code: $($process.ExitCode)"
+          if ($process.ExitCode -notin 0, 3010) {
+            throw "Visual Studio Installer failed with exit code $($process.ExitCode)."
+          }
+
+          $xpInstallPath = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.WinXP -property installationPath
+          if (-not $xpInstallPath) {
+            throw 'Visual Studio Installer completed, but vswhere cannot find Microsoft.VisualStudio.Component.WinXP.'
+          }
+          if ((Resolve-Path -LiteralPath $xpInstallPath).Path -ine (Resolve-Path -LiteralPath $installPath).Path) {
+            throw "The XP component was registered for a different Visual Studio instance: $xpInstallPath"
+          }
+
+          $platform = '${{ matrix.architecture }}'
+          $toolsetsRoot = Join-Path $installPath 'MSBuild\Microsoft\VC'
+          if (-not (Test-Path $toolsetsRoot)) { throw "MSBuild VC targets were not found at $toolsetsRoot." }
+          $platformPattern = [regex]::Escape($platform)
+          $toolsetProps = @(
+            Get-ChildItem -Path $toolsetsRoot -Filter Toolset.props -File -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match "\\Platforms\\$platformPattern\\PlatformToolsets\\v141_xp\\Toolset\.props$" }
+          )
+          if (-not $toolsetProps) {
+            $discoveredToolsets = @(Get-ChildItem -Path $toolsetsRoot -Filter v141_xp -Directory -Recurse -ErrorAction SilentlyContinue)
+            if ($discoveredToolsets) {
+              Write-Host 'Unexpected v141_xp toolset locations:'
+              $discoveredToolsets | Select-Object -ExpandProperty FullName
+            }
+            throw "The v141_xp toolset is not registered for platform $platform."
+          }
+          $toolsetProps | Select-Object -ExpandProperty FullName
+
+      - name: Configure (Windows XP)
+        shell: pwsh
+        run: >
+          cmake -S . -B build -G "Visual Studio 17 2022"
+          -A ${{ matrix.architecture }} -T v141_xp
+          -DBUILD_SHARED_LIBS=ON
+          -DENABLE_TESTS=OFF
+          -DENABLE_PLUGINS=OFF
+          -DENABLE_CUDA=OFF
+          -DWINXP_SUPPORT=ON
+          -DMSVC_CPU_ARCH=${{ matrix.msvc_cpu_arch }}
+
+      - name: Build (Windows XP)
+        shell: pwsh
+        run: cmake --build build --config Release --parallel
+
+      - name: Stage shared library (Windows XP)
+        shell: pwsh
+        run: cmake --install build --config Release --prefix "$PWD/stage"
+
+      - name: Verify shared library (Windows XP)
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem -Path stage -Filter AviSynth.dll -Recurse -File
+          if (-not $dll) { throw 'AviSynth.dll was not installed.' }
+          $dll | Select-Object -ExpandProperty FullName
+
+      - name: Upload Windows XP shared library
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: stage/**/*.dll
+          if-no-files-found: error
