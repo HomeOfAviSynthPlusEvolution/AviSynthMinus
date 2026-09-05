@@ -73,7 +73,6 @@ private:
   convert_proc convert_c {nullptr};
 #ifdef INTEL_INTRINSICS
   convert_proc convert_sse2 {nullptr};
-  convert_proc convert_ssse3 {nullptr};
   convert_proc convert_sse41 {nullptr};
   convert_proc convert_avx2 {nullptr};
 #endif
@@ -118,14 +117,6 @@ ConvertAudio::ConvertAudio(PClip _clip, int _sample_type)
   }
   #ifdef INTEL_INTRINSICS
     switch(PAIR(src_format, dst_format)) {
-      case PAIR(SAMPLE_FLOAT, SAMPLE_INT24):
-      case PAIR(SAMPLE_INT32, SAMPLE_INT24): convert_ssse3 = convert32To24_SSSE3; break;
-      case PAIR(SAMPLE_INT24, SAMPLE_FLOAT):
-      case PAIR(SAMPLE_INT24, SAMPLE_INT32): convert_ssse3 = convert24To32_SSSE3; break;
-      case PAIR(SAMPLE_INT24, SAMPLE_INT16): convert_ssse3 = convert24To16_SSSE3; break;
-      case PAIR(SAMPLE_INT16, SAMPLE_INT24): convert_ssse3 = convert16To24_SSSE3; break;
-      case PAIR(SAMPLE_INT24, SAMPLE_INT8 ): convert_ssse3 = convert24To8_SSSE3;  break;
-      case PAIR(SAMPLE_INT8 , SAMPLE_INT24): convert_ssse3 = convert8To24_SSSE3;  break;
       case PAIR(SAMPLE_INT8 , SAMPLE_FLOAT): convert_sse41 = convert8ToFLT_SSE41; convert_avx2 = convert8ToFLT_AVX2; break;
       case PAIR(SAMPLE_FLOAT, SAMPLE_INT8) : convert_sse2 = convertFLTTo8_SSE2; convert_avx2 = convertFLTTo8_AVX2; break;
       case PAIR(SAMPLE_INT16, SAMPLE_FLOAT): convert_sse41 = convert16ToFLT_SSE41; convert_avx2 = convert16ToFLT_AVX2; break;
@@ -178,31 +169,49 @@ void __stdcall ConvertAudio::GetAudio(void *buf, int64_t start, int64_t count, I
 
   if (convert == nullptr) {
     const int cpu_flags = env->GetCPUFlags();
-    convert = ResolveHighwayAudioConvert(src_format, dst_format, cpu_flags);
-    if (convert == nullptr) {
+    convert = avs_audio_convert::ResolveHighwayAudioConvert(src_format, dst_format, cpu_flags);
+#if defined(INTEL_INTRINSICS) && defined(_MSC_VER) && !defined(__clang__)
+    // The native MSVC F32 -> S24 kernel still loses to the old composition.
+    // Retain just this route until its performance gate passes.
+    const bool retain_float_to_s24 = src_format == SAMPLE_FLOAT &&
+        dst_format == SAMPLE_INT24 && (cpu_flags & CPUF_AVX2) && (cpu_flags & CPUF_SSSE3);
+    if (retain_float_to_s24) convert = nullptr;
+#endif
+    if (convert != nullptr) {
+      two_stage = false;
+    } else {
       convert = convert_c;
-      convert_float = src_format == SAMPLE_FLOAT ? convertFLTTo32 : convert32ToFLT; // for two-stage
+#if defined(INTEL_INTRINSICS) && defined(_MSC_VER) && !defined(__clang__)
+      if (retain_float_to_s24) convert = convert32To24_SSSE3;
+#endif
+      if (two_stage) {
+        convert_float = src_format == SAMPLE_FLOAT ? convertFLTTo32 : convert32ToFLT; // for two-stage
+        #ifdef INTEL_INTRINSICS
+          if ((cpu_flags & CPUF_SSE2)) {
+            if (src_format != SAMPLE_FLOAT)
+              convert_float = convert32ToFLT_SSE2;
+          }
+          if ((cpu_flags & CPUF_SSE4_1)) {
+            if (src_format == SAMPLE_FLOAT)
+              convert_float = convertFLTTo32_SSE41;
+          }
+          if ((cpu_flags & CPUF_AVX2)) {
+            convert_float = src_format == SAMPLE_FLOAT ? convertFLTTo32_AVX2 : convert32ToFLT_AVX2;
+          }
+        #endif
+      }
       #ifdef INTEL_INTRINSICS
         if ((cpu_flags & CPUF_SSE2)) {
           if (convert_sse2)
             convert = convert_sse2;
-          if (src_format != SAMPLE_FLOAT)
-            convert_float = convert32ToFLT_SSE2;
-        }
-        if ((cpu_flags & CPUF_SSSE3)) {
-          if (convert_ssse3)
-            convert = convert_ssse3;
         }
         if ((cpu_flags & CPUF_SSE4_1)) {
           if (convert_sse41)
             convert = convert_sse41;
-          if (src_format == SAMPLE_FLOAT)
-            convert_float = convertFLTTo32_SSE41;
         }
         if ((cpu_flags & CPUF_AVX2)) {
           if (convert_avx2)
             convert = convert_avx2;
-          convert_float = src_format == SAMPLE_FLOAT ? convertFLTTo32_AVX2 : convert32ToFLT_AVX2;
         }
       #endif
     }

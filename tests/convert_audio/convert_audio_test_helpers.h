@@ -464,9 +464,15 @@ inline float integer_to_float_reference(AudioFormat source_format, const std::ui
       return (static_cast<int>(source[0]) - 128) * (1.0F / 128.0F);
     case AudioFormat::S16:
       return read_s16_le(source) * (1.0F / 32768.0F);
+    case AudioFormat::S24: {
+      const std::int32_t s32 = static_cast<std::int32_t>(
+          (static_cast<std::uint32_t>(source[0]) << 8) |
+          (static_cast<std::uint32_t>(source[1]) << 16) |
+          (static_cast<std::uint32_t>(source[2]) << 24));
+      return s32 * (1.0F / 2147483648.0F);
+    }
     case AudioFormat::S32:
       return read_s32_le(source) * (1.0F / 2147483648.0F);
-    case AudioFormat::S24:
     case AudioFormat::F32:
       break;
   }
@@ -501,9 +507,9 @@ inline void convert_float_to_integer_reference(AudioFormat destination_format,
           return value * 128.0F;
         case AudioFormat::S16:
           return value * 32768.0F;
+        case AudioFormat::S24:
         case AudioFormat::S32:
           return value * 2147483648.0F;
-        case AudioFormat::S24:
         case AudioFormat::F32:
           break;
       }
@@ -533,6 +539,18 @@ inline void convert_float_to_integer_reference(AudioFormat destination_format,
         write_u16_le(destination + index * 2, static_cast<std::uint16_t>(result));
         break;
       }
+      case AudioFormat::S24: {
+        std::int32_t result{};
+        if (scaled >= 2147483647.0F)
+          result = std::numeric_limits<std::int32_t>::max();
+        else if (scaled <= -2147483648.0F)
+          result = std::numeric_limits<std::int32_t>::min();
+        else
+          result = static_cast<std::int32_t>(scaled);
+        write_u24_le(destination + index * 3,
+                     (static_cast<std::uint32_t>(result) >> 8) & 0x00ffffffU);
+        break;
+      }
       case AudioFormat::S32: {
         std::int32_t result{};
         if (scaled >= 2147483647.0F)
@@ -544,7 +562,6 @@ inline void convert_float_to_integer_reference(AudioFormat destination_format,
         write_u32_le(destination + index * 4, static_cast<std::uint32_t>(result));
         break;
       }
-      case AudioFormat::S24:
       case AudioFormat::F32:
         throw std::invalid_argument("unsupported float destination format");
     }

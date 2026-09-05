@@ -3,14 +3,16 @@
 #include "kernels.h"
 #include <cstdint>
 
-// Resolves an optimized Highway or fallback C audio conversion routine for the six
-// basic integer conversions between U8, S16, and S32.
+namespace avs_audio_convert {
+
+// Resolves an optimized Highway or fallback C audio conversion routine for the twelve
+// basic integer conversions between U8, S16, S24, and S32, and direct S24 <-> F32.
 //
 // src_format and dst_format are AviSynth sample type bitmasks (e.g. SAMPLE_INT8,
-// SAMPLE_INT16, SAMPLE_INT32 from avisynth.h).
+// SAMPLE_INT16, SAMPLE_INT24, SAMPLE_INT32, SAMPLE_FLOAT from avisynth.h).
 //
-// If (src_format, dst_format) is not one of the six supported routes, returns nullptr.
-// If target is TARGET_C_FALLBACK, returns the corresponding ordinary C function.
+// If (src_format, dst_format) is not supported, returns nullptr.
+// If target is TARGET_C_FALLBACK, returns the corresponding ordinary C function (or nullptr for S24 <-> F32).
 // Otherwise, returns the compiled Highway SIMD kernel for the chosen target.
 convert_proc ResolveHighwayAudioConvert(int src_format, int dst_format, int avs_cpu_flags);
 
@@ -24,5 +26,7 @@ int64_t GetHighwayAudioConvertChosenTarget(int avs_cpu_flags);
 // Returns the bitmask of targets compiled into this translation unit (HWY_TARGETS).
 int64_t GetHighwayAudioConvertCompiledTargets();
 
-// Checks whether a route is one of the six routes supported by this Highway module.
+// Checks whether a route is supported by this Highway module.
 bool IsHighwayAudioConvertSupportedRoute(int src_format, int dst_format);
+
+}  // namespace avs_audio_convert

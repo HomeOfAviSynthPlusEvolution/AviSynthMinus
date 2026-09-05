@@ -22,352 +22,7 @@
   #define SSE41
 #endif
 
-// Hard: 32-24, 24-32, 24-16, 16-24, 24-8, 8-24
-// Float: 32-FLT, FLT-32
-
-SSSE3 void convert32To24_SSSE3(void *inbuf, void *outbuf, int count) {
-  auto in = reinterpret_cast<int32_t *>(inbuf);
-  auto in8 = reinterpret_cast<int8_t *>(inbuf);
-  auto out8 = reinterpret_cast<int8_t *>(outbuf);
-
-  const int c_loop = count & ~15;
-
-  for (int i = c_loop; i < count; i++) {
-    out8[i * 3 + 0] = in8[i * 4 + 1];
-    out8[i * 3 + 1] = in8[i * 4 + 2];
-    out8[i * 3 + 2] = in8[i * 4 + 3];
-  }
-
-  __m128i inv[4], outv[3], mask[6];
-  // clang-format off
-  mask[0] = _mm_set_epi8(
-    -1, -1, -1, -1,
-    15, 14, 13, 11,
-    10,  9,  7,  6,
-     5,  3,  2,  1);
-  mask[1] = _mm_set_epi8(
-     5,  3,  2,  1,
-    -1, -1, -1, -1,
-    -1, -1, -1, -1,
-    -1, -1, -1, -1);
-  mask[2] = _mm_set_epi8(
-    -1, -1, -1, -1,
-    -1, -1, -1, -1,
-    15, 14, 13, 11,
-    10,  9,  7,  6);
-  mask[3] = _mm_set_epi8(
-    10,  9,  7,  6,
-     5,  3,  2,  1,
-    -1, -1, -1, -1,
-    -1, -1, -1, -1);
-  mask[4] = _mm_set_epi8(
-    -1, -1, -1, -1,
-    -1, -1, -1, -1,
-    -1, -1, -1, -1,
-    15, 14, 13, 11);
-  mask[5] = _mm_set_epi8(
-    15, 14, 13, 11,
-    10,  9,  7,  6,
-     5,  3,  2,  1,
-    -1, -1, -1, -1);
-
-  for (int i = 0; i < c_loop; i += 16) {
-    inv[0] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in)); in += 4;
-    inv[1] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in)); in += 4;
-    inv[2] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in)); in += 4;
-    inv[3] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in)); in += 4;
-
-    outv[0] = _mm_or_si128(
-      _mm_shuffle_epi8(inv[0], mask[0]),
-      _mm_shuffle_epi8(inv[1], mask[1])
-    );
-    outv[1] = _mm_or_si128(
-      _mm_shuffle_epi8(inv[1], mask[2]),
-      _mm_shuffle_epi8(inv[2], mask[3])
-    );
-    outv[2] = _mm_or_si128(
-      _mm_shuffle_epi8(inv[2], mask[4]),
-      _mm_shuffle_epi8(inv[3], mask[5])
-    );
-
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out8), outv[0]); out8 += 16;
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out8), outv[1]); out8 += 16;
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out8), outv[2]); out8 += 16;
-  }
-  // clang-format on
-}
-
-SSSE3 void convert24To32_SSSE3(void *inbuf, void *outbuf, int count) {
-  auto in8 = reinterpret_cast<int8_t *>(inbuf);
-  auto out8 = reinterpret_cast<int8_t *>(outbuf);
-  auto out = reinterpret_cast<int32_t *>(outbuf);
-
-  const int c_loop = count & ~15;
-
-  for (int i = c_loop; i < count; i++) {
-    out8[i * 4] = 0;
-    out8[i * 4 + 1] = in8[i * 3 + 0];
-    out8[i * 4 + 2] = in8[i * 3 + 1];
-    out8[i * 4 + 3] = in8[i * 3 + 2];
-  }
-
-  __m128i inv[3], outv[4], mask[6];
-  // clang-format off
-  mask[0] = _mm_set_epi8(
-    11, 10,  9, -1,
-     8,  7,  6, -1,
-     5,  4,  3, -1,
-     2,  1,  0, -1);
-  mask[1] = _mm_set_epi8(
-    -1, -1, -1, -1,
-    -1, -1, -1, -1,
-    -1, -1, 15, -1,
-    14, 13, 12, -1);
-  mask[2] = _mm_set_epi8(
-     7,  6,  5, -1,
-     4,  3,  2, -1,
-     1,  0, -1, -1,
-    -1, -1, -1, -1);
-  mask[3] = _mm_set_epi8(
-    -1, -1, -1, -1,
-    -1, 15, 14, -1,
-    13, 12, 11, -1,
-    10,  9,  8, -1);
-  mask[4] = _mm_set_epi8(
-     3,  2,  1, -1,
-     0, -1, -1, -1,
-    -1, -1, -1, -1,
-    -1, -1, -1, -1);
-  mask[5] = _mm_set_epi8(
-    15, 14, 13, -1,
-    12, 11, 10, -1,
-     9,  8,  7, -1,
-     6,  5,  4, -1);
-
-  for (int i = 0; i < c_loop; i += 16) {
-    inv[0] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in8)); in8 += 16;
-    inv[1] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in8)); in8 += 16;
-    inv[2] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in8)); in8 += 16;
-
-    outv[0] = _mm_shuffle_epi8(inv[0], mask[0]);
-    outv[1] = _mm_or_si128(
-      _mm_shuffle_epi8(inv[0], mask[1]),
-      _mm_shuffle_epi8(inv[1], mask[2])
-    );
-    outv[2] = _mm_or_si128(
-      _mm_shuffle_epi8(inv[1], mask[3]),
-      _mm_shuffle_epi8(inv[2], mask[4])
-    );
-    outv[3] = _mm_shuffle_epi8(inv[2], mask[5]);
-
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out), outv[0]); out += 4;
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out), outv[1]); out += 4;
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out), outv[2]); out += 4;
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out), outv[3]); out += 4;
-  }
-  // clang-format on
-}
-
-SSSE3 void convert24To16_SSSE3(void *inbuf, void *outbuf, int count) {
-  auto in8 = reinterpret_cast<int8_t *>(inbuf);
-  auto out8 = reinterpret_cast<int8_t *>(outbuf);
-  auto out = reinterpret_cast<int16_t *>(outbuf);
-
-  const int c_loop = count & ~15;
-
-  for (int i = c_loop; i < count; i++) {
-    out8[i * 2 + 0] = in8[i * 3 + 1];
-    out8[i * 2 + 1] = in8[i * 3 + 2];
-  }
-
-  __m128i inv[3], outv[2], mask[4];
-  // clang-format off
-  mask[0] = _mm_set_epi8(
-    -1, -1, -1, -1,
-    -1, -1, 14, 13,
-    11, 10,  8,  7,
-     5,  4,  2,  1);
-  mask[1] = _mm_set_epi8(
-     7,  6,  4,  3,
-     1,  0, -1, -1,
-    -1, -1, -1, -1,
-    -1, -1, -1, -1);
-  mask[2] = _mm_set_epi8(
-    -1, -1, -1, -1,
-    -1, -1, -1, -1,
-    -1, -1, -1, 15,
-    13, 12, 10,  9);
-  mask[3] = _mm_set_epi8(
-    15, 14, 12, 11,
-     9,  8,  6,  5,
-     3,  2,  0, -1,
-    -1, -1, -1, -1);
-
-  for (int i = 0; i < c_loop; i += 16) {
-    inv[0] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in8)); in8 += 16;
-    inv[1] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in8)); in8 += 16;
-    inv[2] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in8)); in8 += 16;
-
-    outv[0] = _mm_or_si128(
-      _mm_shuffle_epi8(inv[0], mask[0]),
-      _mm_shuffle_epi8(inv[1], mask[1])
-    );
-    outv[1] = _mm_or_si128(
-      _mm_shuffle_epi8(inv[1], mask[2]),
-      _mm_shuffle_epi8(inv[2], mask[3])
-    );
-
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out), outv[0]); out += 8;
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out), outv[1]); out += 8;
-  }
-  // clang-format on
-}
-
-SSSE3 void convert16To24_SSSE3(void *inbuf, void *outbuf, int count) {
-  auto in = reinterpret_cast<int16_t *>(inbuf);
-  auto in8 = reinterpret_cast<int8_t *>(inbuf);
-  auto out8 = reinterpret_cast<int8_t *>(outbuf);
-
-  const int c_loop = count & ~15;
-
-  for (int i = c_loop; i < count; i++) {
-    out8[i * 3] = 0;
-    out8[i * 3 + 1] = in8[i * 2 + 0];
-    out8[i * 3 + 2] = in8[i * 2 + 1];
-  }
-
-  __m128i inv[2], outv[3], mask[4];
-  // clang-format off
-  mask[0] = _mm_set_epi8(
-    -1,  9,  8, -1,
-     7,  6, -1,  5,
-     4, -1,  3,  2,
-    -1,  1,  0, -1);
-  mask[1] = _mm_set_epi8(
-    -1, -1, -1, -1,
-    -1, -1, -1, -1,
-    15, 14, -1, 13,
-    12, -1, 11, 10);
-  mask[2] = _mm_set_epi8(
-     4, -1,  3,  2,
-    -1,  1,  0, -1,
-    -1, -1, -1, -1,
-    -1, -1, -1, -1);
-  mask[3] = _mm_set_epi8(
-    15, 14, -1, 13,
-    12, -1, 11, 10,
-    -1,  9,  8, -1,
-     7,  6, -1,  5);
-
-  for (int i = 0; i < c_loop; i += 16) {
-    inv[0] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in)); in += 8;
-    inv[1] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in)); in += 8;
-
-    outv[0] = _mm_shuffle_epi8(inv[0], mask[0]);
-    outv[1] = _mm_or_si128(
-      _mm_shuffle_epi8(inv[0], mask[1]),
-      _mm_shuffle_epi8(inv[1], mask[2])
-    );
-    outv[2] = _mm_shuffle_epi8(inv[1], mask[3]);
-
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out8), outv[0]); out8 += 16;
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out8), outv[1]); out8 += 16;
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out8), outv[2]); out8 += 16;
-  }
-  // clang-format on
-}
-
-SSSE3 void convert24To8_SSSE3(void *inbuf, void *outbuf, int count) {
-  auto in8 = reinterpret_cast<int8_t *>(inbuf);
-  auto out = reinterpret_cast<uint8_t *>(outbuf);
-
-  const int c_loop = count & ~15;
-
-  for (int i = c_loop; i < count; i++)
-    out[i] = in8[i * 3 + 2] + 128;
-
-  __m128i inv[3], outv, mask[3];
-  __m128i n128 = _mm_set1_epi8(-128);
-  // clang-format off
-  mask[0] = _mm_set_epi8(
-    -1, -1, -1, -1,
-    -1, -1, -1, -1,
-    -1, -1, -1, 14,
-    11,  8,  5,  2);
-  mask[1] = _mm_set_epi8(
-    -1, -1, -1, -1,
-    -1, -1, 13, 10,
-     7,  4,  1, -1,
-    -1, -1, -1, -1);
-  mask[2] = _mm_set_epi8(
-    15, 12,  9,  6,
-     3,  0, -1, -1,
-    -1, -1, -1, -1,
-    -1, -1, -1, -1);
-
-  for (int i = 0; i < c_loop; i += 16) {
-    inv[0] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in8)); in8 += 16;
-    inv[1] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in8)); in8 += 16;
-    inv[2] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in8)); in8 += 16;
-
-    outv = _mm_or_si128(
-      _mm_shuffle_epi8(inv[0], mask[0]),
-      _mm_shuffle_epi8(inv[1], mask[1])
-    );
-    outv = _mm_or_si128(
-      outv,
-      _mm_shuffle_epi8(inv[2], mask[2])
-    );
-    outv = _mm_add_epi8(outv, n128);
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out), outv); out += 16;
-  }
-  // clang-format on
-}
-
-SSSE3 void convert8To24_SSSE3(void *inbuf, void *outbuf, int count) {
-  auto in = reinterpret_cast<uint8_t *>(inbuf);
-  auto out8 = reinterpret_cast<int8_t *>(outbuf);
-
-  const int c_loop = count & ~15;
-
-  for (int i = c_loop; i < count; i++) {
-    out8[i * 3] = 0;
-    out8[i * 3 + 1] = 0;
-    out8[i * 3 + 2] = in[i] - 128;
-  }
-
-  __m128i inv, outv[3], mask[3];
-  __m128i n128 = _mm_set1_epi8(-128);
-  // clang-format off
-  mask[0] = _mm_set_epi8(
-    -1,  4, -1, -1,
-     3, -1, -1,  2,
-    -1, -1,  1, -1,
-    -1,  0, -1, -1);
-  mask[1] = _mm_set_epi8(
-    -1, -1,  9, -1,
-    -1,  8, -1, -1,
-     7, -1, -1,  6,
-    -1, -1,  5, -1);
-  mask[2] = _mm_set_epi8(
-    15, -1, -1, 14,
-    -1, -1, 13, -1,
-    -1, 12, -1, -1,
-    11, -1, -1, 10);
-
-  for (int i = 0; i < c_loop; i += 16) {
-    inv = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in)); in += 16;
-    inv = _mm_add_epi8(inv, n128);
-
-    outv[0] = _mm_shuffle_epi8(inv, mask[0]);
-    outv[1] = _mm_shuffle_epi8(inv, mask[1]);
-    outv[2] = _mm_shuffle_epi8(inv, mask[2]);
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out8), outv[0]); out8 += 16;
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out8), outv[1]); out8 += 16;
-    _mm_storeu_si128(reinterpret_cast<__m128i *>(out8), outv[2]); out8 += 16;
-  }
-  // clang-format on
-}
+// Float: 8-FLT, FLT-8, 16-FLT, FLT-16, 32-FLT, FLT-32
 
 SSE41 void convert8ToFLT_SSE41(void* inbuf, void* outbuf, int count) {
   auto in = reinterpret_cast<uint8_t*>(inbuf);
@@ -528,4 +183,77 @@ SSE41 void convertFLTTo32_SSE41(void *inbuf, void *outbuf, int count) {
     out32 = _mm_blendv_epi8(out32, minv_i, cmplow);
     _mm_storeu_si128(reinterpret_cast<__m128i *>(out), out32); out += 4;
   }
+}
+
+// Retained for the measured MSVC F32 -> S24 two-stage path.
+SSSE3 void convert32To24_SSSE3(void *inbuf, void *outbuf, int count) {
+  auto in = reinterpret_cast<int32_t *>(inbuf);
+  auto in8 = reinterpret_cast<int8_t *>(inbuf);
+  auto out8 = reinterpret_cast<int8_t *>(outbuf);
+
+  const int c_loop = count & ~15;
+
+  for (int i = c_loop; i < count; i++) {
+    out8[i * 3 + 0] = in8[i * 4 + 1];
+    out8[i * 3 + 1] = in8[i * 4 + 2];
+    out8[i * 3 + 2] = in8[i * 4 + 3];
+  }
+
+  __m128i inv[4], outv[3], mask[6];
+  // clang-format off
+  mask[0] = _mm_set_epi8(
+    -1, -1, -1, -1,
+    15, 14, 13, 11,
+    10,  9,  7,  6,
+     5,  3,  2,  1);
+  mask[1] = _mm_set_epi8(
+     5,  3,  2,  1,
+    -1, -1, -1, -1,
+    -1, -1, -1, -1,
+    -1, -1, -1, -1);
+  mask[2] = _mm_set_epi8(
+    -1, -1, -1, -1,
+    -1, -1, -1, -1,
+    15, 14, 13, 11,
+    10,  9,  7,  6);
+  mask[3] = _mm_set_epi8(
+    10,  9,  7,  6,
+     5,  3,  2,  1,
+    -1, -1, -1, -1,
+    -1, -1, -1, -1);
+  mask[4] = _mm_set_epi8(
+    -1, -1, -1, -1,
+    -1, -1, -1, -1,
+    -1, -1, -1, -1,
+    15, 14, 13, 11);
+  mask[5] = _mm_set_epi8(
+    15, 14, 13, 11,
+    10,  9,  7,  6,
+     5,  3,  2,  1,
+    -1, -1, -1, -1);
+
+  for (int i = 0; i < c_loop; i += 16) {
+    inv[0] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in)); in += 4;
+    inv[1] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in)); in += 4;
+    inv[2] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in)); in += 4;
+    inv[3] = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in)); in += 4;
+
+    outv[0] = _mm_or_si128(
+      _mm_shuffle_epi8(inv[0], mask[0]),
+      _mm_shuffle_epi8(inv[1], mask[1])
+    );
+    outv[1] = _mm_or_si128(
+      _mm_shuffle_epi8(inv[1], mask[2]),
+      _mm_shuffle_epi8(inv[2], mask[3])
+    );
+    outv[2] = _mm_or_si128(
+      _mm_shuffle_epi8(inv[2], mask[4]),
+      _mm_shuffle_epi8(inv[3], mask[5])
+    );
+
+    _mm_storeu_si128(reinterpret_cast<__m128i *>(out8), outv[0]); out8 += 16;
+    _mm_storeu_si128(reinterpret_cast<__m128i *>(out8), outv[1]); out8 += 16;
+    _mm_storeu_si128(reinterpret_cast<__m128i *>(out8), outv[2]); out8 += 16;
+  }
+  // clang-format on
 }
