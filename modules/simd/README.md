@@ -3,6 +3,23 @@
 This module provides common SIMD configuration and target selection policy for
 AviSynth+ using vendored Google Highway 1.4.0 (`third_party/highway`).
 
+## Internal build dependencies
+
+`hwy` and `AvsSimd` are static libraries. Consumers use
+`target_link_libraries` rather than forwarding `$<TARGET_OBJECTS>` or embedding
+copies of dependency objects in their own archives. CMake carries the required
+libraries to the final DLL or executable link.
+
+Audio conversion uses `AudioConvert` (the core adapters) ->
+`AudioConvertKernels` -> `AvsSimd` -> `hwy`. Kernel tests link
+`AudioConvertKernels` without building AvsCore. The core links `AudioConvert`;
+tests requiring core internals use the existing static AvsCore configuration.
+Separate DLLs and test executables may each contain their own linked runtime.
+
+These archives are internal build targets, not self-contained distribution
+packages. In particular, a static `avisynth.lib` must be consumed through its
+CMake target dependencies, not copied alone. External packaging is deferred.
+
 ## Design Principles
 
 1. **Instance-Level Dispatch**: Each filter instance selects an ordinary function pointer at initialization time based on its `IScriptEnvironment` CPU restrictions. No global Highway dispatch state (`DisableTargets`, `SetSupportedTargetsForTest`, `GetChosenTarget().Update`) is modified.

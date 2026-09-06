@@ -136,14 +136,8 @@ endif()
 
 target_link_libraries("AvsCore" ${SYSLIB} AvsSimd)
 
-if(TARGET AvsSimd AND TARGET hwy)
-  target_sources("AvsCore" PRIVATE
-    $<TARGET_OBJECTS:AvsSimd>
-    $<TARGET_OBJECTS:hwy>
-  )
-endif()
-
 add_subdirectory("${CMAKE_SOURCE_DIR}/modules/audio_convert" "${CMAKE_CURRENT_BINARY_DIR}/modules/audio_convert")
+target_link_libraries(AvsCore AudioConvert)
 
 if(ENABLE_CUDA)
   if(${CMAKE_VERSION} VERSION_LESS "3.19.5")

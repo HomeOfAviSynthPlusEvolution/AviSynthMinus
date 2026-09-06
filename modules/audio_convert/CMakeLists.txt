@@ -3,36 +3,35 @@ set(AudioConvertKernels_Sources
   "${CMAKE_CURRENT_LIST_DIR}/src/kernels_highway.cpp"
 )
 
-# Share objects so the installed static core remains self-contained, while
-# kernel tests can link a separate archive without depending on AvsCore.
-add_library(AudioConvertKernelObjects OBJECT ${AudioConvertKernels_Sources})
-add_library(AudioConvertKernels STATIC $<TARGET_OBJECTS:AudioConvertKernelObjects>)
+# Each archive owns its implementation; CMake carries the link dependencies.
+add_library(AudioConvertKernels STATIC ${AudioConvertKernels_Sources})
 
-set_target_properties(AudioConvertKernelObjects PROPERTIES
+set_target_properties(AudioConvertKernels PROPERTIES
   POSITION_INDEPENDENT_CODE ON
   CXX_STANDARD 17
   CXX_STANDARD_REQUIRED ON
 )
 
-foreach(audio_target AudioConvertKernelObjects AudioConvertKernels)
-  target_include_directories(${audio_target} PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/src>
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/avs_core/include>
-  )
-endforeach()
-
-target_link_libraries(AudioConvertKernelObjects PRIVATE AvsSimd)
+target_include_directories(AudioConvertKernels PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/src>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/avs_core/include>
+)
 target_link_libraries(AudioConvertKernels PUBLIC AvsSimd)
 
-# Adapters into AvsCore
+# AviSynth adapters are internal to the core build, not a plugin SDK binary.
 if(TARGET AvsCore)
-  target_sources(AvsCore PRIVATE
-    $<TARGET_OBJECTS:AudioConvertKernelObjects>
+  add_library(AudioConvert STATIC
     "${CMAKE_CURRENT_LIST_DIR}/src/filter.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/src/script.cpp"
   )
-  target_include_directories(AvsCore PRIVATE
+  set_target_properties(AudioConvert PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  target_compile_definitions(AudioConvert PRIVATE BUILDING_AVSCORE)
+  if(NOT BUILD_SHARED_LIBS)
+    target_compile_definitions(AudioConvert PRIVATE AVS_STATIC_LIB)
+  endif()
+  target_link_libraries(AudioConvert PRIVATE AudioConvertKernels)
+  target_include_directories(AudioConvert PUBLIC
     "${CMAKE_CURRENT_LIST_DIR}/include"
     "${CMAKE_CURRENT_LIST_DIR}/src"
   )
