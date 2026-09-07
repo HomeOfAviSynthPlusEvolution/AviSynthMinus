@@ -372,7 +372,7 @@ PVideoFrame __stdcall PlanarRGBtoPackedRGB::GetFrame(int n, IScriptEnvironment* 
       convert_rgbp_to_rgb_c<uint8_t, 3>(srcp, dstp, src_pitch, dst_pitch, vi.width, vi.height);
     else {// RGBA32
 #ifdef INTEL_INTRINSICS
-      if ((env->GetCPUFlags() & CPUF_SSE2) && vi.width >= 4) {
+      if ((env->GetCPUFlags() & CPUF_SSE2) && vi.width >= 8) {
         if(hasSrcAlpha)
           convert_rgbp_to_rgba_sse2<uint8_t, true>(srcp, dstp, src_pitch, dst_pitch, vi.width, vi.height);
         else

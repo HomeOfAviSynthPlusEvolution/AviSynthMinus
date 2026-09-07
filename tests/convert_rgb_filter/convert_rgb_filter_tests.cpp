@@ -256,8 +256,7 @@ void run_packed_to_planar_case(int source_pixel_type, bool source_has_alpha,
 
 template <typename Pixel>
 void run_planar_to_packed_case(int source_pixel_type, bool source_has_alpha,
-                               bool target_has_alpha, int target_pixel_type) {
-  constexpr int width = 5;
+                               bool target_has_alpha, int target_pixel_type, int width = 5) {
   constexpr int height = 3;
   const auto source_vi = make_video_info(
       VideoInfoSpec{width, height, source_pixel_type, 1, 25, 1});
@@ -308,6 +307,16 @@ TEST(ConvertRgbFilter, ConvertsBgr64ToRgbap16WithSourceAlpha) {
 
 TEST(ConvertRgbFilter, ConvertsRgbpToBgr32WithOpaqueAlpha) {
   run_planar_to_packed_case<std::uint8_t>(VideoInfo::CS_RGBP, false, true, VideoInfo::CS_BGR32);
+}
+
+TEST(ConvertRgbFilter, PlanarToPackedAlphaHandlesWidthsAroundSimdBlockSize) {
+  for (int width = 1; width <= 17; ++width) {
+    SCOPED_TRACE(width);
+    run_planar_to_packed_case<std::uint8_t>(VideoInfo::CS_RGBP, false, true, VideoInfo::CS_BGR32, width);
+    run_planar_to_packed_case<std::uint8_t>(VideoInfo::CS_RGBAP, true, true, VideoInfo::CS_BGR32, width);
+    run_planar_to_packed_case<std::uint16_t>(VideoInfo::CS_RGBP16, false, true, VideoInfo::CS_BGR64, width);
+    run_planar_to_packed_case<std::uint16_t>(VideoInfo::CS_RGBAP16, true, true, VideoInfo::CS_BGR64, width);
+  }
 }
 
 TEST(ConvertRgbFilter, ConvertsRgbapToBgr24WithoutAlpha) {
