@@ -1,4 +1,5 @@
 #include "convert/convert_helper.h"
+#include "convert/convert_matrix.h"
 
 #include "support/avisynth_environment.h"
 #include "support/video_filter_test_support.h"
@@ -17,6 +18,25 @@ void export_frame_props(VideoInfo& vi, AVSMap* props, int matrix, int color_rang
 
 namespace avsut::test {
 namespace {
+
+TEST(ConvertMatrixGain, LimitedRgbToFullYRetainsRangeExpansion) {
+  for (int depth : {8, 10, 12, 14, 16}) {
+    for (int shift : {13, 14, 15}) {
+      for (int id : {AVS_MATRIX_BT709, AVS_MATRIX_BT470_BG, AVS_MATRIX_BT2020_NCL}) {
+        for (bool full : {false, true}) {
+          SCOPED_TRACE(::testing::Message() << depth << "/" << shift << "/" << id << "/" << full);
+          ConversionMatrix matrix{};
+          ASSERT_TRUE(do_BuildMatrix_Rgb2Yuv(id, full ? AVS_RANGE_FULL : AVS_RANGE_LIMITED,
+                                            AVS_RANGE_FULL, shift, depth, matrix));
+          const double expected_gain = full ? 1.0 : 255.0 / 219.0;
+          // Three independently rounded coefficients contribute at most 1.5 units.
+          EXPECT_NEAR(matrix.y_b + matrix.y_g + matrix.y_r,
+                      expected_gain * (1 << shift), 1.5);
+        }
+      }
+    }
+  }
+}
 
 class OwnedPropertyMap {
  public:

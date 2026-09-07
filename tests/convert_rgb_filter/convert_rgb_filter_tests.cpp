@@ -17,9 +17,43 @@
 #include <array>
 #include <cstdint>
 #include <limits>
+#include <string>
 #include <vector>
 
 namespace {
+
+TEST(ConvertRgbFloat, ScalarPreservesOutOfRangeFloatValues) {
+  avsut::test::AviSynthEnvironment environment;
+  const AVSValue scalar("none");
+  environment.get()->Invoke("SetMaxCPU", AVSValue(&scalar, 1));
+  const AVSValue script("BlankClip(width=32,height=8,pixel_type=\"YUV444PS\",color_yuv=$ffffff)"
+                        ".ConvertToPlanarRGB(matrix=\"709\")");
+  PClip clip = environment.get()->Invoke("Eval", AVSValue(&script, 1)).AsClip();
+  PVideoFrame frame = clip->GetFrame(0, environment.get());
+  EXPECT_GT(*reinterpret_cast<const float*>(frame->GetReadPtr(PLANAR_R)), 1.0f);
+  EXPECT_GT(*reinterpret_cast<const float*>(frame->GetReadPtr(PLANAR_B)), 1.0f);
+}
+
+TEST(ConvertRgbRange, PackedBitDepthChangesPreserveLimitedRange) {
+  avsut::test::AviSynthEnvironment environment;
+  for (const char* source : {"RGB24", "RGB32", "RGB48", "RGB64"}) {
+    for (const char* target : {"ConvertToRGB24", "ConvertToRGB32", "ConvertToRGB48", "ConvertToRGB64"}) {
+      SCOPED_TRACE(::testing::Message() << source << " -> " << target);
+      std::string script = "c = BlankClip(width=32, height=8, pixel_type=\"";
+      script += source;
+      script += "\", color=$404040).propSet(\"_ColorRange\", 1)\nreturn ";
+      script += target;
+      script += "(c)";
+      const AVSValue arg(script.c_str());
+      PClip clip = environment.get()->Invoke("Eval", AVSValue(&arg, 1)).AsClip();
+      PVideoFrame frame = clip->GetFrame(0, environment.get());
+      int error = 0;
+      EXPECT_EQ(environment.get()->propGetInt(environment.get()->getFramePropsRO(frame),
+                                             "_ColorRange", 0, &error), 1);
+      EXPECT_EQ(error, 0);
+    }
+  }
+}
 
 using avsut::test::AviSynthEnvironment;
 using avsut::test::fill_plane_full_pitch;

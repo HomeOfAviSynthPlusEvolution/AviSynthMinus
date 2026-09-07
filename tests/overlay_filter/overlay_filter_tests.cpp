@@ -21,10 +21,51 @@
 #include <cstdint>
 #include <ostream>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
 namespace {
+
+TEST(OverlayMultiplyDispatch, ScalarMatchesSimdForEightBitMasksAndOpacity) {
+  avsut::test::AviSynthEnvironment environment;
+  if (!(environment.get()->GetCPUFlags() & CPUF_SSE4_1))
+    GTEST_SKIP() << "SSE4.1 is required for the reference path";
+  for (const char* opacity : {"1.0", "0.5"}) {
+    for (bool masked : {false, true}) {
+      SCOPED_TRACE(::testing::Message() << opacity << "/mask=" << masked);
+      std::string script = "b=BlankClip(width=32,height=8,pixel_type=\"YV24\",color_yuv=$c83fdb)\n";
+      script += "o=BlankClip(b,color_yuv=$abda27)\nm=BlankClip(b,color_yuv=$7be541)\n";
+      script += "return Overlay(b,o,mode=\"Multiply\",opacity=";
+      script += opacity;
+      if (masked) script += ",mask=m";
+      script += ")";
+      const AVSValue arg(script.c_str());
+      const AVSValue simd("sse4.1");
+      environment.get()->Invoke("SetMaxCPU", AVSValue(&simd, 1));
+      PClip reference = environment.get()->Invoke("Eval", AVSValue(&arg, 1)).AsClip();
+      const auto expected = avsut::test::FrameSnapshot::capture(
+          reference->GetFrame(0, environment.get()), reference->GetVideoInfo());
+      const AVSValue scalar("none");
+      environment.get()->Invoke("SetMaxCPU", AVSValue(&scalar, 1));
+      PClip actual = environment.get()->Invoke("Eval", AVSValue(&arg, 1)).AsClip();
+      const auto output = avsut::test::FrameSnapshot::capture(
+          actual->GetFrame(0, environment.get()), actual->GetVideoInfo());
+      ASSERT_EQ(output.planes().size(), expected.planes().size());
+      for (std::size_t p = 0; p < output.planes().size(); ++p) {
+        const auto& a = output.planes()[p];
+        const auto& b = expected.planes()[p];
+        ASSERT_EQ(a.row_size, b.row_size);
+        ASSERT_EQ(a.height, b.height);
+        // Allocation padding is not image data and can differ across paths.
+        for (int y = 0; y < a.height; ++y)
+          for (int x = 0; x < a.row_size; ++x)
+            ASSERT_EQ(a.bytes[y * a.pitch + x], b.bytes[y * b.pitch + x])
+                << "plane=" << p << " x=" << x << " y=" << y;
+      }
+    }
+  }
+}
 
 using avsut::test::AviSynthEnvironment;
 using avsut::test::fill_plane_full_pitch;
