@@ -1,0 +1,47 @@
+AviSynthMinus: core-only x86 + x64 mod for official AviSynth+ 3.7.5
+
+Install official AviSynth+ 3.7.5 with x86 and/or x64 components FIRST:
+https://github.com/AviSynth/AviSynthPlus/releases/tag/v3.7.5
+
+This package targets native x64 Windows 10 or later. It is not an XP,
+ARM64, 32-bit Windows, standalone or full AviSynth installer. It updates
+both installed architectures, but does not add missing official components.
+It does not install a Visual C++ runtime. The VS2026 builds require matching
+x86 and x64 Microsoft Visual C++
+v14 runtime (MSVCP140.dll, VCRUNTIME140.dll and VCRUNTIME140_1.dll), at least
+as recent as the compiler used to build it. An older official installation
+does not guarantee a sufficiently recent runtime. Runtime information:
+https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist
+
+Close all applications using AviSynth before installation or removal.
+Only installed x64 (System32) and x86 (SysWOW64) AviSynth.dll cores are
+replaced. Plugins, scripts, settings and file associations are not changed.
+
+The first installation backs up the current core under:
+  Program Files\AviSynthMinus Mod
+The x86 backup/state is stored separately in its x86 subdirectory. Existing
+x64-only mod backups and the uninstall entry are preserved by this upgrade.
+Subsequent managed upgrades preserve each baseline. If you previously
+copied a Minus DLL manually, you must explicitly accept backing up that
+Minus DLL: uninstall will restore Minus, NOT the official core.
+
+Remove this mod BEFORE upgrading or uninstalling official AviSynth+.
+Uninstall restores the baseline only if the current core and backup still
+match the recorded hashes and the official installation is still present.
+If the core or official installation changed, no stale DLL is restored.
+Backups and the state manifest are intentionally retained after removal.
+Do not delete them while the mod is active.
+
+A pending.json file indicates an interrupted operation. Automatic changes
+are blocked until the core, manifest and retained DLLs can be reviewed.
+Keep all files in that directory for recovery; do not just delete the journal.
+
+All components are checked before changes. Each architecture has an
+independent replacement transaction. If a later component fails, completed
+components remain installed and tracked; Setup reports failure, not success.
+Close consumers and retry. An uninstall failure retains management files;
+retry skips already restored components and handles remaining components.
+
+Project/source:
+https://github.com/HomeOfAviSynthPlusEvolution/AviSynthMinus
+This mod is a separate community project, not an official AviSynth+ release.
