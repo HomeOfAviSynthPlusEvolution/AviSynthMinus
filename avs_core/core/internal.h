@@ -59,8 +59,8 @@
 
 // !! precision problems 2.60f < 2.60. Extra care for scripts where the version checking occurs like "IsAvs26 = VersionNumber()>=2.60"
 #define AVS_VERSION 3.75  // Note: Used by VersionNumber() script function
-#define AVS_COPYRIGHT "\n\xA9 2000-2015 Ben Rudiak-Gould, et al.\nhttp://avisynth.nl\n\xA9 2013-2025 AviSynth+ Project"
-#define AVS_COPYRIGHT_UTF8 u8"\n\u00A9 2000-2015 Ben Rudiak-Gould, et al.\nhttp://avisynth.nl\n\u00A9 2013-2025 AviSynth+ Project"
+#define AVS_COPYRIGHT "\n\xA9 2000-2015 Ben Rudiak-Gould, et al.\nhttp://avisynth.nl\n\xA9 2013-2026 AviSynth+ Project\n\xA9 2026 AviSynthMinus Project"
+#define AVS_COPYRIGHT_UTF8 u8"\n\u00A9 2000-2015 Ben Rudiak-Gould, et al.\nhttp://avisynth.nl\n\u00A9 2013-2026 AviSynth+ Project\n\u00A9 2026 AviSynthMinus Project"
 #define BUILTIN_FUNC_PREFIX "AviSynth"
 
 enum MANAGE_CACHE_KEYS
