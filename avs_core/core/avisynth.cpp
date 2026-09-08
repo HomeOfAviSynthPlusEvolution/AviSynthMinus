@@ -89,6 +89,7 @@
 #include <cmath>
 #include <limits>
 #include <set>
+#include <tuple>
 
 #include "FilterGraph.h"
 #include "DeviceManager.h"
@@ -102,93 +103,63 @@
 class GlobalLockManager
 {
 public:
-  // Get a named mutex. If it doesn't exist, it's created.
-  static std::mutex& get_mutex(const std::string& name);
-  static std::mutex* find_mutex(const char* name);
-
-  // Track which environments hold which locks for cleanup.
-  static void acquire_lock_for_env(const std::string& name, ScriptEnvironment* env);
-  static void release_lock_for_env(const char* name, ScriptEnvironment* env);
-
-  // Called when an IScriptEnvironment is destroyed.
-  static void on_environment_exit(ScriptEnvironment* env);
+  static void acquire(const char* name);
+  static void release(const char* name);
 
 private:
   GlobalLockManager() = delete;
   ~GlobalLockManager() = delete;
 
-  static std::map<std::string, std::unique_ptr<std::mutex>, std::less<>> s_namedMutexes;
-  static std::mutex s_mutexMapLock; // Protects s_namedMutexes
-
-  static std::map<ScriptEnvironment*, std::set<std::string, std::less<>>> s_envToHeldLocks;
-  static std::mutex s_envLocksMapLock; // Protects s_envToHeldLocks
+  struct LockEntry {
+    std::mutex mutex;
+    size_t users = 0; // Holder plus waiters; protected by s_mutexMapLock.
+  };
+  using MutexMap = std::map<std::string, LockEntry, std::less<>>;
+  static MutexMap s_namedMutexes;
+  static std::mutex s_mutexMapLock;
 };
 
-std::map<std::string, std::unique_ptr<std::mutex>, std::less<>> GlobalLockManager::s_namedMutexes;
+GlobalLockManager::MutexMap GlobalLockManager::s_namedMutexes;
 std::mutex GlobalLockManager::s_mutexMapLock;
-std::map<ScriptEnvironment*, std::set<std::string, std::less<>>> GlobalLockManager::s_envToHeldLocks;
-std::mutex GlobalLockManager::s_envLocksMapLock;
 
-std::mutex& GlobalLockManager::get_mutex(const std::string& name)
+void GlobalLockManager::acquire(const char* name)
 {
-  std::lock_guard<std::mutex> lock(s_mutexMapLock);
-  auto it = s_namedMutexes.find(name);
-  if (it == s_namedMutexes.end())
-    it = s_namedMutexes.emplace(name, std::make_unique<std::mutex>()).first;
-  return *it->second;
-}
-
-std::mutex* GlobalLockManager::find_mutex(const char* name)
-{
-  std::lock_guard<std::mutex> lock(s_mutexMapLock);
-  const auto it = s_namedMutexes.find(name);
-  return it == s_namedMutexes.end() ? nullptr : it->second.get();
-}
-
-void GlobalLockManager::acquire_lock_for_env(const std::string& name, ScriptEnvironment* env)
-{
-  std::lock_guard<std::mutex> envLock(s_envLocksMapLock);
-  const auto it = s_envToHeldLocks.try_emplace(env).first;
+  MutexMap::iterator it;
+  {
+    std::lock_guard<std::mutex> lock(s_mutexMapLock);
+    it = s_namedMutexes.find(name);
+    if (it == s_namedMutexes.end())
+      // Construct the key in place: MSVC's debug string move constructor can
+      // allocate a proxy despite being noexcept.
+      it = s_namedMutexes.emplace(std::piecewise_construct,
+        std::forward_as_tuple(name), std::tuple<>()).first;
+    // Reserve before waiting: the current holder must not erase this mutex
+    // while another thread is about to lock it. Map iterators remain stable.
+    ++it->second.users;
+  }
+  // Never hold the registry lock while waiting for a named mutex. All memory
+  // allocations precede locking, so a successful lock needs no further setup.
   try {
-    it->second.insert(name);
+    it->second.mutex.lock();
   }
   catch (...) {
-    if (it->second.empty())
-      s_envToHeldLocks.erase(it);
+    std::lock_guard<std::mutex> lock(s_mutexMapLock);
+    if (--it->second.users == 0)
+      s_namedMutexes.erase(it);
     throw;
   }
 }
 
-void GlobalLockManager::release_lock_for_env(const char* name, ScriptEnvironment* env)
+void GlobalLockManager::release(const char* name)
 {
-  std::lock_guard<std::mutex> envLock(s_envLocksMapLock);
-  const auto it = s_envToHeldLocks.find(env);
-  if (it != s_envToHeldLocks.end())
-  {
-    const auto held = it->second.find(name);
-    if (held != it->second.end())
-      it->second.erase(held);
-    if (it->second.empty())
-      s_envToHeldLocks.erase(it);
-  }
-}
-
-void GlobalLockManager::on_environment_exit(ScriptEnvironment* env)
-{
-  std::lock_guard<std::mutex> envLock(s_envLocksMapLock);
-  auto it = s_envToHeldLocks.find(env);
-  if (it != s_envToHeldLocks.end())
-  {
-    // Note: The actual mutexes are not unlocked here, only the tracking is cleared.
-    // A truly stuck mutex requires more complex solutions (e.g., timed_mutex with recovery,
-    // or ensuring threads exit gracefully). For Avisynth's use case, clearing the tracking
-    // is important to prevent memory leaks in the map.
-
-    // If it tried to call unlock() on a mutex held by another (potentially crashed) thread,
-    // that would lead to undefined behavior.By simply removing the tracking entry,
-    // we avoid this dangerous operation.
-    s_envToHeldLocks.erase(it);
-  }
+  std::lock_guard<std::mutex> lock(s_mutexMapLock);
+  const auto it = s_namedMutexes.find(name); // No allocation, even for long names.
+  if (it == s_namedMutexes.end()) return;
+  // Keep lookup, unlock and reclamation under the same registry lock. Waiters
+  // retain their reservations until their own release (or a failed lock).
+  it->second.mutex.unlock();
+  if (--it->second.users == 0)
+    s_namedMutexes.erase(it);
 }
 
 extern const AVSFunction Audio_filters[],
@@ -2714,8 +2685,6 @@ ScriptEnvironment::~ScriptEnvironment() {
   // Before we start to pull the world apart
   // give every one their last wish.
   at_exit.Execute(threadEnv.get());
-
-  GlobalLockManager::on_environment_exit(this); // V12
 
   delete thread_pool;
 
@@ -5696,22 +5665,14 @@ int ScriptEnvironment::SetMemoryMax(AvsDeviceType type, int index, int mem)
 bool ScriptEnvironment::AcquireGlobalLock(const char* name)
 {
   if (!name) return false;
-  std::string lock_name(name);
-  std::mutex& mtx = GlobalLockManager::get_mutex(lock_name);
-  std::unique_lock<std::mutex> lock(mtx); // Roll back if tracking allocation fails.
-  GlobalLockManager::acquire_lock_for_env(lock_name, this); // Track for cleanup.
-  lock.release(); // ReleaseGlobalLock now owns the responsibility to unlock.
+  GlobalLockManager::acquire(name);
   return true;
 }
 
 void ScriptEnvironment::ReleaseGlobalLock(const char* name)
 {
   if (!name) return;
-  // Heterogeneous lookups avoid allocating even for long lock names.
-  std::mutex* mtx = GlobalLockManager::find_mutex(name);
-  if (!mtx) return;
-  GlobalLockManager::release_lock_for_env(name, this); // Untrack.
-  mtx->unlock();
+  GlobalLockManager::release(name);
 }
 
 PVideoFrame ScriptEnvironment::GetOnDeviceFrame(const PVideoFrame& src, Device* device)

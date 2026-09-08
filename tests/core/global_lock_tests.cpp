@@ -2,6 +2,8 @@
 #include <avisynth_c.h>
 #include <gtest/gtest.h>
 
+#include <array>
+#include <atomic>
 #include <cstdlib>
 #include <cstdio>
 #include <exception>
@@ -14,6 +16,9 @@ namespace {
 // Only the calling thread is affected, and assertions run after injection ends.
 thread_local int allocations_before_failure = -1;
 thread_local std::exception_ptr allocation_exception;
+// Measure allocations/frees on this thread so environment worker startup does
+// not affect the synchronous acquisition/release memory checks.
+thread_local std::ptrdiff_t allocation_balance = 0;
 
 class AllocationFailure {
 public:
@@ -38,12 +43,18 @@ void* operator new(std::size_t size) {
   }
   if (allocations_before_failure > 0)
     --allocations_before_failure;
-  if (void* p = std::malloc(size ? size : 1))
+  if (void* p = std::malloc(size ? size : 1)) {
+    ++allocation_balance;
     return p;
+  }
   throw std::bad_alloc();
 }
 
-void operator delete(void* p) noexcept { std::free(p); }
+void operator delete(void* p) noexcept {
+  if (p)
+    --allocation_balance;
+  std::free(p);
+}
 void operator delete(void* p, std::size_t) noexcept { ::operator delete(p); }
 void* operator new[](std::size_t size) { return ::operator new(size); }
 void operator delete[](void* p) noexcept { ::operator delete(p); }
@@ -72,6 +83,7 @@ TEST(GlobalLockAllocation, FailedAcquireDoesNotLeaveLockHeld) {
   for (int budget = 0; budget < 32; ++budget) {
     char name[128];
     std::snprintf(name, sizeof(name), "global-lock-allocation-failure-long-name-%d", budget);
+    const auto before = allocation_balance;
     bool acquired = false;
     try {
       AllocationFailure inject(budget);
@@ -82,6 +94,8 @@ TEST(GlobalLockAllocation, FailedAcquireDoesNotLeaveLockHeld) {
     }
     if (acquired)
       owner.get()->ReleaseGlobalLock(name);
+    const auto after = allocation_balance;
+    EXPECT_EQ(after, before); // Failed setup must also reclaim partial entries.
     AcquireOnAnotherThread(waiter.get(), name);
     if (acquired) {
       succeeded = true;
@@ -170,6 +184,74 @@ TEST(CApiGlobalLockAllocation, ContainsSystemErrorsAndUnknownExceptions) {
     avs_release_global_lock(env.get(), name);
     EXPECT_EQ(avs_get_error(env.get()), nullptr);
   }
+}
+
+TEST(GlobalLockLifetime, ReclaimsUniqueNamesAfterBalancedRelease) {
+  AviSynthEnvironment env;
+  const auto before = allocation_balance;
+  bool all_acquired = true;
+  for (int i = 0; i < 10000; ++i) {
+    char name[128];
+    std::snprintf(name, sizeof(name), "global-lock-reclamation-long-name-%d", i);
+    if (env.get()->AcquireGlobalLock(name))
+      env.get()->ReleaseGlobalLock(name);
+    else
+      all_acquired = false;
+  }
+  const auto after = allocation_balance;
+  EXPECT_TRUE(all_acquired);
+  // Compare allocation balance rather than RSS, which includes allocator caches.
+  // These entries are created and released on this thread; no framework
+  // assertions or thread creation occur in the interval.
+  EXPECT_EQ(after, before);
+}
+
+TEST(GlobalLockLifetime, DifferentNamesCanBeHeldConcurrently) {
+  AviSynthEnvironment owner;
+  AviSynthEnvironment waiter;
+  ASSERT_TRUE(owner.get()->AcquireGlobalLock("global-lock-independent-owner"));
+  AcquireOnAnotherThread(waiter.get(), "global-lock-independent-waiter");
+  owner.get()->ReleaseGlobalLock("global-lock-independent-owner");
+}
+
+TEST(GlobalLockLifetime, ContendedLockRemainsExclusiveDuringReuse) {
+  constexpr int worker_count = 4;
+  constexpr int iterations = 2000;
+  std::array<AviSynthEnvironment, worker_count> environments;
+  std::array<std::thread, worker_count> workers;
+  std::atomic<int> ready{0};
+  std::atomic<bool> start{false};
+  std::atomic<int> active{0};
+  std::atomic<int> violations{0};
+  std::atomic<int> completed{0};
+  for (int i = 0; i < worker_count; ++i) {
+    workers[i] = std::thread([&, i] {
+      ++ready;
+      while (!start.load())
+        std::this_thread::yield();
+      for (int n = 0; n < iterations; ++n) {
+        constexpr const char* name = "global-lock-contention-and-reuse";
+        auto* env = environments[i].get();
+        if (!env->AcquireGlobalLock(name)) {
+          ++violations;
+          continue;
+        }
+        if (active.fetch_add(1) != 0)
+          ++violations;
+        std::this_thread::yield();
+        ++completed;
+        --active;
+        env->ReleaseGlobalLock(name);
+      }
+    });
+  }
+  while (ready.load() != worker_count)
+    std::this_thread::yield();
+  start = true;
+  for (auto& worker : workers)
+    worker.join();
+  EXPECT_EQ(violations.load(), 0);
+  EXPECT_EQ(completed.load(), worker_count * iterations);
 }
 
 } // namespace
