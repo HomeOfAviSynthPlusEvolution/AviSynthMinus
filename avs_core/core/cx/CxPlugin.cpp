@@ -18,12 +18,6 @@ namespace {
 
 constexpr uint32_t kCxAbiVersion = AVS_CX_ABI_VERSION_1;
 
-struct CxFunctionBinding {
-  CxHostSession *session;
-  avs_cx_apply_function_v1 apply;
-  void *plugin_user_data;
-};
-
 std::string CopyStringView(avs_cx_string_view_v1 value) {
   if (value.data == nullptr) {
     if (value.size == 0)
@@ -793,6 +787,7 @@ avs_cx_status AVS_CX_CALL CxHostSession::RegisterFunction(
   }
   auto *self = static_cast<CxHostSession *>(context);
   void *stored = nullptr;
+  std::list<CxFunctionBinding>::iterator binding_it;
   std::unique_lock<std::recursive_mutex> registration_lock;
   try {
     // Use the same lock as ScriptEnvironment::AddFunction, function lookup
@@ -806,9 +801,8 @@ avs_cx_status AVS_CX_CALL CxHostSession::RegisterFunction(
       return AVS_CX_STATUS_INVALID_ARGUMENT;
     }
 
-    const CxFunctionBinding binding{self, apply, plugin_user_data};
-    stored = const_cast<char *>(self->environment_->SaveString(
-        reinterpret_cast<const char *>(&binding), sizeof(binding)));
+    binding_it = self->bindings_.insert(self->bindings_.end(), {self, apply, plugin_user_data});
+    stored = &*binding_it;
     self->manager_->AddFunction(function_name.c_str(), parameters.c_str(),
         &ApplyBridge, stored, nullptr, false, false);
     return AVS_CX_STATUS_OK;
@@ -819,7 +813,10 @@ avs_cx_status AVS_CX_CALL CxHostSession::RegisterFunction(
   } catch (...) {
     self->SetLastError("unknown error while registering CX function");
   }
-  if (stored) self->RemoveFunctions(stored);
+  if (stored) {
+    self->RemoveFunctions(stored);
+    self->bindings_.erase(binding_it);
+  }
   return AVS_CX_STATUS_HOST_ERROR;
 }
 

@@ -19,6 +19,13 @@ The current x64 implementation is a proving ground, not ARM64 validation.
   entering the host. Nested loads restore their caller's plugin context on all
   exits, including exceptions from legacy loaders. Export-list variables and arbitrary plugin side
   effects are not transactionally restored.
+* Host callback bindings live in a session-owned typed list with stable addresses,
+  rather than binary records in SaveString. Registration rollback removes aliases
+  before erasing the corresponding record. Failed initialization removes all of
+  that session's functions before its records are destroyed; committed records
+  live until plugin-manager teardown, after function entries are deleted.
+  SaveString itself compares explicit-length data with memcmp, consistent with
+  its full-byte hash; embedded NULs must not merge different records.
 * A host clip's opaque token is its core-owned IClip address, retained and
   released only by core callbacks. Incoming host clips reuse plugin-local
   proxies while they are alive. The proxy index is weak: last local release

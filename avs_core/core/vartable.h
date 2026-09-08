@@ -84,7 +84,10 @@ struct CompositeKeyDjb2Hash {
 // Custom equality function for composite keys
 struct CompositeKeyEqual {
   bool operator()(const std::pair<const char*, size_t>& lhs, const std::pair<const char*, size_t>& rhs) const {
-    return (lhs.second == rhs.second) && (std::strncmp(lhs.first, rhs.first, lhs.second) == 0);
+    // Explicit-length SaveString accepts embedded NULs. Equality must inspect
+    // the same bytes as the hash, including bytes after the first NUL.
+    return (lhs.second == rhs.second) &&
+      (lhs.second == 0 || std::memcmp(lhs.first, rhs.first, lhs.second) == 0);
   }
 };
 

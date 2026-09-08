@@ -255,6 +255,43 @@ TEST(CxBoundaries, NewSubframeAndCowIdentitySurviveHostRoundTrip) {
   }
 }
 
+TEST(CxBoundaries, BatchRegistrationsKeepCallbacksAndUserData) {
+  for (const char *path : {CX_SMOKE_LEGACY_PATH, DualPluginPath()}) {
+    SCOPED_TRACE(path);
+    AviSynthEnvironment first, second;
+    auto *a = first.get();
+    auto *b = second.get();
+    for (auto *env : {a, b}) {
+      static_cast<IScriptEnvironment2 *>(env)->ClearAutoloadDirs();
+      LoadPlugin(env, path);
+    }
+    for (int batch = 0; batch < 2; ++batch) {
+      for (auto *env : {a, b}) {
+        const AVSValue args[] = {batch * 1024, 1024, env == a ? 0 : 10000};
+        ASSERT_TRUE(env->Invoke("CXRegisterBatch", AVSValue(args, 3)).AsBool());
+      }
+      // Recheck earlier bindings after growth, interleaving the two sessions.
+      for (int i = 0; i < (batch + 1) * 1024; ++i) {
+        const std::string name = "CXBatchBinding" + std::to_string(i);
+        for (auto *env : {a, b}) {
+          const int value = i + (env == a ? 0 : 10000);
+          ASSERT_EQ(env->Invoke(name.c_str(), AVSValue(nullptr, 0)).AsInt(),
+                    i % 2 ? -1 - value : value) << name;
+        }
+      }
+    }
+  }
+}
+
+TEST(CxBoundaries, BinarySaveStringDistinguishesHashCollisions) {
+  for (const char *path : {CX_SMOKE_LEGACY_PATH, DualPluginPath()}) {
+    SCOPED_TRACE(path);
+    AviSynthEnvironment environment;
+    LoadPlugin(environment.get(), path);
+    EXPECT_TRUE(environment.get()->Invoke("CXBinaryStrings", AVSValue(nullptr, 0)).AsBool());
+  }
+}
+
 struct RegistrationGate {
   std::promise<void> entered, release;
 };

@@ -8,6 +8,7 @@
 #include <avs/cx/sdk.h>
 
 #include <string>
+#include <list>
 #include <vector>
 
 class InternalEnvironment;
@@ -66,6 +67,15 @@ private:
     avs_cx_shutdown_v1 shutdown;
     void *plugin_user_data;
   };
+
+  struct CxFunctionBinding {
+    CxHostSession *session;
+    avs_cx_apply_function_v1 apply;
+    void *plugin_user_data;
+  };
+  // Typed storage with stable addresses, guarded by the host registration lock.
+  // Remove function-table entries before destroying their bindings.
+  std::list<CxFunctionBinding> bindings_;
 
   PluginManager *manager_;
   InternalEnvironment *environment_;

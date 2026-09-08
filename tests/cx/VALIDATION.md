@@ -50,11 +50,10 @@ Both complete dual-entry plugins compile with RTTI disabled. The
 semantic test compares registration, numeric types, host clip identity and
 write-probe results against Init3 using the same source.
 
-The first frame-index matrix run reported one SEH access violation (0xc0000005)
-in `AllDirections/CxGlobalLockRoutes.SerializesAcrossInterfaces/2`, MSVC core
-with the GCC plugin. Twenty consecutive isolated reruns and the subsequent
-complete matrix passed. This intermittent failure has not been diagnosed;
-the passing counts above describe the final run, not proof that it is resolved.
+The CX matrix includes an embedded-NUL SaveString hash-collision check through Init3 and CX,
+and a batch registration regression: two environments each register 2,048 functions in two
+batches with alternating callbacks and different user_data. Interleaved checks
+verify that growing the registry preserves earlier bindings and session isolation.
 
 Registration regression tests hold the host plugin lock in a legacy DLL's init
 while another thread registers from GetFrame through Init3 or CX, followed by

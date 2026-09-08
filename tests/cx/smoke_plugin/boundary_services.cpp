@@ -1,9 +1,35 @@
 #include <avisynth.h>
 
 #include <future>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <vector>
 
 namespace {
+AVSValue __cdecl BindingEven(AVSValue, void *data, IScriptEnvironment *) {
+  return static_cast<int>(reinterpret_cast<uintptr_t>(data));
+}
+AVSValue __cdecl BindingOdd(AVSValue, void *data, IScriptEnvironment *) {
+  return -1 - static_cast<int>(reinterpret_cast<uintptr_t>(data));
+}
+AVSValue __cdecl RegisterBatch(AVSValue args, void *, IScriptEnvironment *env) {
+  for (int i = args[0].AsInt(); i < args[0].AsInt() + args[1].AsInt(); ++i) {
+    char name[64];
+    std::snprintf(name, sizeof(name), "CXBatchBinding%d", i);
+    env->AddFunction(name, "", i % 2 ? BindingOdd : BindingEven,
+        reinterpret_cast<void *>(static_cast<uintptr_t>(i + args[2].AsInt())));
+  }
+  return true;
+}
+AVSValue __cdecl BinaryStrings(AVSValue, void *, IScriptEnvironment *env) {
+  // Same full DJB2 hash; differ only after NUL. strncmp incorrectly merges them.
+  const char a[] = {'a', 0, 1, 33}, b[] = {'a', 0, 2, 0};
+  const char *first = env->SaveString(a, sizeof(a));
+  const char *second = env->SaveString(b, sizeof(b));
+  return std::memcmp(first, a, sizeof(a)) == 0 &&
+      std::memcmp(second, b, sizeof(b)) == 0;
+}
 // The host fixture supplies distinct, cached frames and interleaved stereo audio.
 bool Pixels(const PVideoFrame &frame, int value) {
   for (int y = 0; y < frame->GetHeight(); ++y)
@@ -159,6 +185,8 @@ AVSValue __cdecl FrameRoundTrip(AVSValue args, void *, IScriptEnvironment *env) 
 } // namespace
 
 void RegisterBoundaryServices(IScriptEnvironment *env) {
+  env->AddFunction("CXRegisterBatch", "iii", RegisterBatch, nullptr);
+  env->AddFunction("CXBinaryStrings", "", BinaryStrings, nullptr);
   env->AddFunction("CXMultipleFrames", "cc", MultipleFrames, nullptr);
   env->AddFunction("CXRetainedCow", "c", RetainedCow, nullptr);
   env->AddFunction("CXMultipleAudio", "cc", MultipleAudio, nullptr);
