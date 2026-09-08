@@ -92,6 +92,12 @@ preservation, frame identity, local pixel/property COW, subframes, saved
 environments, nested Invoke, arrays, errors and concurrent frame calls.
 `cx_smoke_c` is compiled as C and uses only protocol headers.
 
+Global-lock tests reuse the original plugin calls through CX and Init3 and
+exercise all nine owner/waiter combinations with the existing C API. The C API
+caller is compiled as C. Independent environments avoid Invoke's per-environment
+serialization. CTest runs each test in its own process with a 15-second timeout;
+the matrix script uses CTest so deadlock failures are bounded.
+
 Build `cx_tests` and `cx_smoke_benchmark` with each compiler, then run
 `tests/cx/run_matrix.ps1` with the two build directories and GCC runtime path.
 This exercises MSVC and GCC cores against both compilers' CX DLLs, including

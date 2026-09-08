@@ -52,6 +52,24 @@ AVSValue __cdecl CreatePassThrough(AVSValue arguments, void *, IScriptEnvironmen
   return new LegacyPassThrough(arguments[0].AsClip());
 }
 
+// The same source exercises Init3 and the source-compatible CX adapter.
+AVSValue __cdecl AcquireLock(AVSValue arguments, void *, IScriptEnvironment *environment) {
+  return environment->AcquireGlobalLock(arguments[0].AsString());
+}
+
+AVSValue __cdecl ReleaseLock(AVSValue arguments, void *, IScriptEnvironment *environment) {
+  environment->ReleaseGlobalLock(arguments[0].AsString());
+  return true;
+}
+
+AVSValue __cdecl GlobalLockRoundTrip(AVSValue, void *, IScriptEnvironment *environment) {
+  constexpr char name[] = "avs-cx-smoke-global-lock";
+  if (!environment->AcquireGlobalLock(name))
+    environment->ThrowError("global-lock acquire failed");
+  environment->ReleaseGlobalLock(name);
+  return true;
+}
+
 } // namespace
 
 const AVS_Linkage *AVS_linkage = nullptr;
@@ -63,5 +81,8 @@ AvisynthPluginInit3(IScriptEnvironment *environment, const AVS_Linkage *const li
   RegisterLegacyServices(environment);
   environment->AddFunction("CXCheckerInvert", "c[block]i", &CreateChecker, nullptr);
   environment->AddFunction("CXSmokePassThrough", "c", &CreatePassThrough, nullptr);
+  environment->AddFunction("CXGlobalLockRoundTrip", "", &GlobalLockRoundTrip, nullptr);
+  environment->AddFunction("CXAcquireLock", "s", &AcquireLock, nullptr);
+  environment->AddFunction("CXReleaseLock", "s", &ReleaseLock, nullptr);
   return "AviSynth CX smoke plugin (legacy Init3)";
 }

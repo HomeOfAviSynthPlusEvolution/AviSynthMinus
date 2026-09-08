@@ -45,7 +45,17 @@ add_dependencies(cx_tests
 )
 
 include(GoogleTest)
-gtest_discover_tests(cx_tests TEST_PREFIX "cx.")
+gtest_discover_tests(cx_tests TEST_PREFIX "cx." PROPERTIES TIMEOUT 15)
+
+# Each lock test runs in its own process; broken unlocks cannot hang the matrix.
+add_executable(cx_global_lock_tests global_lock_tests.cpp legacy_c_lock.c)
+target_link_libraries(cx_global_lock_tests PRIVATE GTest::gtest_main AvsCoreExternal)
+target_compile_definitions(cx_global_lock_tests PRIVATE
+  CX_SMOKE_DUAL_PATH="$<TARGET_FILE:cx_smoke_dual>"
+  CX_SMOKE_LEGACY_PATH="$<TARGET_FILE:cx_smoke_legacy>")
+add_dependencies(cx_global_lock_tests cx_smoke_dual cx_smoke_legacy)
+add_dependencies(cx_tests cx_global_lock_tests)
+gtest_discover_tests(cx_global_lock_tests TEST_PREFIX "cx." PROPERTIES TIMEOUT 15)
 
 add_executable(cx_smoke_benchmark cx_smoke_benchmark.cpp)
 target_include_directories(cx_smoke_benchmark PRIVATE

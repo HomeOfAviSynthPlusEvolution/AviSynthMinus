@@ -19,7 +19,8 @@ try {
       $env:AVS_CX_SDK_PATH = $env:AVS_CX_SMOKE_DUAL_PATH
       $env:AVS_CX_C_PATH = "$plugin/cx_smoke_c.dll"
       $env:AVS_CX_STACKED_PATH = "$plugin/cx_convert_stacked.dll"
-      & "$core/cx_tests.exe"
+      $buildDir = if ($core -eq $msvc) { $MsvcBuild } else { $GccBuild }
+      & ctest --test-dir $buildDir -C Release --output-on-failure -R '^cx\.'
       if ($LASTEXITCODE -ne 0) { throw "CX matrix failed: core=$core plugin=$plugin" }
     }
   }

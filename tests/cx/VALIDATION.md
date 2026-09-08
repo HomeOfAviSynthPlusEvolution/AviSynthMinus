@@ -56,6 +56,14 @@ or retain staged function registrations. Existing `avisynth_c_plugin_init`
 and `avisynth_c_plugin_init2` loaders are preserved; the pure-C fixture here
 tests CX1, not those older protocols.
 
+Global lock tests cover two legacy-source lock roundtrips, nine
+owner/waiter combinations across CX, Init3 and the existing C API, and a
+different-name independence test. The C API caller is a C translation unit
+linked into the test executable, not a dynamically loaded legacy C plugin.
+The CX DLL is exchanged in the compiler matrix; Init3 always uses its core's
+compiler. No duplicate GLOBLOCK feature or public CX C++ API is introduced.
+All CX tests run individually through CTest with 15-second process timeouts.
+
 ## Performance
 
 PowerShell command: `./cx_smoke_benchmark.exe 3000 7`. One thread, 1920x1080 Y8,
