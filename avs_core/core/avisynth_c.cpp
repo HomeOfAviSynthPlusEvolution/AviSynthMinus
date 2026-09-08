@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <cstdarg>
+#include <new>
 
 
 struct AVS_Clip
@@ -1525,6 +1526,16 @@ int AVSC_CC avs_acquire_global_lock(AVS_ScriptEnvironment* p, const char* name)
     p->error = err.msg;
     return 0;
   }
+  catch (const std::bad_alloc&) {
+    // Static messages remain valid after the exception is destroyed and do not
+    // require another allocation while reporting an out-of-memory failure.
+    p->error = "avs_acquire_global_lock: out of memory";
+    return 0;
+  }
+  catch (...) {
+    p->error = "avs_acquire_global_lock: failed to acquire lock";
+    return 0;
+  }
 }
 
 // V12
@@ -1537,6 +1548,9 @@ void AVSC_CC avs_release_global_lock(AVS_ScriptEnvironment* p, const char* name)
   }
   catch (const AvisynthError& err) {
     p->error = err.msg;
+  }
+  catch (...) {
+    p->error = "avs_release_global_lock: failed to release lock";
   }
 }
 
