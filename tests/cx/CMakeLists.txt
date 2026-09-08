@@ -13,6 +13,7 @@ target_include_directories(cx_c_header_check PRIVATE "${CX_SMOKE_INCLUDE_DIR}")
 add_library(cx_smoke_dual SHARED
   smoke_plugin/legacy_entry.cpp
   smoke_plugin/legacy_services.cpp
+  smoke_plugin/boundary_services.cpp
   smoke_plugin/sdk_entry.cpp
   "${CX_SMOKE_INCLUDE_DIR}/avs/cx/legacy.cpp"
   smoke_plugin/checker_kernel.h
@@ -26,6 +27,7 @@ set_target_properties(cx_smoke_dual PROPERTIES PREFIX "" OUTPUT_NAME "cx_smoke_d
 add_library(cx_smoke_legacy SHARED
   smoke_plugin/legacy_entry.cpp
   smoke_plugin/legacy_services.cpp
+  smoke_plugin/boundary_services.cpp
   smoke_plugin/checker_kernel.h
 )
 target_include_directories(cx_smoke_legacy PRIVATE "${CX_SMOKE_INCLUDE_DIR}")
@@ -55,10 +57,12 @@ add_dependencies(cx_tests
 
 add_library(cx_registration_dependency SHARED smoke_plugin/registration_dependency.cpp)
 add_library(cx_registration_gate SHARED smoke_plugin/registration_dependency.cpp)
+add_library(cx_registration_throw SHARED smoke_plugin/registration_dependency.cpp)
+target_compile_definitions(cx_registration_throw PRIVATE CX_REGISTRATION_THROW)
 target_compile_definitions(cx_registration_gate PRIVATE CX_REGISTRATION_GATE)
 add_library(cx_smoke_nested SHARED smoke_plugin/nested_entry.cpp
   "${CX_SMOKE_INCLUDE_DIR}/avs/cx/legacy.cpp")
-foreach(target cx_registration_dependency cx_registration_gate cx_smoke_nested)
+foreach(target cx_registration_dependency cx_registration_gate cx_registration_throw cx_smoke_nested)
   target_include_directories(${target} PRIVATE "${CX_SMOKE_INCLUDE_DIR}")
   set_target_properties(${target} PROPERTIES PREFIX "")
   add_dependencies(cx_tests ${target})
@@ -66,6 +70,7 @@ endforeach()
 target_compile_definitions(cx_tests PRIVATE
   CX_REGISTRATION_DEPENDENCY_PATH="$<TARGET_FILE:cx_registration_dependency>"
   CX_REGISTRATION_GATE_PATH="$<TARGET_FILE:cx_registration_gate>"
+  CX_REGISTRATION_THROW_PATH="$<TARGET_FILE:cx_registration_throw>"
   CX_NESTED_PATH="$<TARGET_FILE:cx_smoke_nested>")
 
 include(GoogleTest)

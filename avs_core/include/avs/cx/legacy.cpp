@@ -2,6 +2,7 @@
 // linking exception as avisynth.h. The legacy C++ ABI stays inside this DLL.
 #include "sdk.h"
 #include <atomic>
+#include <array>
 #include <avisynth_cx_legacy.h>
 #include <avs/cx/sdk/runtime.h>
 #include <cassert>
@@ -14,6 +15,7 @@
 #include <mutex>
 #include <map>
 #include <stdexcept>
+#include <tuple>
 #include <vector>
 #ifdef _WIN32
 #include <windows.h>
@@ -87,11 +89,26 @@ public:
 #include "sdk/value_methods.inc"
 
 namespace {
+using FrameKey = std::tuple<uintptr_t, uintptr_t, uintptr_t>;
+FrameKey Key(avs_cx_frame_ref_v1 r, const avs_cx_sdk_feature_v1 *sdk) {
+  return {reinterpret_cast<uintptr_t>(r.object), reinterpret_cast<uintptr_t>(r.operations),
+          reinterpret_cast<uintptr_t>(sdk)};
+}
+struct FrameIndex {
+  std::mutex mutex;
+  std::map<FrameKey, Frame *> frames;
+};
+// Weak entries only. Sharding avoids serializing unrelated frame traffic.
+std::array<FrameIndex, 16> frame_indices;
+FrameIndex &Index(const FrameKey &key) {
+  const auto address = std::get<0>(key);
+  return frame_indices[((address >> 4) ^ (address >> 12)) % frame_indices.size()];
+}
 struct Frame : VideoFrame {
   static void *operator new(size_t n) { return ::operator new(n); }
   static void operator delete(void *p) { ::operator delete(p); }
   std::atomic<unsigned> references{0};
-  avs::cx::frame ref;
+  const avs::cx::frame ref;
   const avs_cx_sdk_feature_v1 *sdk;
   // Plane descriptors are fetched once and are local on subsequent getters.
   avs_cx_plane_v1 planes[8]{};
@@ -155,16 +172,35 @@ struct Frame : VideoFrame {
     return planes[i];
   }
 };
-Frame *Wrap(avs_cx_frame_ref_v1 ref, const avs_cx_sdk_feature_v1 *sdk) {
+PVideoFrame Wrap(avs_cx_frame_ref_v1 ref, const avs_cx_sdk_feature_v1 *sdk) {
   auto owned = avs::cx::frame::adopt(ref);
-  return new Frame(std::move(owned), sdk);
+  const auto key = Key(ref, sdk);
+  auto &index = Index(key);
+  // Destruction (including on allocation failure) must release host refs only
+  // after unlocking. The incoming owned ref also prevents host address reuse.
+  std::unique_ptr<Frame> candidate;
+  std::lock_guard<std::mutex> lock(index.mutex);
+  auto it = index.frames.find(key);
+  if (it != index.frames.end()) return PVideoFrame(it->second);
+  candidate.reset(new Frame(std::move(owned), sdk));
+  index.frames.emplace(key, candidate.get());
+  return PVideoFrame(candidate.release());
 }
 void RetainFrame(VideoFrame *p) {
   Frame::From(p)->references.fetch_add(1, std::memory_order_relaxed);
 }
 void ReleaseFrame(VideoFrame *p) {
-  if (Frame::From(p)->references.fetch_sub(1, std::memory_order_acq_rel) == 1)
-    delete Frame::From(p);
+  auto *f = Frame::From(p);
+  const auto key = Key(f->ref.get(), f->sdk);
+  auto &index = Index(key);
+  bool destroy;
+  {
+    // Lookup+retain and the last release+erase are indivisible to each other.
+    std::lock_guard<std::mutex> lock(index.mutex);
+    destroy = f->references.fetch_sub(1, std::memory_order_acq_rel) == 1;
+    if (destroy) index.frames.erase(key);
+  }
+  if (destroy) delete f;
 }
 Frame *WritableFrame(const VideoFrame *p) { return const_cast<Frame *>(Frame::From(p)); }
 } // namespace
@@ -702,25 +738,23 @@ public:
     if (src && *src)
       q.frame = Frame::From(src->operator->())->ref.get();
     auto r = Dispatch(q);
-    auto f = avs::cx::frame::adopt(r.frame);
-    return new Frame(std::move(f), session->sdk);
+    return Wrap(r.frame, session->sdk);
   }
   bool __stdcall MakeWritable(PVideoFrame *p) override {
     if (!p || !*p)
       ThrowError("CX SDK: null frame");
     auto *f = Frame::From(p->operator->());
-    // A second local smart pointer must count as a shared host frame for COW.
-    if (f->references.load(std::memory_order_relaxed) > 1) {
-      PVideoFrame copy(new Frame(f->ref, session->sdk));
-      *p = copy;
-      f = Frame::From(p->operator->());
-    }
-    auto old = f->ref.get().object;
+    if ((*p)->IsWritable()) return false;
+    // Never retarget an indexed wrapper: retained aliases must keep the old
+    // frame and cached planes. This extra host reference also enforces local COW.
+    auto writable = f->ref;
+    const auto old = f->ref.get().object;
     avs_cx_error_v1 e{};
     e.struct_size = sizeof(e);
-    Check(session->runtime.make_writable(&Call(), &f->ref, &e), e);
-    f->mask = 0;
-    return f->ref.get().object != old;
+    Check(session->runtime.make_writable(&Call(), &writable, &e), e);
+    const bool changed = writable.get().object != old;
+    *p = Wrap(writable.detach(), session->sdk);
+    return changed;
   }
   void __stdcall BitBlt(BYTE *d, int dp, const BYTE *s, int sp, int row, int h) override {
     if (row < 0 || h < 0)
@@ -774,7 +808,7 @@ public:
     avs_cx_error_v1 e{};
     e.struct_size = sizeof(e);
     Check(ref.get_frame(n, &static_cast<Environment *>(env)->Call(), &f, &e), e);
-    return new Frame(std::move(f), sdk);
+    return Wrap(f.detach(), sdk);
   }
   void __stdcall GetAudio(void *p, int64_t s, int64_t n, IScriptEnvironment *env) override {
     avs_cx_error_v1 e{};

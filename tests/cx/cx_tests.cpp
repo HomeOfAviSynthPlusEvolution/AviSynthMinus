@@ -124,6 +124,137 @@ TEST(CxCompatibility, AlternatingCompilerChain) {
   for (auto &job : jobs) EXPECT_EQ(job.get(), expected);
 }
 
+class BoundarySource final : public IClip {
+  VideoInfo vi_{};
+  std::vector<PVideoFrame> frames_;
+  int base_;
+public:
+  BoundarySource(IScriptEnvironment *env, int base) : base_(base) {
+    vi_.width = 70; vi_.height = 33; vi_.pixel_type = VideoInfo::CS_Y8;
+    vi_.num_frames = 3; vi_.SetFPS(24, 1);
+    vi_.sample_type = SAMPLE_INT32; vi_.nchannels = 2;
+    vi_.audio_samples_per_second = 48000; vi_.num_audio_samples = 6000;
+    for (int n = 0; n < 3; ++n) {
+      PVideoFrame frame = env->NewVideoFrame(vi_);
+      for (int y = 0; y < frame->GetHeight(); ++y)
+        std::memset(frame->GetWritePtr() + y * frame->GetPitch(), base + n, frame->GetRowSize());
+      frames_.push_back(frame);
+    }
+  }
+  const VideoInfo &__stdcall GetVideoInfo() override { return vi_; }
+  PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment *) override { return frames_.at(n); }
+  void __stdcall GetAudio(void *buffer, int64_t start, int64_t count, IScriptEnvironment *) override {
+    for (int64_t i = 0; i < count * 2; ++i)
+      static_cast<int *>(buffer)[i] = base_ * 100 + static_cast<int>(start * 2 + i);
+  }
+  bool __stdcall GetParity(int) override { return false; }
+  int __stdcall SetCacheHints(int hint, int) override {
+    return hint == CACHE_GET_MTMODE ? MT_NICE_FILTER : 0;
+  }
+};
+
+TEST(CxBoundaries, MultipleUpstreamsAndRetainedReadPointers) {
+  for (const char *path : {CX_SMOKE_LEGACY_PATH, DualPluginPath()}) {
+    SCOPED_TRACE(path);
+    AviSynthEnvironment environment;
+    auto *env = environment.get();
+    LoadPlugin(env, path);
+    const AVSValue args[] = {new BoundarySource(env, 10), new BoundarySource(env, 40)};
+    EXPECT_TRUE(env->Invoke("CXMultipleFrames", AVSValue(args, 2)).AsBool());
+  }
+}
+
+TEST(CxBoundaries, RetainedFrameCopyOnWrite) {
+  for (const char *path : {CX_SMOKE_LEGACY_PATH, DualPluginPath()}) {
+    SCOPED_TRACE(path);
+    AviSynthEnvironment environment;
+    auto *env = environment.get();
+    LoadPlugin(env, path);
+    const AVSValue arg(new BoundarySource(env, 10));
+    EXPECT_TRUE(env->Invoke("CXRetainedCow", AVSValue(&arg, 1)).AsBool());
+  }
+}
+
+TEST(CxBoundaries, TwoUpstreamStereoAudioRanges) {
+  for (const char *path : {CX_SMOKE_LEGACY_PATH, DualPluginPath()}) {
+    SCOPED_TRACE(path);
+    AviSynthEnvironment environment;
+    auto *env = environment.get();
+    LoadPlugin(env, path);
+    const AVSValue args[] = {new BoundarySource(env, 10), new BoundarySource(env, 40)};
+    EXPECT_TRUE(env->Invoke("CXMultipleAudio", AVSValue(args, 2)).AsBool());
+  }
+}
+
+TEST(CxBoundaries, FramesSurviveAcrossCallbacksAndReleasedInputs) {
+  for (const char *path : {CX_SMOKE_LEGACY_PATH, DualPluginPath()}) {
+    SCOPED_TRACE(path);
+    AviSynthEnvironment environment;
+    auto *env = environment.get();
+    LoadPlugin(env, path);
+    PClip held;
+    {
+      const AVSValue args[] = {new BoundarySource(env, 10), new BoundarySource(env, 40)};
+      held = env->Invoke("CXHeldFrames", AVSValue(args, 2)).AsClip();
+    } // The filter must retain both inputs itself.
+    for (int n : {0, 2, 1, 0}) {
+      const auto pixels = CopyPlane(held->GetFrame(n, env));
+      EXPECT_EQ(pixels, std::vector<uint8_t>(70 * 33, 10));
+    }
+  }
+}
+
+TEST(CxBoundaries, PluginThreadUsesSavedFactoryEnvironment) {
+  for (const char *path : {CX_SMOKE_LEGACY_PATH, DualPluginPath()}) {
+    SCOPED_TRACE(path);
+    AviSynthEnvironment environment;
+    auto *env = environment.get();
+    LoadPlugin(env, path);
+    const PClip source = new BoundarySource(env, 10);
+    const AVSValue arg(source);
+    const PClip clip = env->Invoke("CXThreadFrame", AVSValue(&arg, 1)).AsClip();
+    for (int n = 0; n < 3; ++n) {
+      auto expected = std::vector<uint8_t>(70 * 33, 10 + n);
+      expected[0] = 90 + n;
+      EXPECT_EQ(CopyPlane(clip->GetFrame(n, env)), expected);
+      EXPECT_EQ(CopyPlane(source->GetFrame(n, env)), std::vector<uint8_t>(70 * 33, 10 + n));
+    }
+  }
+}
+
+TEST(CxBoundaries, RepeatedHostFramePreservesPluginObjectIdentity) {
+  for (const char *path : {CX_SMOKE_LEGACY_PATH, DualPluginPath()}) {
+    SCOPED_TRACE(path);
+    AviSynthEnvironment environment;
+    auto *env = environment.get();
+    LoadPlugin(env, path);
+    const AVSValue arg(new BoundarySource(env, 10));
+    EXPECT_TRUE(env->Invoke("CXSameFrame", AVSValue(&arg, 1)).AsBool());
+  }
+}
+
+TEST(CxBoundaries, ConcurrentFrameImportsAndLastRelease) {
+  for (const char *path : {CX_SMOKE_LEGACY_PATH, DualPluginPath()}) {
+    SCOPED_TRACE(path);
+    AviSynthEnvironment environment;
+    auto *env = environment.get();
+    LoadPlugin(env, path);
+    const AVSValue arg(new BoundarySource(env, 10));
+    EXPECT_TRUE(env->Invoke("CXConcurrentFrameIdentity", AVSValue(&arg, 1)).AsBool());
+  }
+}
+
+TEST(CxBoundaries, NewSubframeAndCowIdentitySurviveHostRoundTrip) {
+  for (const char *path : {CX_SMOKE_LEGACY_PATH, DualPluginPath()}) {
+    SCOPED_TRACE(path);
+    AviSynthEnvironment environment;
+    auto *env = environment.get();
+    LoadPlugin(env, path);
+    const AVSValue arg(new BoundarySource(env, 10));
+    EXPECT_TRUE(env->Invoke("CXFrameRoundTripIdentity", AVSValue(&arg, 1)).AsBool());
+  }
+}
+
 struct RegistrationGate {
   std::promise<void> entered, release;
 };
@@ -179,9 +310,12 @@ TEST(CxCompatibility, NestedLoadsRestoreOuterPluginName) {
                    const_cast<char *>(CX_REGISTRATION_DEPENDENCY_PATH));
   env->AddFunction("CXLoadMissingDependency", "", LoadRegistrationDependency,
                    const_cast<char *>(CX_REGISTRATION_DEPENDENCY_PATH ".missing"));
+  env->AddFunction("CXLoadThrowingDependency", "", LoadRegistrationDependency,
+                   const_cast<char *>(CX_REGISTRATION_THROW_PATH));
   const char *path = std::getenv("AVS_CX_NESTED_PATH");
   LoadPlugin(env, path && *path ? path : CX_NESTED_PATH);
-  for (const char *name : {"CXBeforeNested", "CXAfterNested", "CXAfterFailedNested"}) {
+  for (const char *name : {"CXBeforeNested", "CXAfterNested", "CXAfterFailedNested",
+                           "CXAfterThrowingNested"}) {
     const std::string qualified = std::string("cx_smoke_nested_") + name;
     EXPECT_TRUE(env->FunctionExists(qualified.c_str()));
     EXPECT_EQ(env->Invoke(qualified.c_str(), AVSValue(nullptr, 0)).AsInt(), 42);

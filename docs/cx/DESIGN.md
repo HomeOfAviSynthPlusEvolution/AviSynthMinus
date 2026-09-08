@@ -27,6 +27,13 @@ The current x64 implementation is a proving ground, not ARM64 validation.
   the same local IClip identity. No foreign C++ object is dereferenced by the SDK.
 * A non-writable frame returns a successful write probe with a null data
   pointer. Invalid requests and actual host failures remain errors.
+* Frame imports reuse a local VideoFrame wrapper keyed by the host object,
+  operations table and SDK table while local references remain alive. Sixteen
+  weak-index shards serialize lookup/retain with final release/removal. The
+  incoming owned host reference prevents address reuse during lookup; no host
+  callback or destruction runs under an index lock. Wrappers never change their
+  host reference: copy-on-write imports a replacement, preserving retained
+  aliases, the index key and cached planes. Unique writable frames stay in place.
 
 The local proxy index avoids dynamic_cast, so the complete smoke plugin
 is built without RTTI. Reference/index updates use a short recursive mutex;

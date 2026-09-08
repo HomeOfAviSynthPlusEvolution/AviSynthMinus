@@ -74,11 +74,13 @@ AVSValue __cdecl GlobalLockRoundTrip(AVSValue, void *, IScriptEnvironment *envir
 
 const AVS_Linkage *AVS_linkage = nullptr;
 void RegisterLegacyServices(IScriptEnvironment *);
+void RegisterBoundaryServices(IScriptEnvironment *);
 
 extern "C" AVS_CX_EXPORT const char *__stdcall
 AvisynthPluginInit3(IScriptEnvironment *environment, const AVS_Linkage *const linkage) {
   AVS_linkage = linkage;
   RegisterLegacyServices(environment);
+  RegisterBoundaryServices(environment);
   environment->AddFunction("CXCheckerInvert", "c[block]i", &CreateChecker, nullptr);
 #if defined(_MSC_VER)
   environment->AddFunction("CXMsvcCheckerInvert", "c[block]i", &CreateChecker, nullptr);

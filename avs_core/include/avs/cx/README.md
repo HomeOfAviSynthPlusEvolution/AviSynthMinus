@@ -60,7 +60,8 @@ and destroyed, but non-null function/device objects are not transported.
 The SDK uses a stable environment proxy per session. Nested and concurrent
 callbacks select the correct opaque host environment through thread-local
 call scopes; a saved C++ environment pointer does not point to a temporary
-stack object. Retained frames have independent owning host references. Local
+stack object. Live imports of the same host frame reuse one local wrapper,
+which owns a host reference; the weak index is removed on last local release. Local
 smart-pointer sharing participates in copy-on-write. Read-plane descriptors
 are cached with synchronized publication, so row processing uses local data.
 

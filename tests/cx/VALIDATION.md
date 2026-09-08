@@ -50,10 +50,17 @@ Both complete dual-entry plugins compile with RTTI disabled. The
 semantic test compares registration, numeric types, host clip identity and
 write-probe results against Init3 using the same source.
 
+The first frame-index matrix run reported one SEH access violation (0xc0000005)
+in `AllDirections/CxGlobalLockRoutes.SerializesAcrossInterfaces/2`, MSVC core
+with the GCC plugin. Twenty consecutive isolated reruns and the subsequent
+complete matrix passed. This intermittent failure has not been diagnosed;
+the passing counts above describe the final run, not proof that it is resolved.
+
 Registration regression tests hold the host plugin lock in a legacy DLL's init
 while another thread registers from GetFrame through Init3 or CX, followed by
 eight concurrent registrations. A separate CX plugin loads a same-core-compiler
-legacy dependency and a missing dependency during init, then checks the outer
+legacy dependency, a missing dependency, and a DLL whose Init3 deliberately
+throws during init, then checks the outer
 plugin's qualified function names. The CX outer plugin participates in the
 cross-compiler matrix; the legacy dependency always matches its core ABI.
 
@@ -77,6 +84,33 @@ linked into the test executable, not a dynamically loaded legacy C plugin.
 The CX DLL is exchanged in the compiler matrix; Init3 always uses its core's
 compiler. No duplicate GLOBLOCK feature or public CX C++ API is introduced.
 All CX tests run individually through CTest with 15-second process timeouts.
+
+### Boundary cases
+
+The same ordinary plugin source is tested through same-compiler Init3 and each
+CX matrix route. A deterministic host source retains three distinct 70x33 Y8
+frames and emits position-dependent interleaved stereo INT32 audio. Tests cover:
+
+- Multiple upstream clips and three simultaneous frames from one upstream,
+  with retained read pointers and all visible pixels checked after more imports.
+- Copy-on-write while the original frame and its read pointer remain retained.
+- Two independent audio ranges at nonzero offsets, buffer guards, and a
+  zero-length read.
+- A filter retaining both inputs after the factory arguments are destroyed,
+  and holding a frame/read pointer across out-of-order GetFrame callbacks.
+- A plugin-owned worker using the environment saved by its factory in a later
+  GetFrame call, including frame retrieval and copy-on-write. The worker joins
+  before the callback returns; detached workers, environment destruction races,
+  and every environment service are not covered.
+
+`RepeatedHostFramePreservesPluginObjectIdentity` checks that repeated imports
+of the same cached host frame reuse the plugin-local wrapper. Further
+regressions exercise four plugin threads importing/releasing
+frames (1,000 iterations each, with one permanently held frame and two without
+permanent local anchors), plus new-frame, subframe and copied-frame identity
+after a host roundtrip. Copy-on-write must keep the original indexed wrapper
+and its pixels intact; a unique new frame must not be unnecessarily copied.
+These tests do not establish complete clip/function/device identity support.
 
 ## Performance
 
