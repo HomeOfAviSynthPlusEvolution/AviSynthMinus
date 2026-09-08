@@ -248,6 +248,7 @@ class SINGLE_INHERITANCE PFunction;
 class Device;
 class SINGLE_INHERITANCE PDevice;
 struct AVSMap;
+class CxCoreFrameAccess;
 
 
 
@@ -556,6 +557,18 @@ public:
   PDevice& OPERATOR_ASSIGN1(const PDevice& p);
   void DESTRUCTOR();
 #endif
+
+public:
+  void CX_CONSTRUCTOR0();
+  void CX_CONSTRUCTOR1(Device* p);
+  void CX_CONSTRUCTOR2(const PDevice& p);
+  PDevice& CX_OPERATOR_ASSIGN0(Device* p);
+  PDevice& CX_OPERATOR_ASSIGN1(const PDevice& p);
+  void CX_DESTRUCTOR();
+  AvsDeviceType CX_GetType() const;
+  int CX_GetId() const;
+  int CX_GetIndex() const;
+  const char* CX_GetName() const;
 };
 
 // Unshifted channel mask constants like in WAVEFORMATEXTENSIBLE
@@ -988,6 +1001,69 @@ struct VideoInfo {
   void SetChannelMask(bool isChannelMaskKnown, unsigned int dwChannelMask) AVS_BakedCode(AVS_LinkCall_Void(SetChannelMask)(isChannelMaskKnown, dwChannelMask))
   unsigned int GetChannelMask() const AVS_BakedCode(return AVS_LinkCallOptDefault(GetChannelMask, 0) )
 
+
+public:
+  // Plugin-local CX linkage implementations; no data or virtual slots added.
+  bool CX_HasVideo() const ;
+  bool CX_HasAudio() const ;
+  bool CX_IsRGB() const ;
+  bool CX_IsRGB24() const ;
+  bool CX_IsRGB32() const ;
+  bool CX_IsYUV() const ;
+  bool CX_IsYUY2() const ;
+  bool CX_IsYV24()  const ;
+  bool CX_IsYV16()  const ;
+  bool CX_IsYV12()  const ;
+  bool CX_IsY8()    const ;
+  bool CX_IsYV411() const ;
+  //bool CX_IsYUV9()  const ;
+  bool CX_IsColorSpace(int c_space) const ;
+  bool CX_Is(int property) const ;
+  bool CX_IsPlanar() const ;
+  bool CX_IsFieldBased() const ;
+  bool CX_IsParityKnown() const ;
+  bool CX_IsBFF() const ;
+  bool CX_IsTFF() const ;
+  int64_t CX_AudioSamplesFromFrames(int frames) const ;
+  int CX_FramesFromAudioSamples(int64_t samples) const ;
+  int64_t CX_AudioSamplesFromBytes(int64_t bytes) const ;
+  int64_t CX_BytesFromAudioSamples(int64_t samples) const ;
+  int CX_AudioChannels() const ;
+  int CX_SampleType() const;
+  bool CX_IsSampleType(int testtype) const;
+  int CX_SamplesPerSecond() const ;
+  int CX_BytesPerAudioSample() const ;
+  void CX_SetFieldBased(bool isfieldbased)  ;
+  void CX_Set(int property)  ;
+  void CX_Clear(int property)  ;
+  int CX_BytesPerChannelSample() const ;
+  bool CX_IsVPlaneFirst() const ;
+  int CX_BytesFromPixels(int pixels) const ;
+  int CX_RowSize(int plane = DEFAULT_PLANE) const ;
+  int CX_BMPSize() const ;
+  int CX_GetPlaneWidthSubsampling(int plane) const ;
+  int CX_GetPlaneHeightSubsampling(int plane) const ;
+  int CX_BitsPerPixel() const ;
+  void CX_SetFPS(unsigned numerator, unsigned denominator) ;
+  void CX_MulDivFPS(unsigned multiplier, unsigned divisor) ;
+  bool CX_IsSameColorspace(const VideoInfo& vi) const ;
+  int CX_NumComponents() const ;
+  int CX_ComponentSize() const ;
+  int CX_BitsPerComponent() const ;
+  bool CX_Is444()  const ;
+  bool CX_Is422()  const ;
+  bool CX_Is420()  const ;
+  bool CX_IsY()       const ;
+  bool CX_IsRGB48()   const ;
+  bool CX_IsRGB64()   const ;
+  bool CX_IsYUVA() const ;
+  bool CX_IsPlanarRGB() const ;
+  bool CX_IsPlanarRGBA() const ;
+  bool CX_IsChannelMaskKnown() const ;
+  void CX_SetChannelMask(bool isChannelMaskKnown, unsigned int dwChannelMask)
+;
+  unsigned int CX_GetChannelMask() const
+;
 }; // end struct VideoInfo
 
 
@@ -1036,11 +1112,22 @@ private:
 public:
     void DESTRUCTOR();  /* Damn compiler won't allow taking the address of reserved constructs, make a dummy interlude */
 #endif
+
+
+public:
+  const BYTE* CX_GetReadPtr() const;
+  BYTE* CX_GetWritePtr();
+  int CX_GetDataSize() const;
+  int CX_GetSequenceNumber() const;
+  int CX_GetRefcount() const;
+  void CX_DESTRUCTOR();
 }; // end class VideoFrameBuffer
 
 
 // smart pointer to VideoFrame
 class PVideoFrame {
+
+  friend class CxCoreFrameAccess;
 
   VideoFrame* p;
 
@@ -1070,6 +1157,17 @@ public:
   void OPERATOR_ASSIGN1(const PVideoFrame& x);
   void DESTRUCTOR();
 #endif
+
+public:
+  // Plugin-local CX linkage implementations; no data or virtual slots added.
+  void CX_Init(VideoFrame* x) ;
+  void CX_Set(VideoFrame* x) ;
+  void CX_CONSTRUCTOR0()                         ;
+  void CX_CONSTRUCTOR1(const PVideoFrame& x)     ;
+  void CX_CONSTRUCTOR2(VideoFrame* x)            ;
+  void CX_OPERATOR_ASSIGN0(VideoFrame* x)        ;
+  void CX_OPERATOR_ASSIGN1(const PVideoFrame& x) ;
+  void CX_DESTRUCTOR()                           ;
 }; // end class PVideoFrame
 
 
@@ -1077,6 +1175,12 @@ public:
 // is overloaded to recycle class instances.
 
 class VideoFrame {
+  friend class AvsCxSdkAccess;
+
+  explicit VideoFrame(std::nullptr_t) : refcount(0), vfb(nullptr), offset(0),
+    pitch(0), row_size(0), height(0), offsetU(0), offsetV(0), pitchUV(0),
+    row_sizeUV(0), heightUV(0), offsetA(0), pitchA(0), row_sizeA(0),
+    properties(nullptr), pixel_type(0) {} // SDK wrapper construction
   volatile long refcount;
   VideoFrameBuffer* vfb;
 
@@ -1098,6 +1202,9 @@ class VideoFrame {
   int pixel_type; // V10 - Copy from VideoInfo
 
   friend class PVideoFrame;
+  // Core-only access used to translate an owning CX frame reference without
+  // exposing VideoFrame's compiler-specific layout at the plugin boundary.
+  friend class CxCoreFrameAccess;
   void AddRef();
   void Release();
 
@@ -1157,6 +1264,24 @@ public:
 private:
     VideoFrame& operator=(const VideoFrame&);
 
+public:
+  int CX_GetPitch(int plane) const ;
+  int CX_GetRowSize(int plane) const ;
+  int CX_GetHeight(int plane) const ;
+  VideoFrameBuffer* CX_GetFrameBuffer() const ;
+  int CX_GetOffset(int plane) const ;
+  const BYTE* CX_GetReadPtr(int plane) const ;
+  bool CX_IsWritable() const ;
+  BYTE* CX_GetWritePtr(int plane) const ;
+  void CX_DESTRUCTOR() ;
+  AVSMap& CX_getProperties() ;
+  const AVSMap& CX_getConstProperties() ;
+  void CX_setProperties(const AVSMap& properties) ;
+  int CX_CheckMemory() const ;
+  PDevice CX_GetDevice() const ;
+  bool CX_IsPropertyWritable() const ;
+  int CX_GetPixelType() const ;
+  void CX_AmendPixelType(int new_pixel_type) ;
 }; // end class VideoFrame
 
 enum CachePolicyHint {
@@ -1251,6 +1376,8 @@ enum CachePolicyHint {
 
 // Base class for all filters.
 class IClip {
+  friend class AvsCxSdkAccess;
+
   friend class PClip;
   friend class AVSValue;
   volatile long refcnt;
@@ -1307,6 +1434,18 @@ public:
   void OPERATOR_ASSIGN1(const PClip& x);
   void DESTRUCTOR();
 #endif
+
+public:
+  // Plugin-local CX linkage implementations; no data or virtual slots added.
+  IClip* CX_GetPointerWithAddRef() const ;
+  void CX_Init(IClip* x) ;
+  void CX_Set(IClip* x) ;
+  void CX_CONSTRUCTOR0()                   ;
+  void CX_CONSTRUCTOR1(const PClip& x)     ;
+  void CX_CONSTRUCTOR2(IClip* x)           ;
+  void CX_OPERATOR_ASSIGN0(IClip* x)       ;
+  void CX_OPERATOR_ASSIGN1(const PClip& x) ;
+  void CX_DESTRUCTOR()                     ;
 }; // end class PClip
 
 enum AVSPropTypes {
@@ -1458,6 +1597,69 @@ public:
   void            Assign2(const AVSValue* src, bool init, bool no_deep_arrays);
 
 #endif
+
+public:
+  // Plugin-local CX linkage implementations; no data or virtual slots added.
+  void CX_CONSTRUCTOR0()                            ;
+  void CX_CONSTRUCTOR1(IClip* c)                    ;
+  void CX_CONSTRUCTOR2(const PClip& c)              ;
+  void CX_CONSTRUCTOR3(bool b)                      ;
+  void CX_CONSTRUCTOR4(int i)                       ;
+  void CX_CONSTRUCTOR5(float f)                     ;
+  void CX_CONSTRUCTOR6(double f)
+;
+  void CX_CONSTRUCTOR7(const char* s)               ;
+  void CX_CONSTRUCTOR8(const AVSValue* a, int size)
+;
+  void CX_CONSTRUCTOR9(const AVSValue& v)           ;
+  void CX_CONSTRUCTOR10(const AVSValue& v, bool no_deep_arrays)  ;
+  void CX_CONSTRUCTOR11(const PFunction& n) ;
+  void CX_CONSTRUCTOR12(int64_t l) ;
+  void CX_DESTRUCTOR()
+;
+  void CX_MarkArrayAsNonDeepCopy()
+;
+  AVSValue& CX_OPERATOR_ASSIGN(const AVSValue& v)   ;
+  bool CX_Defined() const ;
+  bool CX_IsClip() const ;
+  bool CX_IsBool() const ;
+  bool CX_IsInt() const ;
+  bool CX_IsLongStrict() const ;
+  bool CX_IsFloat() const ;
+  bool CX_IsFloatfStrict() const ;
+  bool CX_IsString() const ;
+  bool CX_IsArray() const ;
+  bool CX_IsFunction() const ;
+  PClip CX_AsClip() const ;
+  bool CX_AsBool1() const ;
+  bool CX_AsBool() const ;
+  int CX_AsInt1() const ;
+  int CX_AsInt() const ;
+  int64_t CX_AsLong1() const ;
+  int64_t CX_AsLong() const ;
+  const char* CX_AsString1() const ;
+  const char* CX_AsString() const ;
+  double CX_AsFloat1() const ;
+  double CX_AsFloat() const ;
+  float CX_AsFloatf() const ;
+  bool CX_AsBool2(bool def) const ;
+  bool CX_AsBool(bool def) const ;
+  int CX_AsInt2(int def) const ;
+  int CX_AsInt(int def) const ;
+  int64_t CX_AsLong2(int64_t def) const ;
+  int64_t CX_AsLong(int64_t def) const ;
+  double CX_AsDblDef(double def) const ;
+  double CX_AsFloat2(float def) const ;
+  double CX_AsFloat(float def) const ;
+  float CX_AsFloatf(float def) const ;
+  const char* CX_AsString2(const char* def) const ;
+  const char* CX_AsString(const char* def) const ;
+  PFunction CX_AsFunction() const ;
+  int CX_ArraySize() const ;
+  const AVSValue& CX_OPERATOR_INDEX(int index) const ;
+  void CX_Assign(const AVSValue* src, bool init) ;
+  void CX_Assign2(const AVSValue* src, bool init, bool no_deep_arrays) ;
+  AvsValueType CX_GetType() const ;
 }; // end class AVSValue
 
 #define AVS_UNUSED(x) (void)(x)
@@ -1508,6 +1710,14 @@ public:
   PFunction& OPERATOR_ASSIGN1(const PFunction& p);
   void DESTRUCTOR();
 #endif
+
+public:
+  void CX_CONSTRUCTOR0();
+  void CX_CONSTRUCTOR1(IFunction* p);
+  void CX_CONSTRUCTOR2(const PFunction& p);
+  PFunction& CX_OPERATOR_ASSIGN0(IFunction* p);
+  PFunction& CX_OPERATOR_ASSIGN1(const PFunction& p);
+  void CX_DESTRUCTOR();
 };
 
 

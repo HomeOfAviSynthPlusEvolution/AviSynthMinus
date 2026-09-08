@@ -5,6 +5,7 @@ FILE(GLOB AvsCore_Sources RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
 
   "include/*.h"
   "include/avs/*.h"
+  "include/avs/cx/*.h"
 
   "convert/*.c"
   "convert/*.cpp"
@@ -13,6 +14,9 @@ FILE(GLOB AvsCore_Sources RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
   "core/*.c"
   "core/*.cpp"
   "core/*.h"
+
+  "core/cx/*.cpp"
+  "core/cx/*.h"
 
   "core/parser/*.c"
   "core/parser/*.cpp"

@@ -3,10 +3,12 @@
 
 #include <string>
 #include <map>
+#include <memory>
 #include <vector>
 #include "internal.h"
 
 class InternalEnvironment;
+class CxHostSession;
 struct PluginFile;
 
 struct StdStriComparer
@@ -26,6 +28,9 @@ typedef std::map<std::string,FunctionList,StdStriComparer> FunctionMap;
 class PluginManager
 {
 private:
+  friend class CxHostSession;
+  static bool IsValidParameterString(const char *parameters);
+
   InternalEnvironment *Env;
   PluginFile *PluginInLoad;
   std::vector<std::string> AutoloadDirs;
@@ -37,6 +42,7 @@ private:
   bool AutoloadExecuted;
   bool Autoloading;
 
+  int TryAsCx1(PluginFile &plugin, AVSValue *result, std::string& error_message);
   int TryAsAvs26(PluginFile &plugin, AVSValue *result, std::string& avsexception_message);
   bool TryAsAvs25(PluginFile &plugin, AVSValue *result);
   bool TryAsAvsPreV11C(PluginFile& plugin, AVSValue* result);

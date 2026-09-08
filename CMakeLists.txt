@@ -421,6 +421,7 @@ else()
   install(
           FILES ${CMAKE_CURRENT_SOURCE_DIR}/avs_core/include/avisynth.h
                 ${CMAKE_CURRENT_SOURCE_DIR}/avs_core/include/avisynth_c.h
+                ${CMAKE_CURRENT_SOURCE_DIR}/avs_core/include/avisynth_cx_legacy.h
           DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/avisynth
   )
 

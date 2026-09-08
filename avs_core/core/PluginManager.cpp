@@ -1,10 +1,13 @@
 #include "PluginManager.h"
 #include <avisynth.h>
+#include <avs/cx/abi.h>
 #include <unordered_set>
 #include <avisynth_c.h>
 #include "strings.h"
 #include "InternalEnvironment.h"
+#include "cx/CxPlugin.h"
 #include <cassert>
+#include <cstring>
 #include "function.h"
 #include <avs/filesystem.h>
 
@@ -141,7 +144,7 @@ static bool IsParameterTypeModifier(char c) {
   }
 }
 
-static bool IsValidParameterString(const char* p) {
+bool PluginManager::IsValidParameterString(const char* p) {
   // does not check for logical errors such as
   // when unnamed untyped array (.+) is followed by additional parameters
   int state = 0;
@@ -488,13 +491,14 @@ struct PluginFile
   bool isPluginAvs25;
   bool isPluginPreV11C;
   bool isPluginC; // we register it, but it won't be used
+  std::shared_ptr<CxHostSession> cxSession;
 
   PluginFile(const std::string &filePath);
 };
 
 PluginFile::PluginFile(const std::string &filePath) :
   FilePath(GetFullPathNameWrap(filePath)), BaseName(), Library(NULL),
-  isPluginAvs25(false), isPluginPreV11C(false), isPluginC(false)
+  isPluginAvs25(false), isPluginPreV11C(false), isPluginC(false), cxSession()
 {
   // Turn all '\' into '/'
   replace(FilePath, '\\', '/');
@@ -893,31 +897,45 @@ bool PluginManager::LoadPlugin(PluginFile &plugin, bool throwOnError, AVSValue *
     Env->ThrowError("Cannot load file '%s'. Reason: %s", plugin.FilePath.c_str(), dlerror());
 #endif
 
-  // Try to load various plugin interfaces
-  std::string avsexception26_message;
-  const int avs26res = TryAsAvs26(plugin, result, avsexception26_message);
-  if (avs26res != 0) // 0: OK, plugin had AvisynthPluginInit3Func
+  // CX is an independent C ABI and is always preferred when present. A CX
+  // initialization failure is not allowed to fall back to a C++ ABI entry.
+  std::string cx_error_message;
+  const int cxres = TryAsCx1(plugin, result, cx_error_message);
+  if (cxres != 0)
   {
-    if (avs26res != 1) { // 1: AvisynthPluginInit3Func not found 
-      // plugin entry point exists but exception was thrown
-      // Bad plugin, we must report the exception immediately regardless of throwOnError
-      // Message could be from plugin author or, e.g., from env->AddFunction()
-      Env->ThrowError("'%s' plugin loading error:\n%s", plugin.FilePath.c_str(), avsexception26_message.c_str());
+    if (cxres != 1) {
+      plugin.cxSession.reset();
+      FreeLibrary(plugin.Library);
+      plugin.Library = NULL;
+      Env->ThrowError("'%s' CX plugin loading error:\n%s",
+                      plugin.FilePath.c_str(), cx_error_message.c_str());
     }
 
-    if (!TryAsAvsC(plugin, result)) // V11: try avisynth_c_plugin_init2, plugin is 64 bit capable
+    std::string avsexception26_message;
+    const int avs26res = TryAsAvs26(plugin, result, avsexception26_message);
+    if (avs26res != 0) // 0: OK, plugin had AvisynthPluginInit3Func
     {
-      if (!TryAsAvsPreV11C(plugin, result))  // try avisynth_c_plugin_init, plugin is not 64 bit capable, 64 bit data will be casted down to int/float
-      {
-        if (!TryAsAvs25(plugin, result))
-        {
-          FreeLibrary(plugin.Library);
-          plugin.Library = NULL;
+      if (avs26res != 1) { // 1: AvisynthPluginInit3Func not found
+        // plugin entry point exists but exception was thrown
+        // Bad plugin, we must report the exception immediately regardless of throwOnError
+        // Message could be from plugin author or, e.g., from env->AddFunction()
+        Env->ThrowError("'%s' plugin loading error:\n%s", plugin.FilePath.c_str(), avsexception26_message.c_str());
+      }
 
-          if (throwOnError)
-            Env->ThrowError("'%s' cannot be used as a plugin for AviSynth.", plugin.FilePath.c_str());
-          else
-            return false;
+      if (!TryAsAvsC(plugin, result)) // V11: try avisynth_c_plugin_init2, plugin is 64 bit capable
+      {
+        if (!TryAsAvsPreV11C(plugin, result))  // try avisynth_c_plugin_init, plugin is not 64 bit capable, 64 bit data will be casted down to int/float
+        {
+          if (!TryAsAvs25(plugin, result))
+          {
+            FreeLibrary(plugin.Library);
+            plugin.Library = NULL;
+
+            if (throwOnError)
+              Env->ThrowError("'%s' cannot be used as a plugin for AviSynth.", plugin.FilePath.c_str());
+            else
+              return false;
+          }
         }
       }
     }
@@ -925,6 +943,59 @@ bool PluginManager::LoadPlugin(PluginFile &plugin, bool throwOnError, AVSValue *
 
   PluginList.push_back(plugin);
   return true;
+}
+
+// 0: success
+// 1: no AvisynthPluginInitCX1 entry point
+// 2: CX initialization failure
+int PluginManager::TryAsCx1(PluginFile &plugin,
+                            AVSValue *result,
+                            std::string &error_message)
+{
+#ifdef AVS_POSIX
+  auto init = reinterpret_cast<avs_cx_plugin_init_cx1_fn>(
+      dlsym(plugin.Library, "AvisynthPluginInitCX1"));
+#else
+  auto init = reinterpret_cast<avs_cx_plugin_init_cx1_fn>(
+      GetProcAddress(plugin.Library, "AvisynthPluginInitCX1"));
+  if (!init)
+    init = reinterpret_cast<avs_cx_plugin_init_cx1_fn>(
+        GetProcAddress(plugin.Library, "_AvisynthPluginInitCX1"));
+#endif
+
+  error_message.clear();
+  if (init == nullptr)
+    return 1;
+
+  auto session = std::make_shared<CxHostSession>(this, Env);
+  plugin.cxSession = session;
+  PluginFile *previous_plugin = PluginInLoad;
+  PluginInLoad = &plugin;
+  avs_cx_status status = AVS_CX_STATUS_PLUGIN_ERROR;
+  try {
+    status = init(session->Host());
+  }
+  catch (...) {
+    error_message = "an exception crossed the AvisynthPluginInitCX1 C ABI boundary";
+  }
+
+  if (status == AVS_CX_STATUS_OK) {
+    PluginInLoad = &plugin;
+    status = session->Commit();
+  }
+  PluginInLoad = previous_plugin;
+
+  if (status != AVS_CX_STATUS_OK) {
+    if (error_message.empty())
+      error_message = session->LastError();
+    if (error_message.empty())
+      error_message = "AvisynthPluginInitCX1 returned status " + std::to_string(status);
+    return 2;
+  }
+
+  const std::string& plugin_name = session->PluginName();
+  *result = Env->SaveString(plugin_name.empty() ? plugin.BaseName.c_str() : plugin_name.c_str());
+  return 0;
 }
 
 std::string PluginManager::ListAutoloadDirs()
