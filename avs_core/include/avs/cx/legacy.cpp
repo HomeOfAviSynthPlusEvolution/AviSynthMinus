@@ -12,6 +12,7 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <map>
 #include <stdexcept>
 #include <vector>
 #ifdef _WIN32
@@ -25,12 +26,22 @@ namespace {
 struct Session;
 struct Frame;
 class Environment;
+// Weak proxy index: entries disappear with the last local IClip reference.
+// No session-long owning cache, and no RTTI requirement on plugin projects.
+std::recursive_mutex clip_mutex;
+using ClipKey = std::pair<uintptr_t, uintptr_t>;
+ClipKey Key(avs_cx_clip_ref_v1 r) {
+  return {reinterpret_cast<uintptr_t>(r.object), reinterpret_cast<uintptr_t>(r.operations)};
+}
+std::map<ClipKey, IClip *> host_proxies;
+std::map<IClip *, avs_cx_clip_ref_v1> host_refs;
 void RetainFrame(VideoFrame *);
 void ReleaseFrame(VideoFrame *);
 } // namespace
 class AvsCxSdkAccess {
 public:
   static void Retain(IClip *p) {
+    std::lock_guard<std::recursive_mutex> lock(clip_mutex);
     if (p) {
 #ifdef _WIN32
       InterlockedIncrement(&p->refcnt);
@@ -40,15 +51,25 @@ public:
     }
   }
   static void Release(IClip *p) {
-    if (p) {
+    if (!p) return;
+    bool destroy;
+    {
+      std::lock_guard<std::recursive_mutex> lock(clip_mutex);
 #ifdef _WIN32
-      if (!InterlockedDecrement(&p->refcnt))
-        delete p;
+      destroy = !InterlockedDecrement(&p->refcnt);
 #else
-      if (!__atomic_sub_fetch(&p->refcnt, 1, __ATOMIC_ACQ_REL))
-        delete p;
+      destroy = !__atomic_sub_fetch(&p->refcnt, 1, __ATOMIC_ACQ_REL);
 #endif
+      if (destroy) {
+        auto it = host_refs.find(p);
+        if (it != host_refs.end()) {
+          host_proxies.erase(Key(it->second));
+          host_refs.erase(it);
+        }
+      }
     }
+    // Destruction may call another plugin; never hold the index lock there.
+    if (destroy) delete p;
   }
   static void Retain(VideoFrame *p) {
     if (p)
@@ -844,6 +865,26 @@ struct PluginClip {
     return ops;
   }
 };
+AVSValue WrapClip(avs_cx_clip_ref_v1 ref, Session *s) {
+  const auto key = Key(ref);
+  {
+    std::lock_guard<std::recursive_mutex> lock(clip_mutex);
+    auto it = host_proxies.find(key);
+    if (it != host_proxies.end()) return AVSValue(it->second);
+  }
+  // Fetch video information outside the index lock: it can invoke another DLL.
+  std::unique_ptr<HostClip> candidate(new HostClip(avs::cx::clip::retain(ref), s->sdk));
+  std::lock_guard<std::recursive_mutex> lock(clip_mutex);
+  auto it = host_proxies.find(key);
+  if (it != host_proxies.end()) return AVSValue(it->second);
+  auto *p = candidate.get();
+  host_refs.emplace(p, ref);
+  try { host_proxies.emplace(key, p); }
+  catch (...) { host_refs.erase(p); throw; }
+  candidate.release();
+  return AVSValue(p);
+}
+
 AVSValue From(const avs_cx_value_v1 &v, Session *s) {
   switch (v.type) {
   case AVS_CX_VALUE_UNDEFINED:
@@ -852,12 +893,16 @@ AVSValue From(const avs_cx_value_v1 &v, Session *s) {
     return v.value.boolean != 0;
   case AVS_CX_VALUE_INT:
     return AVSValue(v.value.integer);
+  case AVS_CX_VALUE_INT32:
+    return AVSValue(static_cast<int>(v.value.integer));
   case AVS_CX_VALUE_FLOAT:
     return v.value.floating_point;
+  case AVS_CX_VALUE_FLOAT32:
+    return AVSValue(static_cast<float>(v.value.floating_point));
   case AVS_CX_VALUE_STRING:
     return s->Save(v.value.string.data, static_cast<int>(v.value.string.size));
   case AVS_CX_VALUE_CLIP:
-    return new HostClip(avs::cx::clip::retain(v.value.clip), s->sdk);
+    return WrapClip(v.value.clip, s);
   case AVS_CX_VALUE_ARRAY: {
     if (v.value.array.size > static_cast<uint32_t>((std::numeric_limits<short>::max)()))
       throw AvisynthError("CX SDK: array exceeds legacy AVSValue capacity");
@@ -880,10 +925,10 @@ avs_cx_value_v1 Values::To(const AVSValue &v, Session *s) {
     r.type = AVS_CX_VALUE_BOOL;
     r.value.boolean = v.AsBool();
   } else if (v.IsInt()) {
-    r.type = AVS_CX_VALUE_INT;
+    r.type = v.IsLongStrict() ? AVS_CX_VALUE_INT : AVS_CX_VALUE_INT32;
     r.value.integer = v.AsLong();
   } else if (v.IsFloat()) {
-    r.type = AVS_CX_VALUE_FLOAT;
+    r.type = v.IsFloatfStrict() ? AVS_CX_VALUE_FLOAT32 : AVS_CX_VALUE_FLOAT;
     r.value.floating_point = v.AsFloat();
   } else if (v.IsString()) {
     r.type = AVS_CX_VALUE_STRING;
@@ -896,8 +941,14 @@ avs_cx_value_v1 Values::To(const AVSValue &v, Session *s) {
       r.type = AVS_CX_VALUE_UNDEFINED;
       return r;
     }
-    if (auto *host = dynamic_cast<HostClip *>(p.operator->()))
-      clips.push_back(host->ref);
+    avs_cx_clip_ref_v1 host{};
+    {
+      std::lock_guard<std::recursive_mutex> lock(clip_mutex);
+      auto it = host_refs.find(p.operator->());
+      if (it != host_refs.end()) host = it->second;
+    }
+    if (host.object)
+      clips.push_back(avs::cx::clip::retain(host));
     else {
       auto *c = new PluginClip(p, s);
       clips.push_back(avs::cx::clip::adopt({c, &PluginClip::Ops()}));

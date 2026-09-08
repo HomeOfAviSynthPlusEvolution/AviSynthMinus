@@ -16,6 +16,8 @@ class PluginManager;
 class CxCoreFrameAccess {
 public:
   static void AddRef(VideoFrame *frame);
+  static void AddRef(IClip *clip);
+  static void Release(IClip *clip);
   static void Release(VideoFrame *frame);
   static void Adopt(PVideoFrame *destination, VideoFrame *frame) noexcept;
   static VideoFrame *Detach(PVideoFrame *source) noexcept;
@@ -58,13 +60,7 @@ private:
   static void __cdecl ShutdownBridge(void *user_data, IScriptEnvironment *environment);
 
   void SetLastError(const char *message) noexcept;
-
-  struct PendingFunction {
-    std::string name;
-    std::string parameter_string;
-    avs_cx_apply_function_v1 apply;
-    void *plugin_user_data;
-  };
+  void RemoveFunctions(void *binding = nullptr) noexcept;
 
   struct PendingShutdown {
     avs_cx_shutdown_v1 shutdown;
@@ -81,7 +77,6 @@ private:
   avs_cx_sdk_feature_v1 sdk_feature_{};
   std::string plugin_name_;
   std::string last_error_;
-  std::vector<PendingFunction> pending_functions_;
   std::vector<PendingShutdown> pending_shutdowns_;
   bool committed_ = false;
 };

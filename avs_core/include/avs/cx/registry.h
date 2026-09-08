@@ -34,7 +34,9 @@ typedef struct avs_cx_registry_feature_v1 {
   void *reserved[8];
 } avs_cx_registry_feature_v1;
 
-// Registration is valid only during AvisynthPluginInitCX1. The host copies the
+// Registration is immediately visible, including during initialization and
+// later callbacks. Failed initialization removes this session's registrations.
+// Calls must use the host's normal registration synchronization. The host copies the
 // pointed-to name and parameter bytes before each registration call returns.
 // Registered callbacks and plugin_user_data remain valid until shutdown.
 

@@ -17,7 +17,10 @@ enum avs_cx_value_type {
   AVS_CX_VALUE_FLOAT = 3,
   AVS_CX_VALUE_STRING = 4,
   AVS_CX_VALUE_CLIP = 5,
-  AVS_CX_VALUE_ARRAY = 6
+  AVS_CX_VALUE_ARRAY = 6,
+  // Preserve the public AVSValue type, not just its numeric value.
+  AVS_CX_VALUE_INT32 = 7,
+  AVS_CX_VALUE_FLOAT32 = 8
 };
 
 struct avs_cx_value_v1;

@@ -43,6 +43,13 @@ dependencies; the table describes the required routes, not a recorded pass resul
 
 ## Correctness coverage
 
+The generated-value parity check is registered when Python is available.
+The matrix supplies the alternate compiler DLL
+for the six-stage mixed chain; running CTest alone skips that mixed-chain test.
+Both complete dual-entry plugins compile with RTTI disabled. The
+semantic test compares registration, numeric types, host clip identity and
+write-probe results against Init3 using the same source.
+
 Each combination exercises the ordinary C++ SDK adapter, a pure-C CX plugin,
 and the unchanged `plugins/ConvertStacked/ConvertStacked.cpp`. The latter
 roundtrips planar 16-bit Y/YUV420/YUV422/YUV444 through stacked and double-width

@@ -47,6 +47,22 @@ AVSValue __cdecl CreateServices(AVSValue a, void *, IScriptEnvironment *env) {
   return new Services(a[0].AsClip(), env);
 }
 AVSValue __cdecl Echo(AVSValue a, void *, IScriptEnvironment *) { return a[0]; }
+AVSValue __cdecl ValueType(AVSValue a, void *, IScriptEnvironment *) {
+  return int(a[0].GetType());
+}
+AVSValue __cdecl SameClip(AVSValue a, void *, IScriptEnvironment *) {
+  return a[0].AsClip().operator->() == a[1].AsClip().operator->();
+}
+AVSValue __cdecl WriteProbe(AVSValue a, void *, IScriptEnvironment *env) {
+  PVideoFrame frame = a[0].AsClip()->GetFrame(0, env);
+  return frame->GetWritePtr() == nullptr;
+}
+AVSValue __cdecl Answer(AVSValue, void *, IScriptEnvironment *) { return 42; }
+AVSValue __cdecl LateRegistration(AVSValue, void *, IScriptEnvironment *env) {
+  env->AddFunction("CXRegisteredLate", "", Answer, nullptr);
+  return env->FunctionExists("CXRegisteredLate") &&
+         env->Invoke("CXRegisteredLate", AVSValue(nullptr, 0)).AsInt() == 42;
+}
 AVSValue __cdecl CopyOnWrite(AVSValue a, void *, IScriptEnvironment *env) {
   const VideoInfo vi = a[0].AsClip()->GetVideoInfo();
   PVideoFrame first = env->NewVideoFrame(vi);
@@ -71,6 +87,14 @@ AVSValue __cdecl CopyOnWrite(AVSValue a, void *, IScriptEnvironment *env) {
 }
 } // namespace
 void RegisterLegacyServices(IScriptEnvironment *env) {
+  env->AddFunction("CXRegisteredDuringInit", "", Answer, nullptr);
+  if (!env->FunctionExists("CXRegisteredDuringInit") ||
+      env->Invoke("CXRegisteredDuringInit", AVSValue(nullptr, 0)).AsInt() != 42)
+    env->ThrowError("registration must be immediately visible");
+  env->AddFunction("CXRegisterLate", "", LateRegistration, nullptr);
+  env->AddFunction("CXValueType", ".", ValueType, nullptr);
+  env->AddFunction("CXSameClip", "cc", SameClip, nullptr);
+  env->AddFunction("CXWriteProbe", "c", WriteProbe, nullptr);
   env->AddFunction("CXServices", "c", CreateServices, nullptr);
   env->AddFunction("CXEcho", ".", Echo, nullptr);
   env->AddFunction("CXCow", "c", CopyOnWrite, nullptr);

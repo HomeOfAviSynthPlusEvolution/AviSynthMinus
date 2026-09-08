@@ -1,5 +1,8 @@
 # Source-compatible CX SDK (experimental)
 
+See the [maintainer design notes](../../../../docs/cx/DESIGN.md) in the source
+repository for semantic constraints and compatibility limits.
+
 The plugin keeps its existing AviSynth C++ source. A plugin-local adapter
 implements the existing classes and `AVS_Linkage` using CX C callbacks. C++
 objects, virtual tables, member pointers, allocations and exceptions stay on
@@ -129,6 +132,8 @@ Do not require plugins to be rebuilt merely because the implementation changes.
 This commitment does not promise that CX itself or its internal design will
 remain, nor does it extend the set of currently supported API operations.
 
+The adapter does not require RTTI. Host CheckVersion
+is not a complete capability check for this experimental adapter.
 The public adoption surface is the existing C++ API plus the init macro.
 `sdk/runtime.h` and linkage helpers are implementation details, not a second
 filter API for plugin authors. Once a protocol layout is released, new

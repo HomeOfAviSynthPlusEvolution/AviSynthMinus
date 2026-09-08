@@ -1376,6 +1376,7 @@ enum CachePolicyHint {
 
 // Base class for all filters.
 class IClip {
+  friend class CxCoreFrameAccess;
   friend class AvsCxSdkAccess;
 
   friend class PClip;

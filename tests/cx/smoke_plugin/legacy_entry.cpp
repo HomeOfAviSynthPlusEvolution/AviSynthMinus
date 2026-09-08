@@ -80,6 +80,11 @@ AvisynthPluginInit3(IScriptEnvironment *environment, const AVS_Linkage *const li
   AVS_linkage = linkage;
   RegisterLegacyServices(environment);
   environment->AddFunction("CXCheckerInvert", "c[block]i", &CreateChecker, nullptr);
+#if defined(_MSC_VER)
+  environment->AddFunction("CXMsvcCheckerInvert", "c[block]i", &CreateChecker, nullptr);
+#else
+  environment->AddFunction("CXGccCheckerInvert", "c[block]i", &CreateChecker, nullptr);
+#endif
   environment->AddFunction("CXSmokePassThrough", "c", &CreatePassThrough, nullptr);
   environment->AddFunction("CXGlobalLockRoundTrip", "", &GlobalLockRoundTrip, nullptr);
   environment->AddFunction("CXAcquireLock", "s", &AcquireLock, nullptr);

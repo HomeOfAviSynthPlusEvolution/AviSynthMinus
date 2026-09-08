@@ -76,6 +76,53 @@ TEST(CxPluginLoading, FallsBackToUnchangedInit3Path) {
             "AviSynth CX smoke plugin (legacy Init3)");
 }
 
+TEST(CxCompatibility, PreservesRegistrationTypesIdentityAndWriteProbe) {
+  for (const char *path : {CX_SMOKE_LEGACY_PATH, DualPluginPath()}) {
+    SCOPED_TRACE(path);
+    AviSynthEnvironment environment;
+    auto *env = environment.get();
+    LoadPlugin(env, path); // The plugin invokes a just-registered function in Init.
+    EXPECT_TRUE(env->Invoke("CXRegisterLate", AVSValue(nullptr, 0)).AsBool());
+    EXPECT_EQ(env->Invoke("CXRegisteredLate", AVSValue(nullptr, 0)).AsInt(), 42);
+    for (const AVSValue &value : {AVSValue(17), AVSValue(int64_t(17)),
+                                 AVSValue(float(1.25)), AVSValue(double(1.25))}) {
+      EXPECT_EQ(env->Invoke("CXValueType", AVSValue(&value, 1)).AsInt(), int(value.GetType()));
+      EXPECT_EQ(env->Invoke("CXEcho", AVSValue(&value, 1)).GetType(), value.GetType());
+    }
+    const PClip source = CreateY8Clip(env, 64, 32);
+    const AVSValue args[] = {source, source};
+    EXPECT_TRUE(env->Invoke("CXSameClip", AVSValue(args, 2)).AsBool());
+    const PVideoFrame retained = source->GetFrame(0, env);
+    const AVSValue arg(source);
+    EXPECT_TRUE(env->Invoke("CXWriteProbe", AVSValue(&arg, 1)).AsBool());
+  }
+}
+
+TEST(CxCompatibility, AlternatingCompilerChain) {
+  const char *other = std::getenv("AVS_CX_OTHER_DUAL_PATH");
+  if (!other || !*other) GTEST_SKIP() << "Run run_matrix.ps1 to supply the other compiler DLL";
+  AviSynthEnvironment environment;
+  auto *env = environment.get();
+  LoadPlugin(env, CX_SMOKE_DUAL_PATH);
+  LoadPlugin(env, other);
+  ASSERT_TRUE(env->FunctionExists("CXMsvcCheckerInvert"));
+  ASSERT_TRUE(env->FunctionExists("CXGccCheckerInvert"));
+  const PClip original = CreateY8Clip(env, 70, 52);
+  PClip chain = original;
+  for (int i = 0; i < 6; ++i) {
+    const AVSValue args[] = {chain, 16};
+    chain = env->Invoke(i % 2 ? "CXGccCheckerInvert" : "CXMsvcCheckerInvert",
+                        AVSValue(args, 2)).AsClip();
+  }
+  const auto expected = CopyPlane(original->GetFrame(0, env));
+  std::vector<std::future<std::vector<uint8_t>>> jobs;
+  for (int i = 0; i < 4; ++i)
+    jobs.push_back(std::async(std::launch::async, [&, i] {
+      return CopyPlane(chain->GetFrame(i, env));
+    }));
+  for (auto &job : jobs) EXPECT_EQ(job.get(), expected);
+}
+
 TEST(CxPluginLoading, DoesNotEnterLegacyAbiAfterCxInitializationFails) {
   AviSynthEnvironment environment;
   EXPECT_THROW({ LoadPlugin(environment.get(), CX_SMOKE_REJECT_PATH); }, AvisynthError);

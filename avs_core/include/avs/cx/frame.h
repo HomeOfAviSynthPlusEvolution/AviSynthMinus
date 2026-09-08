@@ -61,6 +61,8 @@ typedef struct avs_cx_frame_ops_v1 {
 } avs_cx_frame_ops_v1;
 
 // retain, release, get_plane, and get_pixel_type are mandatory in v1.
+// A write probe on a non-writable frame succeeds with plane_out->data == NULL,
+// matching VideoFrame::GetWritePtr. Invalid requests still return an error.
 
 typedef struct avs_cx_frame_feature_v1 {
   uint32_t struct_size;

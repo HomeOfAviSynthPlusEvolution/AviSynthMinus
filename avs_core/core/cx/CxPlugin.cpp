@@ -4,6 +4,7 @@
 #include "../PluginManager.h"
 
 #include <atomic>
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <deque>
@@ -126,8 +127,8 @@ avs_cx_status AVS_CX_CALL HostFrameGetPlane(void *object, uint32_t plane, uint32
     if (access == AVS_CX_FRAME_ACCESS_WRITE) {
       data = frame->GetWritePtr(static_cast<int>(plane));
       if (data == nullptr) {
-        SetCxError(error_out, AVS_CX_STATUS_HOST_ERROR, "frame is not writable");
-        return AVS_CX_STATUS_HOST_ERROR;
+        // A failed write probe is normal, and the legacy API returns nullptr.
+        return AVS_CX_STATUS_OK;
       }
     } else {
       data = const_cast<BYTE *>(frame->GetReadPtr(static_cast<int>(plane)));
@@ -176,22 +177,13 @@ const avs_cx_frame_ops_v1 &HostFrameOperations() {
   return operations;
 }
 
-struct HostClipHandle {
-  explicit HostClipHandle(PClip value) : clip(std::move(value)) {}
-
-  std::atomic<uint32_t> references{1};
-  PClip clip;
-};
-
+// The opaque token is the core's IClip address. Its ownership stays in the
+// core; canonical tokens avoid one new identity per value conversion.
 void AVS_CX_CALL HostClipRetain(void *object) {
-  static_cast<HostClipHandle *>(object)->references.fetch_add(1, std::memory_order_relaxed);
+  CxCoreFrameAccess::AddRef(static_cast<IClip *>(object));
 }
-
 void AVS_CX_CALL HostClipRelease(void *object) {
-  auto *handle = static_cast<HostClipHandle *>(object);
-  if (handle->references.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-    delete handle;
-  }
+  CxCoreFrameAccess::Release(static_cast<IClip *>(object));
 }
 
 bool ValidCall(const avs_cx_call_context_v1 *call) {
@@ -209,7 +201,7 @@ avs_cx_status AVS_CX_CALL HostClipGetVideoInfo(void *object, avs_cx_video_info_v
   *video_info_out = {};
   video_info_out->struct_size = sizeof(*video_info_out);
   try {
-    VideoInfoToCx(static_cast<HostClipHandle *>(object)->clip->GetVideoInfo(), video_info_out);
+    VideoInfoToCx(static_cast<IClip *>(object)->GetVideoInfo(), video_info_out);
     return AVS_CX_STATUS_OK;
   } catch (const AvisynthError &error) {
     SetCxErrorCopy(error_out, AVS_CX_STATUS_HOST_ERROR, error.msg);
@@ -234,7 +226,7 @@ avs_cx_status AVS_CX_CALL HostClipGetFrame(void *object, int64_t frame_number,
   *frame_out = {};
   try {
     auto *environment = static_cast<IScriptEnvironment *>(call->environment);
-    PVideoFrame frame = static_cast<HostClipHandle *>(object)->clip->GetFrame(
+    PVideoFrame frame = static_cast<IClip *>(object)->GetFrame(
         static_cast<int>(frame_number), environment);
     VideoFrame *raw = frame.operator->();
     if (raw == nullptr) {
@@ -262,7 +254,7 @@ avs_cx_status AVS_CX_CALL HostClipGetAudio(void *object, void *buffer, int64_t s
     return AVS_CX_STATUS_INVALID_ARGUMENT;
   }
   try {
-    static_cast<HostClipHandle *>(object)->clip->GetAudio(
+    static_cast<IClip *>(object)->GetAudio(
         buffer, start, count, static_cast<IScriptEnvironment *>(call->environment));
     return AVS_CX_STATUS_OK;
   } catch (const AvisynthError &error) {
@@ -285,7 +277,7 @@ avs_cx_status AVS_CX_CALL HostClipGetParity(void *object, int64_t frame_number, 
   }
   try {
     *parity_out =
-        static_cast<HostClipHandle *>(object)->clip->GetParity(static_cast<int>(frame_number)) ? 1
+        static_cast<IClip *>(object)->GetParity(static_cast<int>(frame_number)) ? 1
                                                                                                : 0;
     return AVS_CX_STATUS_OK;
   } catch (...) {
@@ -303,7 +295,7 @@ avs_cx_status AVS_CX_CALL HostClipSetCacheHints(void *object, int32_t cache_hint
   }
   try {
     *result_out =
-        static_cast<HostClipHandle *>(object)->clip->SetCacheHints(cache_hints, frame_range);
+        static_cast<IClip *>(object)->SetCacheHints(cache_hints, frame_range);
     return AVS_CX_STATUS_OK;
   } catch (...) {
     SetCxError(error_out, AVS_CX_STATUS_HOST_ERROR, "host cache-hint request failed");
@@ -331,7 +323,7 @@ const avs_cx_clip_ops_v1 &HostClipOperations() {
 class CxArgumentStorage {
 public:
   ~CxArgumentStorage() {
-    for (HostClipHandle *clip : clips_) {
+    for (IClip *clip : clips_) {
       HostClipRelease(clip);
     }
   }
@@ -346,10 +338,10 @@ public:
       result.type = AVS_CX_VALUE_BOOL;
       result.value.boolean = source.AsBool() ? 1 : 0;
     } else if (source.IsInt()) {
-      result.type = AVS_CX_VALUE_INT;
+      result.type = source.IsLongStrict() ? AVS_CX_VALUE_INT : AVS_CX_VALUE_INT32;
       result.value.integer = source.AsLong();
     } else if (source.IsFloat()) {
-      result.type = AVS_CX_VALUE_FLOAT;
+      result.type = source.IsFloatfStrict() ? AVS_CX_VALUE_FLOAT32 : AVS_CX_VALUE_FLOAT;
       result.value.floating_point = source.AsFloat();
     } else if (source.IsString()) {
       result.type = AVS_CX_VALUE_STRING;
@@ -360,9 +352,10 @@ public:
       if (!source.AsClip())
         return result;
       result.type = AVS_CX_VALUE_CLIP;
-      std::unique_ptr<HostClipHandle> handle(new HostClipHandle(source.AsClip()));
-      clips_.push_back(handle.get());
-      result.value.clip.object = handle.release();
+      IClip *clip = source.AsClip().operator->();
+      clips_.push_back(clip);
+      HostClipRetain(clip);
+      result.value.clip.object = clip;
       result.value.clip.operations = &HostClipOperations();
     } else if (source.IsArray()) {
       result.type = AVS_CX_VALUE_ARRAY;
@@ -380,7 +373,7 @@ public:
   }
 
 private:
-  std::vector<HostClipHandle *> clips_;
+  std::vector<IClip *> clips_;
   std::deque<std::vector<avs_cx_value_v1>> arrays_;
 };
 
@@ -546,8 +539,12 @@ AVSValue ValueFromCx(const avs_cx_value_v1 &value, CxHostSession *session,
     return AVSValue(value.value.boolean != 0);
   case AVS_CX_VALUE_INT:
     return AVSValue(value.value.integer);
+  case AVS_CX_VALUE_INT32:
+    return AVSValue(static_cast<int>(value.value.integer));
   case AVS_CX_VALUE_FLOAT:
     return AVSValue(value.value.floating_point);
+  case AVS_CX_VALUE_FLOAT32:
+    return AVSValue(static_cast<float>(value.value.floating_point));
   case AVS_CX_VALUE_STRING: {
     const std::string text = CopyStringView(value.value.string);
     if (text.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
@@ -557,7 +554,7 @@ AVSValue ValueFromCx(const avs_cx_value_v1 &value, CxHostSession *session,
   }
   case AVS_CX_VALUE_CLIP:
     if (value.value.clip.operations == &HostClipOperations() && value.value.clip.object)
-      return AVSValue(static_cast<HostClipHandle *>(value.value.clip.object)->clip);
+      return AVSValue(static_cast<IClip *>(value.value.clip.object));
     return AVSValue(new CxClipProxy(value.value.clip, session, environment));
   case AVS_CX_VALUE_ARRAY: {
     if (value.value.array.values == nullptr && value.value.array.size != 0) {
@@ -580,6 +577,9 @@ AVSValue ValueFromCx(const avs_cx_value_v1 &value, CxHostSession *session,
 }
 
 } // namespace
+
+void CxCoreFrameAccess::AddRef(IClip *clip) { clip->AddRef(); }
+void CxCoreFrameAccess::Release(IClip *clip) { clip->Release(); }
 
 void CxCoreFrameAccess::AddRef(VideoFrame *frame) {
   if (frame != nullptr)
@@ -665,6 +665,7 @@ CxHostSession::CxHostSession(PluginManager *manager, InternalEnvironment *enviro
 CxHostSession::~CxHostSession() {
   if (committed_)
     return;
+  RemoveFunctions();
   for (auto it = pending_shutdowns_.rbegin(); it != pending_shutdowns_.rend(); ++it) {
     try {
       it->shutdown(it->plugin_user_data);
@@ -673,28 +674,36 @@ CxHostSession::~CxHostSession() {
   }
 }
 
-avs_cx_status CxHostSession::Commit() noexcept {
-  if (committed_)
-    return AVS_CX_STATUS_OK;
-  auto &functions =
-      manager_->Autoloading ? manager_->AutoloadedFunctions : manager_->ExternalFunctions;
-  FunctionMap previous;
-  bool modified = false;
-  try {
-    previous = functions;
-    modified = true;
-    for (const PendingFunction &pending : pending_functions_) {
-      const CxFunctionBinding binding{this, pending.apply, pending.plugin_user_data};
-      const char *stored =
-          environment_->SaveString(reinterpret_cast<const char *>(&binding), sizeof(binding));
-      manager_->AddFunction(pending.name.c_str(), pending.parameter_string.c_str(), &ApplyBridge,
-                            const_cast<char *>(stored), nullptr, false, false);
+// Remove only this session's registrations, including aliases. Nested plugin
+// loads may have registered unrelated functions which must survive rollback.
+void CxHostSession::RemoveFunctions(void *binding) noexcept {
+  for (auto *map : {&manager_->ExternalFunctions, &manager_->AutoloadedFunctions}) {
+    for (;;) {
+      const AVSFunction *found = nullptr;
+      for (const auto &entry : *map) {
+        for (const auto *f : entry.second) {
+          if (f->apply == &ApplyBridge &&
+              static_cast<CxFunctionBinding *>(f->user_data)->session == this &&
+              (!binding || f->user_data == binding)) { found = f; break; }
+        }
+        if (found) break;
+      }
+      if (!found) break;
+      for (auto it = map->begin(); it != map->end();) {
+        auto &list = it->second;
+        list.erase(std::remove(list.begin(), list.end(), found), list.end());
+        if (list.empty()) it = map->erase(it); else ++it;
+      }
+      delete found;
     }
-    // One atomic AtExit insertion; a partial series must never leave callbacks
-    // into a DLL which the loader is about to unload after a commit failure.
+  }
+}
+
+avs_cx_status CxHostSession::Commit() noexcept {
+  if (committed_) return AVS_CX_STATUS_OK;
+  try {
     environment_->AtExit(&ShutdownBridge, this);
     committed_ = true;
-    pending_functions_.clear();
     return AVS_CX_STATUS_OK;
   } catch (const AvisynthError &error) {
     SetLastError(error.msg);
@@ -702,26 +711,6 @@ avs_cx_status CxHostSession::Commit() noexcept {
     SetLastError(error.what());
   } catch (...) {
     SetLastError("unable to commit CX registrations");
-  }
-  if (modified) {
-    for (const auto &entry : functions) {
-      const auto old = previous.find(entry.first);
-      const size_t first_new = old == previous.end() ? 0 : old->second.size();
-      for (size_t i = first_new; i < entry.second.size(); ++i) {
-        const AVSFunction *function = entry.second[i];
-        // Canonical and ordinary entries share one allocation.
-        if (function) {
-          // Remove all aliases before destruction, without allocating on this
-          // failure path (which may itself have been caused by allocation).
-          for (auto &alias : functions)
-            for (auto &candidate : alias.second)
-              if (candidate == function)
-                candidate = nullptr;
-          delete function;
-        }
-      }
-    }
-    functions.swap(previous);
   }
   return AVS_CX_STATUS_HOST_ERROR;
 }
@@ -802,6 +791,7 @@ avs_cx_status AVS_CX_CALL CxHostSession::RegisterFunction(
     return AVS_CX_STATUS_INVALID_ARGUMENT;
   }
   auto *self = static_cast<CxHostSession *>(context);
+  void *stored = nullptr;
   try {
     const std::string function_name = CopyStringView(*name);
     const std::string parameters = CopyStringView(*parameter_string);
@@ -811,8 +801,11 @@ avs_cx_status AVS_CX_CALL CxHostSession::RegisterFunction(
       return AVS_CX_STATUS_INVALID_ARGUMENT;
     }
 
-    self->pending_functions_.push_back(
-        PendingFunction{function_name, parameters, apply, plugin_user_data});
+    const CxFunctionBinding binding{self, apply, plugin_user_data};
+    stored = const_cast<char *>(self->environment_->SaveString(
+        reinterpret_cast<const char *>(&binding), sizeof(binding)));
+    self->manager_->AddFunction(function_name.c_str(), parameters.c_str(),
+        &ApplyBridge, stored, nullptr, false, false);
     return AVS_CX_STATUS_OK;
   } catch (const AvisynthError &error) {
     self->SetLastError(error.msg);
@@ -821,6 +814,7 @@ avs_cx_status AVS_CX_CALL CxHostSession::RegisterFunction(
   } catch (...) {
     self->SetLastError("unknown error while registering CX function");
   }
+  if (stored) self->RemoveFunctions(stored);
   return AVS_CX_STATUS_HOST_ERROR;
 }
 

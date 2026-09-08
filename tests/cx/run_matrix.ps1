@@ -7,12 +7,14 @@ param(
 $ErrorActionPreference = 'Stop'
 $msvc = (Resolve-Path "$MsvcBuild/tests/cx/Release").Path
 $gcc = (Resolve-Path "$GccBuild/tests/cx").Path
-$keys = @('PATH', 'AVS_CX_SMOKE_DUAL_PATH', 'AVS_CX_SDK_PATH', 'AVS_CX_C_PATH', 'AVS_CX_STACKED_PATH')
+$keys = @('PATH', 'AVS_CX_SMOKE_DUAL_PATH', 'AVS_CX_SDK_PATH', 'AVS_CX_C_PATH', 'AVS_CX_STACKED_PATH', 'AVS_CX_OTHER_DUAL_PATH')
 $saved = @{}
 foreach ($key in $keys) { $saved[$key] = [Environment]::GetEnvironmentVariable($key, 'Process') }
 try {
   $env:PATH = "$GccRuntime;$env:PATH"
   foreach ($core in @($msvc, $gcc)) {
+    $other = if ($core -eq $msvc) { $gcc } else { $msvc }
+    $env:AVS_CX_OTHER_DUAL_PATH = "$other/cx_smoke_dual.dll"
     foreach ($plugin in @($msvc, $gcc)) {
       Write-Host "Core: $core; plugins: $plugin"
       $env:AVS_CX_SMOKE_DUAL_PATH = "$plugin/cx_smoke_dual.dll"

@@ -1,6 +1,12 @@
 set(CX_SMOKE_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/avs_core/include")
 
 enable_language(C)
+find_package(Python3 QUIET COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+  add_test(NAME cx.GeneratedValuesMatchCore
+    COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tools/generate_cx_values.py" --check)
+  set_tests_properties(cx.GeneratedValuesMatchCore PROPERTIES TIMEOUT 15)
+endif()
 add_library(cx_c_header_check OBJECT c_header_compile.c)
 target_include_directories(cx_c_header_check PRIVATE "${CX_SMOKE_INCLUDE_DIR}")
 
@@ -12,6 +18,9 @@ add_library(cx_smoke_dual SHARED
   smoke_plugin/checker_kernel.h
 )
 target_include_directories(cx_smoke_dual PRIVATE "${CX_SMOKE_INCLUDE_DIR}")
+target_compile_options(cx_smoke_dual PRIVATE
+  $<$<CXX_COMPILER_ID:MSVC>:/GR->
+  $<$<CXX_COMPILER_ID:GNU,Clang>:-fno-rtti>)
 set_target_properties(cx_smoke_dual PROPERTIES PREFIX "" OUTPUT_NAME "cx_smoke_dual")
 
 add_library(cx_smoke_legacy SHARED
