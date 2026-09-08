@@ -13,9 +13,11 @@ The current x64 implementation is a proving ground, not ARM64 validation.
 * Registration is visible immediately during initialization and later calls.
   Failed initialization removes only this session's function entries and all
   their aliases, preserving unrelated registrations from nested plugin loads.
-  AtExit ownership is committed once. Registration still follows the core's
-  normal synchronization requirements; arbitrary concurrent mutation is not
-  made safe by this change. Export-list variables and arbitrary plugin side
+  AtExit ownership is committed once. Registration and failure rollback hold
+  the same recursive plugin mutex as ordinary AddFunction, lookup and loading.
+  SDK binding insertion is synchronized separately, releasing that lock before
+  entering the host. Nested loads restore their caller's plugin context on all
+  exits, including exceptions from legacy loaders. Export-list variables and arbitrary plugin side
   effects are not transactionally restored.
 * A host clip's opaque token is its core-owned IClip address, retained and
   released only by core callbacks. Incoming host clips reuse plugin-local

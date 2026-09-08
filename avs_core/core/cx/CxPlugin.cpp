@@ -677,6 +677,7 @@ CxHostSession::~CxHostSession() {
 // Remove only this session's registrations, including aliases. Nested plugin
 // loads may have registered unrelated functions which must survive rollback.
 void CxHostSession::RemoveFunctions(void *binding) noexcept {
+  std::lock_guard<std::recursive_mutex> lock(manager_->registration_mutex_);
   for (auto *map : {&manager_->ExternalFunctions, &manager_->AutoloadedFunctions}) {
     for (;;) {
       const AVSFunction *found = nullptr;
@@ -792,7 +793,11 @@ avs_cx_status AVS_CX_CALL CxHostSession::RegisterFunction(
   }
   auto *self = static_cast<CxHostSession *>(context);
   void *stored = nullptr;
+  std::unique_lock<std::recursive_mutex> registration_lock;
   try {
+    // Use the same lock as ScriptEnvironment::AddFunction, function lookup
+    // and plugin loading. Keep it held through failure rollback too.
+    registration_lock = std::unique_lock<std::recursive_mutex>(self->manager_->registration_mutex_);
     const std::string function_name = CopyStringView(*name);
     const std::string parameters = CopyStringView(*parameter_string);
     if (function_name.empty() || ContainsNul(function_name) || ContainsNul(parameters) ||

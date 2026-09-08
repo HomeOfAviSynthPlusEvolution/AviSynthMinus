@@ -470,8 +470,15 @@ public:
     throw AvisynthError(s);
   }
   void __stdcall AddFunction(const char *n, const char *p, ApplyFunc f, void *d) override {
-    session->bindings.push_back({session, f, d});
-    Check(session->runtime.register_function(n, p, &Apply, &session->bindings.back()), {});
+    Binding *binding;
+    {
+      std::lock_guard<std::mutex> lock(session->mutex);
+      session->bindings.push_back({session, f, d});
+      binding = &session->bindings.back(); // deque references remain stable
+    }
+    // Never hold the SDK mutex while waiting for the host's plugin lock:
+    // the thread loading a plugin can re-enter this session.
+    Check(session->runtime.register_function(n, p, &Apply, binding), {});
   }
   const AVS_Linkage *__stdcall GetAVSLinkage() override { return &cx_sdk_linkage; }
   void __stdcall AtExit(ShutdownFunc f, void *d) override {

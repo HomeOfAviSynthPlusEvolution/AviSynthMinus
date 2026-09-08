@@ -58,6 +58,20 @@ AVSValue __cdecl WriteProbe(AVSValue a, void *, IScriptEnvironment *env) {
   return frame->GetWritePtr() == nullptr;
 }
 AVSValue __cdecl Answer(AVSValue, void *, IScriptEnvironment *) { return 42; }
+class RegistrationFrame final : public GenericVideoFilter {
+public:
+  explicit RegistrationFrame(PClip c) : GenericVideoFilter(c) {}
+  PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment *env) override {
+    env->AddFunction(env->Sprintf("CXFromFrame%d", n), "", Answer, nullptr);
+    return child->GetFrame(n, env);
+  }
+  int __stdcall SetCacheHints(int h, int) override {
+    return h == CACHE_GET_MTMODE ? MT_NICE_FILTER : 0;
+  }
+};
+AVSValue __cdecl CreateRegistrationFrame(AVSValue a, void *, IScriptEnvironment *) {
+  return new RegistrationFrame(a[0].AsClip());
+}
 AVSValue __cdecl LateRegistration(AVSValue, void *, IScriptEnvironment *env) {
   env->AddFunction("CXRegisteredLate", "", Answer, nullptr);
   return env->FunctionExists("CXRegisteredLate") &&
@@ -87,6 +101,7 @@ AVSValue __cdecl CopyOnWrite(AVSValue a, void *, IScriptEnvironment *env) {
 }
 } // namespace
 void RegisterLegacyServices(IScriptEnvironment *env) {
+  env->AddFunction("CXRegistrationFrame", "c", CreateRegistrationFrame, nullptr);
   env->AddFunction("CXRegisteredDuringInit", "", Answer, nullptr);
   if (!env->FunctionExists("CXRegisteredDuringInit") ||
       env->Invoke("CXRegisteredDuringInit", AVSValue(nullptr, 0)).AsInt() != 42)

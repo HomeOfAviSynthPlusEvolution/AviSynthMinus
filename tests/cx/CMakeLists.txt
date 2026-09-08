@@ -53,6 +53,21 @@ add_dependencies(cx_tests
   cx_smoke_reject
 )
 
+add_library(cx_registration_dependency SHARED smoke_plugin/registration_dependency.cpp)
+add_library(cx_registration_gate SHARED smoke_plugin/registration_dependency.cpp)
+target_compile_definitions(cx_registration_gate PRIVATE CX_REGISTRATION_GATE)
+add_library(cx_smoke_nested SHARED smoke_plugin/nested_entry.cpp
+  "${CX_SMOKE_INCLUDE_DIR}/avs/cx/legacy.cpp")
+foreach(target cx_registration_dependency cx_registration_gate cx_smoke_nested)
+  target_include_directories(${target} PRIVATE "${CX_SMOKE_INCLUDE_DIR}")
+  set_target_properties(${target} PROPERTIES PREFIX "")
+  add_dependencies(cx_tests ${target})
+endforeach()
+target_compile_definitions(cx_tests PRIVATE
+  CX_REGISTRATION_DEPENDENCY_PATH="$<TARGET_FILE:cx_registration_dependency>"
+  CX_REGISTRATION_GATE_PATH="$<TARGET_FILE:cx_registration_gate>"
+  CX_NESTED_PATH="$<TARGET_FILE:cx_smoke_nested>")
+
 include(GoogleTest)
 gtest_discover_tests(cx_tests TEST_PREFIX "cx." PROPERTIES TIMEOUT 15)
 

@@ -36,7 +36,8 @@ typedef struct avs_cx_registry_feature_v1 {
 
 // Registration is immediately visible, including during initialization and
 // later callbacks. Failed initialization removes this session's registrations.
-// Calls must use the host's normal registration synchronization. The host copies the
+// The host provides the same registration synchronization as its legacy API.
+// The host copies the
 // pointed-to name and parameter bytes before each registration call returns.
 // Registered callbacks and plugin_user_data remain valid until shutdown.
 

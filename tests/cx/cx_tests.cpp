@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <future>
+#include <chrono>
 #include <string>
 #include <vector>
 #ifdef _WIN32
@@ -121,6 +122,71 @@ TEST(CxCompatibility, AlternatingCompilerChain) {
       return CopyPlane(chain->GetFrame(i, env));
     }));
   for (auto &job : jobs) EXPECT_EQ(job.get(), expected);
+}
+
+struct RegistrationGate {
+  std::promise<void> entered, release;
+};
+AVSValue __cdecl HoldRegistrationGate(AVSValue, void *data, IScriptEnvironment *) {
+  auto *gate = static_cast<RegistrationGate *>(data);
+  gate->entered.set_value();
+  gate->release.get_future().wait();
+  return true;
+}
+
+TEST(CxCompatibility, FrameRegistrationWaitsForHostPluginLock) {
+  for (const char *path : {CX_SMOKE_LEGACY_PATH, DualPluginPath()}) {
+    SCOPED_TRACE(path);
+    AviSynthEnvironment environment;
+    auto *env = environment.get();
+    LoadPlugin(env, path);
+    RegistrationGate gate;
+    env->AddFunction("CXHoldRegistrationGate", "", HoldRegistrationGate, &gate);
+    const AVSValue source(CreateY8Clip(env, 64, 32));
+    const PClip clip = env->Invoke("CXRegistrationFrame", AVSValue(&source, 1)).AsClip();
+    auto loader = std::async(std::launch::async, [&] {
+      LoadPlugin(env, CX_REGISTRATION_GATE_PATH);
+    });
+    gate.entered.get_future().wait(); // Loader now holds the host plugin mutex.
+    std::promise<void> attempting;
+    auto started = attempting.get_future();
+    auto frame = std::async(std::launch::async, [&] {
+      attempting.set_value();
+      return clip->GetFrame(0, env);
+    });
+    started.wait();
+    const auto status = frame.wait_for(std::chrono::milliseconds(200));
+    gate.release.set_value(); // Always release before any potentially fatal check.
+    loader.get();
+    EXPECT_EQ(status, std::future_status::timeout);
+    EXPECT_TRUE(frame.get());
+    std::vector<std::future<PVideoFrame>> frames;
+    for (int i = 1; i <= 8; ++i)
+      frames.push_back(std::async(std::launch::async, [&, i] { return clip->GetFrame(i, env); }));
+    for (auto &job : frames) EXPECT_TRUE(job.get());
+    for (int i = 0; i <= 8; ++i)
+      EXPECT_EQ(env->Invoke(("CXFromFrame" + std::to_string(i)).c_str(), AVSValue(nullptr, 0)).AsInt(), 42);
+  }
+}
+
+AVSValue __cdecl LoadRegistrationDependency(AVSValue, void *data, IScriptEnvironment *env) {
+  return LoadPlugin(env, static_cast<const char *>(data)).empty() ? AVSValue(false) : AVSValue(true);
+}
+TEST(CxCompatibility, NestedLoadsRestoreOuterPluginName) {
+  AviSynthEnvironment environment;
+  auto *env = environment.get();
+  env->AddFunction("CXLoadNestedDependency", "", LoadRegistrationDependency,
+                   const_cast<char *>(CX_REGISTRATION_DEPENDENCY_PATH));
+  env->AddFunction("CXLoadMissingDependency", "", LoadRegistrationDependency,
+                   const_cast<char *>(CX_REGISTRATION_DEPENDENCY_PATH ".missing"));
+  const char *path = std::getenv("AVS_CX_NESTED_PATH");
+  LoadPlugin(env, path && *path ? path : CX_NESTED_PATH);
+  for (const char *name : {"CXBeforeNested", "CXAfterNested", "CXAfterFailedNested"}) {
+    const std::string qualified = std::string("cx_smoke_nested_") + name;
+    EXPECT_TRUE(env->FunctionExists(qualified.c_str()));
+    EXPECT_EQ(env->Invoke(qualified.c_str(), AVSValue(nullptr, 0)).AsInt(), 42);
+    EXPECT_FALSE(env->FunctionExists((std::string("_") + name).c_str()));
+  }
 }
 
 TEST(CxPluginLoading, DoesNotEnterLegacyAbiAfterCxInitializationFails) {

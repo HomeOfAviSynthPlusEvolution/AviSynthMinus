@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <vector>
 #include "internal.h"
 
@@ -29,6 +30,7 @@ class PluginManager
 {
 private:
   friend class CxHostSession;
+  std::recursive_mutex& registration_mutex_;
   static bool IsValidParameterString(const char *parameters);
 
   InternalEnvironment *Env;
@@ -58,7 +60,7 @@ private:
 
 
 public:
-  PluginManager(InternalEnvironment* env);
+  PluginManager(InternalEnvironment* env, std::recursive_mutex& registration_mutex);
   ~PluginManager();
 
   void ClearAutoloadDirs();

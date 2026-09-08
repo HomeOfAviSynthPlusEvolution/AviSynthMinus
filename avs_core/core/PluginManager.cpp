@@ -539,7 +539,8 @@ PluginFile::PluginFile(const std::string &filePath) :
 ---------------------------------------------------------------------------------
 */
 
-PluginManager::PluginManager(InternalEnvironment* env) :
+PluginManager::PluginManager(InternalEnvironment* env, std::recursive_mutex& registration_mutex) :
+  registration_mutex_(registration_mutex),
   Env(env), PluginInLoad(NULL), AutoloadExecuted(false), Autoloading(false)
 {
   env->SetGlobalVar("$PluginFunctions$", AVSValue(""));
@@ -845,6 +846,13 @@ static bool Is64BitDLL(std::string sDLL, bool &bIs64BitDLL)
 #endif //AVS_WINDOWS
 bool PluginManager::LoadPlugin(PluginFile &plugin, bool throwOnError, AVSValue *result)
 {
+  // Every loader (including legacy C/Init3 paths) must restore its caller's
+  // context, also on exceptions. A nested load must not erase the outer DLL.
+  struct RestoreContext {
+    PluginFile*& current;
+    PluginFile* previous;
+    ~RestoreContext() { current = previous; }
+  } restore{PluginInLoad, PluginInLoad};
   std::vector<PluginFile>& PluginList = Autoloading ? AutoLoadedPlugins : LoadedPlugins;
 
   for (size_t i = 0; i < PluginList.size(); ++i)

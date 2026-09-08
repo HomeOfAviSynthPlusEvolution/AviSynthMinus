@@ -50,6 +50,13 @@ Both complete dual-entry plugins compile with RTTI disabled. The
 semantic test compares registration, numeric types, host clip identity and
 write-probe results against Init3 using the same source.
 
+Registration regression tests hold the host plugin lock in a legacy DLL's init
+while another thread registers from GetFrame through Init3 or CX, followed by
+eight concurrent registrations. A separate CX plugin loads a same-core-compiler
+legacy dependency and a missing dependency during init, then checks the outer
+plugin's qualified function names. The CX outer plugin participates in the
+cross-compiler matrix; the legacy dependency always matches its core ABI.
+
 Each combination exercises the ordinary C++ SDK adapter, a pure-C CX plugin,
 and the unchanged `plugins/ConvertStacked/ConvertStacked.cpp`. The latter
 roundtrips planar 16-bit Y/YUV420/YUV422/YUV444 through stacked and double-width

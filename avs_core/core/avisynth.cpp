@@ -2590,7 +2590,7 @@ ScriptEnvironment::ScriptEnvironment()
     top_frame.Set("$ScriptFileUtf8$", AVSValue());
     top_frame.Set("$ScriptDirUtf8$", AVSValue());
 
-    plugin_manager = new PluginManager(threadEnv.get());
+    plugin_manager = new PluginManager(threadEnv.get(), plugin_mutex);
 #ifdef AVS_WINDOWS
     plugin_manager->AddAutoloadDir("USER_PLUS_PLUGINS", false);
     plugin_manager->AddAutoloadDir("MACHINE_PLUS_PLUGINS", false);
