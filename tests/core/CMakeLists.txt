@@ -25,3 +25,10 @@ target_link_libraries(core_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(core_tests TEST_PREFIX "core.")
+
+# Keep the replacement allocator isolated from the other core tests. Each case
+# runs in its own process so a broken lock cannot hang the entire test run.
+add_executable(global_lock_tests global_lock_tests.cpp)
+target_link_libraries(global_lock_tests PRIVATE GTest::gtest_main AvsCoreExternal)
+gtest_discover_tests(global_lock_tests TEST_PREFIX "core."
+  PROPERTIES TIMEOUT 15)
