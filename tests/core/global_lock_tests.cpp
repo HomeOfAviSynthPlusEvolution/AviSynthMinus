@@ -4,9 +4,11 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <cstdio>
 #include <exception>
+#include <future>
 #include <memory>
 #include <new>
 #include <system_error>
@@ -72,6 +74,53 @@ void AcquireOnAnotherThread(IScriptEnvironment* env, const char* name) {
   });
   waiter.join(); // CTest's process timeout also covers a failed unlock.
   EXPECT_TRUE(acquired);
+}
+
+TEST(GlobalLock, SerializesTheSameNameAcrossEnvironments) {
+  AviSynthEnvironment owner_environment;
+  AviSynthEnvironment waiting_environment;
+  constexpr const char *lock_name = "avs-core-test-global-lock";
+
+  ASSERT_TRUE(owner_environment.get()->AcquireGlobalLock(lock_name));
+
+  std::promise<void> attempting_lock;
+  std::future<void> attempting = attempting_lock.get_future();
+  std::future<bool> acquired = std::async(std::launch::async, [&] {
+    attempting_lock.set_value();
+    const bool result = waiting_environment.get()->AcquireGlobalLock(lock_name);
+    if (result)
+      waiting_environment.get()->ReleaseGlobalLock(lock_name);
+    return result;
+  });
+
+  attempting.wait();
+  EXPECT_EQ(acquired.wait_for(std::chrono::milliseconds(50)),
+            std::future_status::timeout);
+
+  owner_environment.get()->ReleaseGlobalLock(lock_name);
+  ASSERT_EQ(acquired.wait_for(std::chrono::seconds(2)),
+            std::future_status::ready);
+  EXPECT_TRUE(acquired.get());
+}
+
+TEST(GlobalLock, RejectsNullName) {
+  AviSynthEnvironment environment;
+  EXPECT_FALSE(environment.get()->AcquireGlobalLock(nullptr));
+  environment.get()->ReleaseGlobalLock(nullptr);
+}
+
+TEST(CApiGlobalLock, AcquiresAndReleasesNamedLock) {
+  AVS_ScriptEnvironment *environment =
+      avs_create_script_environment(AVISYNTH_INTERFACE_VERSION);
+  ASSERT_NE(environment, nullptr);
+
+  EXPECT_EQ(avs_acquire_global_lock(environment, "avs-c-api-test-global-lock"),
+            1);
+  EXPECT_EQ(avs_get_error(environment), nullptr);
+  avs_release_global_lock(environment, "avs-c-api-test-global-lock");
+  EXPECT_EQ(avs_get_error(environment), nullptr);
+
+  avs_delete_script_environment(environment);
 }
 
 TEST(GlobalLockAllocation, FailedAcquireDoesNotLeaveLockHeld) {
