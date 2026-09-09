@@ -1,3 +1,15 @@
+AviSynthMinus change log
+------------------------
+Source: https://github.com/HomeOfAviSynthPlusEvolution/AviSynthMinus
+
+Changes for the 0.1.x series, grouped by release:
+  ../docs/english/source/avisynthdoc/changelist001.rst (source)
+  ../docs/english/build/html/avisynthdoc/changelist001.html (after make html)
+
+Each minor series has its own change list. The major version is zero-padded
+in the filename: changelist001 covers 0.1.x; changelist002 will cover 0.2.x.
+The historical AviSynth+ notes below are retained as upstream history.
+
 Avisynth Plus change log
 ------------------------
 Source: https://github.com/AviSynth/AviSynthPlus

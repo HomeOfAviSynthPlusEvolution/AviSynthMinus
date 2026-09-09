@@ -121,6 +121,7 @@ Advanced Topics
 Versions History
 ----------------
 
+-   :doc:`AviSynthMinus 0.1 series <changelist001>`
 -   :doc:`Changelist 3.7.5 <changelist375>`
 -   :doc:`Changelist 3.7.4 <changelist374>`
 -   :doc:`Changelist 3.7.3 <changelist373>`
