@@ -23,6 +23,13 @@
 #include <cstdint>
 #include <cstddef>
 
+// needed for linux and bsd l2cache size query
+#if defined(AVS_LINUX) || defined(AVS_BSD)
+#include <cstring>
+#include <cstdio>
+#include <cstdlib>
+#endif
+
 // Neon/Dotprod request in WinAPI ...
 #if defined(ARM64) && defined(AVS_WINDOWS)
 #include <Windows.h>
@@ -452,6 +459,31 @@ static int64_t CPUCheckForExtensions()
   return result;
 }
 
+#if defined(ARM64) && (defined(AVS_LINUX) || defined(AVS_BSD))
+static size_t parse_sysfs_size_string(const char* size_str) {
+  if (size_str == nullptr) {
+    return 0;
+  }
+
+  char* endptr;
+  long value = strtol(size_str, &endptr, 10);
+  if (value <= 0) {
+    return 0;
+  }
+
+  if (*endptr == 'K' || *endptr == 'k') {
+    return (size_t)value * 1024;
+  }
+  else if (*endptr == 'M' || *endptr == 'm') {
+    return (size_t)value * 1024 * 1024;
+  }
+  else if (*endptr == 'G' || *endptr == 'g') {
+    return (size_t)value * 1024 * 1024 * 1024;
+  }
+  return (size_t)value;
+}
+#endif // defined(ARM64) && (defined(AVS_LINUX) || defined(AVS_BSD))
+
 // ------------------------------------------------------------------
 // Core L2 Cache Detection Function
 // ------------------------------------------------------------------
@@ -508,6 +540,55 @@ static size_t DetectL2CacheSize()
   return 0;
 #elif defined(ARM64)
   // Cache detection on ARM is highly vendor/OS-specific.
+// --- Linux/BSD Implementation (e.g., Raspberry Pi 5) ---
+#if defined(AVS_LINUX) || defined(AVS_BSD)
+  // Detection via /sys filesystem (standard on Linux/BSD for cache info).
+  // The path targets the L2 cache size for cpu0 (per core L2 on RPi5/Cortex-A76).
+  // e.g. cat /sys/devices/system/cpu/cpu0/cache/index2/size returns 512K on RPi5
+  static constexpr const char* ARM_L2_CACHE_SYSFS_PATH = "/sys/devices/system/cpu/cpu0/cache/index2/size";
+  FILE* file = fopen(ARM_L2_CACHE_SYSFS_PATH, "r");
+  if (file) {
+    char size_str[32] = { 0 };
+    if (fgets(size_str, sizeof(size_str) - 1, file) != NULL) {
+      // Remove trailing newline character
+      size_t str_len = strlen(size_str);
+      if (str_len > 0 && size_str[str_len - 1] == '\n') {
+        size_str[str_len - 1] = '\0';
+      }
+
+      // Parse the string (e.g., "512K") and return in bytes.
+      size_t l2_cache_bytes = parse_sysfs_size_string(size_str);
+      fclose(file);
+      return l2_cache_bytes;
+    }
+    fclose(file);
+  }
+#elif defined(AVS_MACOS)
+  // macOS/Apple Silicon detection via sysctlbyname.
+  // https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_system_capabilities
+  // The generic 'hw.l2cachesize' is for the least performant core (E-cores).
+  // For performance optimization, we target the L2 cache of the high-performance (P) cores.
+  // These are typically designated as perflevel0.
+  // Note: sysctl returns the cache size in bytes.
+
+  int l2_cache_bytes = 0;
+  size_t len = sizeof(l2_cache_bytes);
+
+  // Check for the L2 cache size of the high-performance cores (P-cores), 
+  // which is the largest and most relevant for optimization.
+  if (sysctlbyname("hw.perflevel0.l2cachesize", &l2_cache_bytes, &len, NULL, 0) == 0 && l2_cache_bytes > 0) {
+    // Return size in bytes.
+    return static_cast<size_t>(l2_cache_bytes);
+  }
+
+  // Fallback to the generic L2 key (typically the E-core cache size).
+  if (sysctlbyname("hw.l2cachesize", &l2_cache_bytes, &len, NULL, 0) == 0 && l2_cache_bytes > 0) {
+    // Return size in bytes.
+    return static_cast<size_t>(l2_cache_bytes);
+  }
+#endif
+
+
   // Returning 0 is a safe default for a portable cross-platform implementation.
   return 0;
 #else
