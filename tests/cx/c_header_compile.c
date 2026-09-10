@@ -3,6 +3,7 @@
 #include <avs/cx/feature_keys.h>
 #include <avs/cx/registry.h>
 #include <avs/cx/sdk.h>
+#include <avs/cx/message.h>
 
 #if defined(__cplusplus)
 #error "CX protocol headers must also compile as C"

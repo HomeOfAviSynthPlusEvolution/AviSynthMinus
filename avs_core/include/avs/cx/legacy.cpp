@@ -1,6 +1,7 @@
 // Compile this file into the plugin, not the core. Same AviSynth license and
 // linking exception as avisynth.h. The legacy C++ ABI stays inside this DLL.
 #include "sdk.h"
+#include "message.h"
 #include <atomic>
 #include <array>
 #include <avisynth_cx_legacy.h>

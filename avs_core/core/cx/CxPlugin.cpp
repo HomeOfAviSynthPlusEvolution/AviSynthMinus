@@ -617,6 +617,11 @@ CxHostSession::CxHostSession(PluginManager *manager, InternalEnvironment *enviro
   environment_feature_.make_writable = &MakeWritable;
   environment_feature_.get_cpu_flags = &GetCpuFlags;
 
+  message_feature_.struct_size = sizeof(message_feature_);
+  message_feature_.abi_version = kCxAbiVersion;
+  message_feature_.context = this;
+  message_feature_.apply = &ApplyMessage;
+
   clip_feature_.struct_size = sizeof(clip_feature_);
   clip_feature_.abi_version = kCxAbiVersion;
   clip_feature_.clip_ops_version = kCxAbiVersion;
@@ -745,6 +750,10 @@ avs_cx_status AVS_CX_CALL CxHostSession::QueryFeature(void *context, uint64_t fe
     feature = &self->frame_feature_;
     size = sizeof(self->frame_feature_);
     break;
+  case AVS_CX_FEATURE_MESSAGE:
+    feature = &self->message_feature_;
+    size = sizeof(self->message_feature_);
+    break;
   case AVS_CX_FEATURE_SDK:
     feature = &self->sdk_feature_;
     size = sizeof(self->sdk_feature_);
@@ -870,6 +879,48 @@ avs_cx_status AVS_CX_CALL CxHostSession::MakeWritable(void *, void *environment,
   } catch (...) {
     frame->object = CxCoreFrameAccess::Detach(&local);
     SetCxError(error_out, AVS_CX_STATUS_HOST_ERROR, "unknown MakeWritable failure");
+  }
+  return AVS_CX_STATUS_HOST_ERROR;
+}
+
+avs_cx_status AVS_CX_CALL CxHostSession::ApplyMessage(void *, void *environment,
+    const avs_cx_message_request_v1 *q, avs_cx_frame_ref_v1 *output,
+    avs_cx_error_v1 *error) noexcept {
+  if (!output || output->object || !environment || !q || q->struct_size < sizeof(*q) ||
+      output == &q->source || !q->source.object || q->source.operations != &HostFrameOperations() ||
+      q->utf8 > 1 || q->message.reserved != 0 || q->size <= 0) {
+    SetCxError(error, AVS_CX_STATUS_INVALID_ARGUMENT, "invalid CX message request");
+    return AVS_CX_STATUS_INVALID_ARGUMENT;
+  }
+  *output = {};
+  try {
+    const auto vi = VideoInfoFromCx(q->video_info);
+    const auto text = CopyStringView(q->message);
+    auto *source = static_cast<VideoFrame *>(q->source.object);
+    if (!vi.HasVideo() || vi.width <= 0 || vi.height <= 0 ||
+        vi.width > std::numeric_limits<int>::max() / 8 || vi.height > std::numeric_limits<int>::max() / 8 ||
+        vi.pixel_type != source->GetPixelType() || vi.RowSize() != source->GetRowSize() ||
+        vi.height != source->GetHeight() || ContainsNul(text)) {
+      SetCxError(error, AVS_CX_STATUS_INVALID_ARGUMENT, "CX message geometry or text is invalid");
+      return AVS_CX_STATUS_INVALID_ARGUMENT;
+    }
+    PVideoFrame local(source); // retain borrowed input; force COW to protect the caller
+    auto *env = static_cast<IScriptEnvironment *>(environment);
+    env->MakeWritable(&local);
+    env->ApplyMessageEx(&local, vi, text.c_str(), q->size, q->text_color,
+                       q->halo_color, q->background_color, q->utf8 != 0);
+    output->object = CxCoreFrameAccess::Detach(&local);
+    output->operations = &HostFrameOperations();
+    return AVS_CX_STATUS_OK;
+  } catch (const std::invalid_argument &e) {
+    SetCxErrorCopy(error, AVS_CX_STATUS_INVALID_ARGUMENT, e.what());
+    return AVS_CX_STATUS_INVALID_ARGUMENT;
+  } catch (const AvisynthError &e) {
+    SetCxErrorCopy(error, AVS_CX_STATUS_HOST_ERROR, e.msg);
+  } catch (const std::exception &e) {
+    SetCxErrorCopy(error, AVS_CX_STATUS_HOST_ERROR, e.what());
+  } catch (...) {
+    SetCxError(error, AVS_CX_STATUS_HOST_ERROR, "CX message rendering failed");
   }
   return AVS_CX_STATUS_HOST_ERROR;
 }
