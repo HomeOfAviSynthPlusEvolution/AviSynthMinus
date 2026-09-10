@@ -1,4 +1,5 @@
 #include "core/internal.h"
+#include "core/cpu_state.h"
 #include <gtest/gtest.h>
 #include "support/avisynth_environment.h"
 #include <cstring>
@@ -18,6 +19,15 @@ TEST(EnvironmentStrings, ExplicitLengthIncludesBytesAfterNul) {
   EXPECT_EQ(std::memcmp(env->SaveString(a, sizeof(a)), a, sizeof(a)), 0);
   EXPECT_STREQ(env->SaveString("ordinary string"), "ordinary string");
   EXPECT_STREQ(env->SaveString("", 0), "");
+}
+
+TEST(V12CpuDetection, RequiresEveryOsStateBitAndUsesCorrectHalfPrecisionLeaves) {
+  EXPECT_TRUE(avs_cpu::HasAvx512State(0xE6));
+  for (unsigned bit : {1u, 2u, 5u, 6u, 7u})
+    EXPECT_FALSE(avs_cpu::HasAvx512State(0xE6 & ~(1u << bit)));
+  EXPECT_EQ(avs_cpu::HalfPrecisionFlags(1u << 23, 0), CPUF_AVX512FP16);
+  EXPECT_EQ(avs_cpu::HalfPrecisionFlags(0, 1u << 5), CPUF_AVX512BF16);
+  EXPECT_EQ(avs_cpu::HalfPrecisionFlags(0, (1u << 16) | (1u << 17)), 0);
 }
 
 TEST(V12CpuPolicy, LimitsNeverEnableFlagsOrAffectOtherEnvironments) {

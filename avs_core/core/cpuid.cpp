@@ -19,6 +19,7 @@
 //	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 #include <avs/cpuid.h>
+#include "cpu_state.h"
 #include <avs/config.h>
 #include <cstdint>
 #include <cstddef>
@@ -311,7 +312,7 @@ static int64_t X86CheckForExtensions()
     }
 
     // Check OS support for AVX-512 (OPMASK, ZMM0-ZMM15, ZMM16-ZMM31 states)
-    if ((xgetbv0_32 & (0x7u << 5)) && (xgetbv0_32 & (0x3u << 1)))
+    if (avs_cpu::HasAvx512State(xgetbv0_32))
     {
       // Leaf 7, Sub-leaf 0 results are already in cpuinfo (from AVX2 check)
 
@@ -349,8 +350,14 @@ static int64_t X86CheckForExtensions()
       if (IS_BIT_SET(cpuinfo[2], 12)) result |= CPUF_AVX512BITALG;
       if (IS_BIT_SET(cpuinfo[2], 14)) result |= CPUF_AVX512VPOPCNTDQ;
 
+      // FP16 is leaf 7.0 EDX[23], BF16 is leaf 7.1 EAX[5].
+      const uint32_t leaf7_edx = static_cast<uint32_t>(cpuinfo[3]);
+      const bool has_subleaf1 = cpuinfo[0] >= 1;
       // --- AVX-512 (Leaf 7, Sub-leaf 1) ---
-      __cpuid_count_wrapper(cpuinfo, 7, 1);
+      if (has_subleaf1)
+        __cpuid_count_wrapper(cpuinfo, 7, 1);
+      else
+        cpuinfo[0] = cpuinfo[1] = cpuinfo[2] = cpuinfo[3] = 0;
 
       // EAX:
 
@@ -364,8 +371,7 @@ static int64_t X86CheckForExtensions()
       */
 
       // EDX:
-      if (IS_BIT_SET(cpuinfo[3], 16)) result |= CPUF_AVX512FP16;
-      if (IS_BIT_SET(cpuinfo[3], 17)) result |= CPUF_AVX512BF16;
+      result |= avs_cpu::HalfPrecisionFlags(leaf7_edx, static_cast<uint32_t>(cpuinfo[0]));
 
       int avx10_minor = get_avx10_minor_version(); // 0 if no AVX10
 
