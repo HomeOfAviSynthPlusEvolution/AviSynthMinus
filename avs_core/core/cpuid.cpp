@@ -134,7 +134,7 @@ static int get_avx10_minor_version() {
 #endif // defined(X86_32) || defined(X86_64)
 
 // ------------------------------------------------------------------
-// Core ARMv8 Feature Detection Function
+// Core aarch64 (ARMv8/v9) Feature Detection Function
 // ------------------------------------------------------------------
 #if defined(ARM64)
 static int64_t ARMCheckForExtensions()
@@ -153,57 +153,96 @@ static int64_t ARMCheckForExtensions()
   unsigned long hwcap = getauxval(AT_HWCAP);
   unsigned long hwcap2 = getauxval(AT_HWCAP2);
 
-  // Tier 2: CPUF_ARM_DOTPROD (Dot Product)
-  // When DOTPROD exists, we have at least Armv8.2-a
-  // Safe gcc/clang flags: -march=armv8.2-a+dotprod
+  // When DOTPROD exists, we have at least Armv8.1-a
+  // optional in v8.1-a, mandatory in v8.4-a
+  // Safe gcc/clang flags: -march=armv8.1-a+dotprod
   if ((hwcap & HWCAP_ASIMDDP)) {
     result |= CPUF_ARM_DOTPROD;
   }
 
-  // Tier 3: CPUF_ARM_SVE2
   // SVE2 (Scalable Vector Extension version 2) optional in v8.5-a, mandatory in v9.0-a
   // Safe flags: -march=armv8.5-a+sve2
   if (hwcap2 & HWCAP2_SVE2) {
     result |= CPUF_ARM_SVE2;
   }
-  else if (hwcap & HWCAP_SVE) {
+
+
+  // CPUF_ARM_SVE2_1 (incremental SVE2 part 1)
+  // optional in v9.1-a, mandatory in v9.2-a
+  #ifdef HWCAP2_SVE2P1
+  #ifdef CPUF_ARM_SVE2_1
+  if (hwcap2 & HWCAP2_SVE2P1) {
+    result |= CPUF_ARM_SVE2_1;
   }
+  #endif
+  #endif
+
+  // CPUF_ARM_I8MM (AdvSIMD Int8 matrix multiply, Armv8.2-I8MM)
+  // optional in v8.2-a, mandatory in v8.6-a
+  // Safe flags: -march=armv8.2-a+i8mm
+  if (hwcap2 & HWCAP2_I8MM) {
+    result |= CPUF_ARM_I8MM;
+  }
+
 
 #elif defined(AVS_MACOS)
 
   // macOS (Apple Silicon) detection via sysctlbyname.
+  // https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_instruction_set_characteristics
   int value = 0;
   size_t len = sizeof(value);
 
-  // Tier 2: CPUF_ARM_DOTPROD (Dot Product)
   // Check for the DOTPROD feature, which is guaranteed on modern Apple Silicon.
+  // All Apple Silicon devices (M1, M2, M3, etc.) are based on ARMv8.6-a or later.
   // The sysctl function returns 0 on success and populates 'value'.
-  if (sysctlbyname("hw.optional.dotprod", &value, &len, NULL, 0) == 0 && value) {
+  if (sysctlbyname("hw.optional.arm.FEAT_DotProd", &value, &len, NULL, 0) == 0 && value) {
     result |= CPUF_ARM_DOTPROD;
   }
+  if (sysctlbyname("hw.optional.arm.FEAT_I8MM", &value, &len, NULL, 0) == 0 && value) {
+    result |= CPUF_ARM_I8MM;
+  }
 
-  // Tier 3: CPUF_ARM_SVE2 (SVE/SVE2 is not currently (2025) implemented by Apple)
+  // SVE2 is mandatory for general ARMv9.0-a compliance, Apple has chosen not to
+  // implement SVE or SVE2 in its M-series CPUs to date (2025).
   // No check required here as the hardware does not support it.
 
 #elif defined(AVS_WINDOWS)
 
   // Windows ARM64 detection using IsProcessorFeaturePresent
-  // Note: Windows ARM does not currently (late 2025) expose SVE/SVE2 features via WinAPI flags.
+  // Windows ARM SVE/SVE2 features via WinAPI flags are available since SDK 26100 (Windows 11 24H2).
 
-  // Tier 2: CPUF_ARM_DOTPROD (Dot Product)
+  // CPUF_ARM_DOTPROD (Dot Product)
 #if defined(PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE)
   if (IsProcessorFeaturePresent(PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE)) {
     result |= CPUF_ARM_DOTPROD;
   }
-#elif defined(PF_ARM_V8_DOTPROD_INSTRUCTIONS_AVAILABLE)
+#endif
+
+#if defined(PF_ARM_V8_DOTPROD_INSTRUCTIONS_AVAILABLE)
   if (IsProcessorFeaturePresent(PF_ARM_V8_DOTPROD_INSTRUCTIONS_AVAILABLE)) {
     result |= CPUF_ARM_DOTPROD;
   }
 #endif
-#else
-  // Fallback for other ARM systems (e.g., Windows ARM64)
-  // If no specific OS mechanism is available, we only rely on the mandatory NEON flag.
+
+#if defined(PF_ARM_SVE2_INSTRUCTIONS_AVAILABLE)
+  if (IsProcessorFeaturePresent(PF_ARM_SVE2_INSTRUCTIONS_AVAILABLE)) {
+    result |= CPUF_ARM_SVE2;
+  }
 #endif
+
+#if defined(PF_ARM_V82_I8MM_INSTRUCTIONS_AVAILABLE)
+  if (IsProcessorFeaturePresent(PF_ARM_V82_I8MM_INSTRUCTIONS_AVAILABLE)) {
+    result |= CPUF_ARM_I8MM;
+  }
+#endif
+
+#if defined(PF_ARM_SVE2_1_INSTRUCTIONS_AVAILABLE)
+  if (IsProcessorFeaturePresent(PF_ARM_SVE2_1_INSTRUCTIONS_AVAILABLE)) {
+    result |= CPUF_ARM_SVE2_1;
+  }
+#endif
+
+#endif // Platform-specific ARM64 feature detection
 
   return result;
 }
