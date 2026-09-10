@@ -1,3 +1,4 @@
+enable_language(C)
 include(FetchContent)
 
 set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
