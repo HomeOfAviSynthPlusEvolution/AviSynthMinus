@@ -3355,8 +3355,9 @@ bool GetTextBoundingBoxFixed(const char* text, const char* fontname, int size, b
 }
 
 
-void ApplyMessage( PVideoFrame* frame, const VideoInfo& vi, const char* message, int size,
-                   int textcolor, int halocolor, int bgcolor, IScriptEnvironment* env )
+// old ApplyMessage with an extra utf8 parameter
+void ApplyMessageEx(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size,
+  int textcolor, int halocolor, int bgcolor, bool utf8, IScriptEnvironment* env)
 {
   AVS_UNUSED(bgcolor);
   AVS_UNUSED(env);
@@ -3371,12 +3372,15 @@ void ApplyMessage( PVideoFrame* frame, const VideoInfo& vi, const char* message,
 #if defined(AVS_WINDOWS) && !defined(NO_WIN_GDI)
   Antialiaser antialiaser(vi.width, vi.height, "Arial", size, textcolor, halocolor, bold, italic, noaa);
   HDC hdcAntialias = antialiaser.GetDC();
-  if  (hdcAntialias)
+  if (hdcAntialias)
   {
-  RECT r = { 4*8, 4*8, vi.width*8, vi.height*8 };
-  DrawText(hdcAntialias, message, lstrlen(message), &r, DT_NOPREFIX|DT_CENTER);
-  GdiFlush();
-  antialiaser.Apply(vi, frame, (*frame)->GetPitch());
+    RECT r = { 4 * 8, 4 * 8, vi.width * 8, vi.height * 8 };
+
+    auto utf8Message = utf8 ? Utf8ToWideChar(message) : AnsiToWideChar(message);
+    DrawTextW(hdcAntialias, utf8Message.get(), (int)wcslen(utf8Message.get()), &r, DT_NOPREFIX | DT_CENTER);
+
+    GdiFlush();
+    antialiaser.Apply(vi, frame, (*frame)->GetPitch());
   }
 #else
   std::unique_ptr<BitmapFont> current_font;
@@ -3395,11 +3399,7 @@ void ApplyMessage( PVideoFrame* frame, const VideoInfo& vi, const char* message,
       return;
   }
 
-  //env->MakeWritable(&frame);
-  //frame->GetWritePtr(); // Bump sequence_number
-
   // AVS_POSIX: utf8 is always true
-  bool utf8 = false; // fixme: true for new utf8-avs+
   std::string s_utf8 = charToUtf8(message, utf8);
 
   int align = 7;
@@ -3412,3 +3412,10 @@ void ApplyMessage( PVideoFrame* frame, const VideoInfo& vi, const char* message,
 
 #endif
 }
+
+void ApplyMessage(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size,
+  int textcolor, int halocolor, int bgcolor, IScriptEnvironment* env) {
+  // Simply call ApplyMessageEx with utf8=false
+  ApplyMessageEx(frame, vi, message, size, textcolor, halocolor, bgcolor, false /*utf8*/, env);
+}
+
