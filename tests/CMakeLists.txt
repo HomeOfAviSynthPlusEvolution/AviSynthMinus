@@ -31,6 +31,7 @@ target_include_directories(AvsCoreExternal INTERFACE
 add_subdirectory(support)
 add_subdirectory(core)
 add_subdirectory(cx)
+add_subdirectory(v12)
 add_subdirectory(bitblt)
 add_subdirectory(limiter)
 add_subdirectory(overlay)
