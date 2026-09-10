@@ -2948,7 +2948,9 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
     CL_NONE,
     CL_NEON,
     CL_DOTPROD,
-    CL_SVE2
+    CL_SVE2,
+    CL_I8MM,
+    CL_SVE2_1
   };
 #elif defined(X86_32) || defined(X86_64)
   enum CPUlevel {
@@ -3014,6 +3016,9 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
     else if (streqi(t, "neon")) cpulevel = CL_NEON;
     else if (streqi(t, "dotprod")) cpulevel = CL_DOTPROD;
     else if (streqi(t, "sve2")) cpulevel = CL_SVE2;
+    else if (streqi(t, "i8mm")) cpulevel = CL_I8MM;
+    else if (streqi(t, "sve2.1")) cpulevel = CL_SVE2_1;
+    // i8mm is just an optional level may not dependent on sve2 and vice versa
     else ThrowError("SetMaxCPU error: cpu level must be empty or none, neon, dotprod or sve2 (%s)", t);
 #elif defined(X86_32) || defined(X86_64)
     else if (streqi(t, "mmx")) cpulevel = CL_MMX;
@@ -3035,8 +3040,11 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
     if (0 == mode) { // limit
       // always switch off the more advanced features compared to previous check if limiting
 #if defined(ARM64)
-      if (cpulevel <= CL_SVE2) {
+      if (cpulevel <= CL_SVE2_1) {
         // already max level, nothing to do
+      }
+      if (cpulevel <= CL_SVE2) {
+        cpu_flags &= ~CPUF_ARM_SVE2_1;
       }
       if (cpulevel <= CL_DOTPROD) {
         cpu_flags &= ~CPUF_ARM_SVE2;
@@ -3090,6 +3098,8 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
       int64_t current_flag;
       switch (cpulevel) {
 #if defined(ARM64)
+      case CL_SVE2_1: current_flag = CPUF_ARM_SVE2_1; break;
+      case CL_I8MM: current_flag = CPUF_ARM_I8MM; break;
       case CL_SVE2: current_flag = CPUF_ARM_SVE2; break;
       case CL_DOTPROD: current_flag = CPUF_ARM_DOTPROD; break;
       case CL_NEON: current_flag = CPUF_ARM_NEON; break;
