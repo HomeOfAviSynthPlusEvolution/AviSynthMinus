@@ -6,6 +6,7 @@
 #include <avs/cx/feature_keys.h>
 #include <avs/cx/registry.h>
 #include <avs/cx/sdk.h>
+#include <avs/cx/message.h>
 
 #include <string>
 #include <list>
@@ -56,6 +57,9 @@ private:
   static avs_cx_status AVS_CX_CALL GetCpuFlags(void *context, void *environment,
                                                uint64_t *flags_out) noexcept;
 
+  static avs_cx_status AVS_CX_CALL ApplyMessage(void *, void *,
+      const avs_cx_message_request_v1 *, avs_cx_frame_ref_v1 *, avs_cx_error_v1 *) noexcept;
+
   static AVSValue __cdecl ApplyBridge(AVSValue arguments, void *user_data,
                                       IScriptEnvironment *environment);
   static void __cdecl ShutdownBridge(void *user_data, IScriptEnvironment *environment);
@@ -85,6 +89,7 @@ private:
   avs_cx_clip_feature_v1 clip_feature_{};
   avs_cx_frame_feature_v1 frame_feature_{};
   avs_cx_sdk_feature_v1 sdk_feature_{};
+  avs_cx_message_feature_v1 message_feature_{};
   std::string plugin_name_;
   std::string last_error_;
   std::vector<PendingShutdown> pending_shutdowns_;

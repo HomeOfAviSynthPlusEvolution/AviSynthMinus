@@ -69,7 +69,7 @@ This is an experimental compatibility implementation, not a claim that every
 AviSynth extension already works. Unsupported callable operations below throw
 an error; the Neo environment query returns null to indicate unavailability:
 
-- `ManageCache`, `DeleteScriptEnvironment`, `ApplyMessage`, and Invoke3/Invoke3Try.
+- `ManageCache`, `DeleteScriptEnvironment`, and Invoke3/Invoke3Try.
 - Non-null PFunction, device/GPU APIs, IScriptEnvironment2/INeoEnv extensions.
 - Direct VideoFrameBuffer access and direct VideoFrame property-object methods;
   use the normal environment property methods instead.
@@ -139,3 +139,17 @@ The public adoption surface is the existing C++ API plus the init macro.
 `sdk/runtime.h` and linkage helpers are implementation details, not a second
 filter API for plugin authors. Once a protocol layout is released, new
 capabilities must use new feature keys rather than changing that layout.
+
+## V12 services
+
+The existing environment CPU query returns the full host-approved 64-bit mask.
+Unknown capabilities remain zero; no new feature table is required. The SDK
+maps GetCPUFlagsEx to this query and GetCPUFlags to its low 32 bits. Environment
+property queries and clip cache hints also retain their existing transports.
+
+AVS_CX_FEATURE_MESSAGE v1 is optional and declared in message.h. It renders a
+message into a new writable host frame while retaining the input pixels and
+properties. Requests specify legacy or UTF-8 encoding and use the same font-size
+units and colors as ApplyMessageEx. The SDK uses it for both ApplyMessage methods.
+An older host without this feature produces an explicit unsupported error only
+when rendering is requested; other SDK functions continue to work.
