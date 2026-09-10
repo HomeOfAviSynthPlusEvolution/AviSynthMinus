@@ -3059,15 +3059,12 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
 #elif defined(X86_32) || defined(X86_64)
       // group feature
       if (cpulevel <= CL_AVX512_FAST) {
-        // disable all avx512, re-enable the whole mask up to "fast"
-        cpu_flags &= ~CPUF_AVX512_MASK;
-        cpu_flags |= CPUF_AVX512_FAST_ALL;
+        // A limit must never enable capabilities absent from the current policy.
+        cpu_flags &= ~(CPUF_AVX512_MASK & ~CPUF_AVX512_FAST_ALL);
       }
       // group feature
       if (cpulevel <= CL_AVX512_BASE) {
-        // disable all avx512, re-enable the whole mask up to "base"
-        cpu_flags &= ~CPUF_AVX512_MASK;
-        cpu_flags |= CPUF_AVX512_BASE_ALL;
+        cpu_flags &= ~(CPUF_AVX512_MASK & ~CPUF_AVX512_BASE_ALL);
       }
       // individual features
       if (cpulevel <= CL_AVX2) // just disable all avx512

@@ -20,6 +20,24 @@ TEST(EnvironmentStrings, ExplicitLengthIncludesBytesAfterNul) {
   EXPECT_STREQ(env->SaveString("", 0), "");
 }
 
+TEST(V12CpuPolicy, LimitsNeverEnableFlagsOrAffectOtherEnvironments) {
+  AviSynthEnvironment first, second;
+  auto *env = first.get();
+  const int64_t native = second.get()->GetCPUFlagsEx();
+#if defined(X86_32) || defined(X86_64)
+  for (const char *limit : {"avx2", "avx512fast", "avx512base", "none", "avx512fast"}) {
+#else
+  for (const char *limit : {"none"}) {
+#endif
+    const int64_t before = env->GetCPUFlagsEx();
+    env->Invoke("SetMaxCPU", AVSValue(limit));
+    const int64_t after = env->GetCPUFlagsEx();
+    EXPECT_EQ(after & ~before, 0) << limit;
+    EXPECT_EQ(static_cast<uint32_t>(env->GetCPUFlags()), static_cast<uint32_t>(after));
+    EXPECT_EQ(second.get()->GetCPUFlagsEx(), native);
+  }
+}
+
 TEST(WorkingDirectory, GetCurrentWorkingDirectoryReturnsNonEmpty) {
 #ifdef AVS_WINDOWS
   const std::wstring cwd = CWDChanger::GetCurrentWorkingDirectory();
