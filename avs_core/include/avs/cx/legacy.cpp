@@ -468,6 +468,11 @@ public:
     Check(session->runtime.get_cpu_flags(&Call(), &f), {});
     return static_cast<int>(f);
   }
+  int64_t __stdcall GetCPUFlagsEx() override {
+    uint64_t f = 0;
+    Check(session->runtime.get_cpu_flags(&Call(), &f), {});
+    return static_cast<int64_t>(f);
+  }
   char *__stdcall SaveString(const char *s, int n = -1) override { return session->Save(s, n); }
   char *__stdcall VSprintf(const char *fmt, va_list args) override {
     va_list copy;

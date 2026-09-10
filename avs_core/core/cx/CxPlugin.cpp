@@ -881,7 +881,7 @@ avs_cx_status AVS_CX_CALL CxHostSession::GetCpuFlags(void *, void *environment,
   }
   try {
     *flags_out =
-        static_cast<uint32_t>(static_cast<IScriptEnvironment *>(environment)->GetCPUFlags());
+        static_cast<uint64_t>(static_cast<IScriptEnvironment *>(environment)->GetCPUFlagsEx());
     return AVS_CX_STATUS_OK;
   } catch (...) {
     return AVS_CX_STATUS_HOST_ERROR;
