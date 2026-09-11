@@ -63,13 +63,12 @@ static inline void __cpuid(int cpuinfo[4], int leaf) {
 
 // --- Platform-specific headers for ARM64 ---
 #if defined(ARM64)
-#if defined(AVS_LINUX) || defined(AVS_BSD)
-// HWCAP values are needed for Linux/BSD
+#if defined(AVS_LINUX)
 #include <sys/auxv.h>
-// Note: <asm/hwcap.h> may be required on some systems, 
-// but AT_HWCAP and values like HWCAP_DOTPROD are often found in sys/auxv.h or defined by toolchain.
-// We assume standard GNU/Clang behavior where flags like HWCAP_DOTPROD are available.
 #include <asm/hwcap.h>
+#elif defined(__FreeBSD__)
+#include <sys/auxv.h>
+#include <machine/elf.h>
 #elif defined(AVS_MACOS)
 // macOS/Apple Silicon uses sysctl for features
 #include <sys/types.h>
@@ -153,26 +152,38 @@ static int64_t ARMCheckForExtensions()
   // We can assume NEON for any successful ARM64 build.
   result |= CPUF_ARM_NEON;
 
-#if defined(AVS_LINUX) || defined(AVS_BSD)
+#if defined(AVS_LINUX) || defined(__FreeBSD__)
 
-  // Linux/BSD HWCAP detection (uses AT_HWCAP/AT_HWCAP2)
-  // aarch64 implies -march=armv8-a
-  // HWCAP_NEON (Basic NEON) is covered by the assumption above.
-  unsigned long hwcap = getauxval(AT_HWCAP);
-  unsigned long hwcap2 = getauxval(AT_HWCAP2);
+  // FreeBSD uses the same capability bits but a different auxiliary-vector API.
+#if defined(AVS_LINUX)
+  uint64_t hwcap = getauxval(AT_HWCAP);
+  uint64_t hwcap2 = getauxval(AT_HWCAP2);
+#else
+  uint64_t hwcap = 0, hwcap2 = 0;
+  if (elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap)) != 0)
+    hwcap = 0;
+#ifdef AT_HWCAP2
+  if (elf_aux_info(AT_HWCAP2, &hwcap2, sizeof(hwcap2)) != 0)
+    hwcap2 = 0;
+#endif
+#endif
 
   // When DOTPROD exists, we have at least Armv8.1-a
   // optional in v8.1-a, mandatory in v8.4-a
   // Safe gcc/clang flags: -march=armv8.1-a+dotprod
+#ifdef HWCAP_ASIMDDP
   if ((hwcap & HWCAP_ASIMDDP)) {
     result |= CPUF_ARM_DOTPROD;
   }
+#endif
 
   // SVE2 (Scalable Vector Extension version 2) optional in v8.5-a, mandatory in v9.0-a
   // Safe flags: -march=armv8.5-a+sve2
+#ifdef HWCAP2_SVE2
   if (hwcap2 & HWCAP2_SVE2) {
     result |= CPUF_ARM_SVE2;
   }
+#endif
 
 
   // CPUF_ARM_SVE2_1 (incremental SVE2 part 1)
@@ -188,9 +199,11 @@ static int64_t ARMCheckForExtensions()
   // CPUF_ARM_I8MM (AdvSIMD Int8 matrix multiply, Armv8.2-I8MM)
   // optional in v8.2-a, mandatory in v8.6-a
   // Safe flags: -march=armv8.2-a+i8mm
+#ifdef HWCAP2_I8MM
   if (hwcap2 & HWCAP2_I8MM) {
     result |= CPUF_ARM_I8MM;
   }
+#endif
 
 
 #elif defined(AVS_MACOS)
