@@ -2,9 +2,28 @@
 #include <avisynth.h>
 #include "support/avisynth_environment.h"
 #include "support/compat_375.h"
+#include <cmath>
 
 namespace avsut::test {
 namespace {
+
+TEST(ToneFilter, WaveformsReleaseAfterAudioAndRejectedVideoUse) {
+  AviSynthEnvironment environment;
+  for (const char* waveform : {"Sine", "Noise", "Square", "Triangle", "Sawtooth", "Silence"}) {
+    SCOPED_TRACE(waveform);
+    const AVSValue args[] = {0.01, waveform};
+    const char* names[] = {"length", "type"};
+    PClip clip = environment.get()->Invoke("Tone", AVSValue(args, 2), names).AsClip();
+    float samples[32];
+    clip->GetAudio(samples, 0, 16, environment.get()); // Default is stereo float.
+    for (float sample : samples)
+      EXPECT_TRUE(std::isfinite(sample));
+    const AVSValue fps_args[] = {clip, 25};
+    EXPECT_THROW(environment.get()->Invoke("ChangeFPS", AVSValue(fps_args, 2)), AvisynthError);
+    // The final clip reference is released each iteration. LeakSanitizer checks
+    // generator ownership on both normal use and the rejected video path.
+  }
+}
 
 TEST(BlankClipFilter, Yuy2FillPreservesHighChromaBytes) {
   AviSynthEnvironment environment;
