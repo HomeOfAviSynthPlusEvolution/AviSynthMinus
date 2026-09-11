@@ -57,6 +57,21 @@ TEST(ArmCpuDetection, DecodesCapabilitiesIndependently) {
 #endif
 }
 
+TEST(ArmCpuDetection, DecodesSve21AboveBit31WhenHeadersSupportIt) {
+  failed_query = 0;
+  test_hwcap = 0;
+  test_hwcap2 = uint64_t{1} << 36;
+#if defined(TEST_OLD_HWCAP)
+  EXPECT_EQ(ARMCheckForExtensions(), CPUF_ARM_NEON);
+#else
+  EXPECT_EQ(ARMCheckForExtensions(), CPUF_ARM_NEON | CPUF_ARM_SVE2_1);
+  test_hwcap = 1UL << 20;
+  test_hwcap2 |= (1UL << 1) | (1UL << 13);
+  EXPECT_EQ(ARMCheckForExtensions(), CPUF_ARM_NEON | CPUF_ARM_DOTPROD |
+      CPUF_ARM_SVE2 | CPUF_ARM_I8MM | CPUF_ARM_SVE2_1);
+#endif
+}
+
 #if defined(TEST_FREEBSD)
 TEST(ArmCpuDetection, FailedAuxiliaryQueriesDoNotEnableFeatures) {
   test_hwcap = 1UL << 20;
