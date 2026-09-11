@@ -1,5 +1,5 @@
 enable_language(C)
-if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$")
   # Match the symbol isolation used for the shipped plugins.
   string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl,-Bsymbolic")
 endif()
