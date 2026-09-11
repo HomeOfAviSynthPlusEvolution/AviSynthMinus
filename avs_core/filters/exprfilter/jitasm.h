@@ -301,9 +301,9 @@ enum OpdSize
 
 namespace detail
 {
-#pragma pack(push, 1)
-
 	/// Operand base class
+	// These are in-memory assembler objects, not encoded instruction bytes.
+	// Keep natural alignment: register members are also accessed by reference.
 	struct Opd
 	{
 		uint8 opdtype_;	// OpdType
@@ -374,8 +374,6 @@ namespace detail
 		}
 		bool operator!=(const Opd& rhs) const {return !(*this == rhs);}
 	};
-
-#pragma pack(pop)
 
 	/// Add O_TYPE_DUMMY to the specified operand
 	inline Opd Dummy(const Opd& opd)

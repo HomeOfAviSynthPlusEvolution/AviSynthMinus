@@ -5001,6 +5001,20 @@ void processFrameWithDynamicVectors(int plane, int w, int h, int pixels_per_iter
   }
 }
 
+#ifdef VS_TARGET_CPU_X86
+// JIT code has no compiler-generated function type metadata before its entry.
+// Keep the exception local to this call; the surrounding frame processing still
+// receives all sanitizer checks.
+#if defined(__clang__)
+__attribute__((no_sanitize("function")))
+#endif
+static void call_expr_jit(ExprData::ProcessLineProc proc, void* rwptrs,
+  intptr_t* ptroffsets, intptr_t niter, uint32_t spatialY)
+{
+  proc(rwptrs, ptroffsets, niter, spatialY);
+}
+#endif
+
 void Exprfilter::processFrame(int plane, int w, int h, int pixels_per_iter, float framecount, float relative_time, int numInputs, 
   uint8_t*& dstp, int dst_stride,
   std::vector<const uint8_t*>& srcp, std::vector<int>& src_stride, std::vector<intptr_t>& ptroffsets, std::vector<const uint8_t*>& srcp_orig)
@@ -5029,7 +5043,7 @@ void Exprfilter::processFrame(int plane, int w, int h, int pixels_per_iter, floa
         rwptrs[i + RWPTR_START_OF_STRIDES] = static_cast<intptr_t>(src_stride[i]);
       }
       // a single line at a time
-      proc(rwptrs, ptroffsets.data(), nfulliterations, y); // parameters are put directly in registers
+      call_expr_jit(proc, rwptrs, ptroffsets.data(), nfulliterations, y);
     }
   }
   else
