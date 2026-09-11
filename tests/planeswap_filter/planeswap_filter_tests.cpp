@@ -456,8 +456,9 @@ TEST_P(PackedRgbExtractTest, ExtractsBgr24ChannelInLogicalTopDownOrder) {
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
 
-  SwapUVToY filter(clip, mode, environment.get());
-  const PVideoFrame output = filter.GetFrame(0, environment.get());
+  const PClip filter = SwapUVToY::CreateAnyToY8(AVSValue(clip),
+      reinterpret_cast<void*>(static_cast<intptr_t>(mode)), environment.get()).AsClip();
+  const PVideoFrame output = filter->GetFrame(0, environment.get());
 
   const int channel = mode == SwapUVToY::BToY8 ? 0 : mode == SwapUVToY::GToY8 ? 1 : 2;
   const auto values = read_frame_plane_active<std::uint8_t>(output, DEFAULT_PLANE);
@@ -503,8 +504,9 @@ TEST_P(PackedRgb48ExtractTest, ExtractsBgr48ChannelWithSixteenBitSamples) {
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
 
-  SwapUVToY filter(clip, mode, environment.get());
-  const PVideoFrame output = filter.GetFrame(0, environment.get());
+  const PClip filter = SwapUVToY::CreateAnyToY8(AVSValue(clip),
+      reinterpret_cast<void*>(static_cast<intptr_t>(mode)), environment.get()).AsClip();
+  const PVideoFrame output = filter->GetFrame(0, environment.get());
 
   const int channel = mode == SwapUVToY::BToY8 ? 0 : mode == SwapUVToY::GToY8 ? 1 : 2;
   const auto values = read_frame_plane_active<std::uint16_t>(output, DEFAULT_PLANE);
