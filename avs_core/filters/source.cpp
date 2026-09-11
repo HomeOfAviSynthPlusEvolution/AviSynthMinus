@@ -137,7 +137,7 @@ static PVideoFrame CreateBlankFrame(const VideoInfo& vi, int color, int mode, co
   // RGB 8->16 bit: not << 8 like YUV but 0..255 -> 0..65535 or 0..1023 for 10 bit
   int pixelsize = vi.ComponentSize();
   int bits_per_pixel = vi.BitsPerComponent();
-  int max_pixel_value = (1 << bits_per_pixel) - 1;
+  int max_pixel_value = pixelsize == 4 ? 1 : (1 << bits_per_pixel) - 1;
   auto rgbcolor8to16 = [](uint8_t color8, int max_pixel_value) { return (uint16_t)(color8 * max_pixel_value / 255); };
 
   // int color holds the "old" 8 bit color values that are scaled automatically to the right bitmap
@@ -278,14 +278,14 @@ static PVideoFrame CreateBlankFrame(const VideoInfo& vi, int color, int mode, co
       const uint16_t color_b  = color_is_array ? clamp(colors[2], 0, max_pixel_value) : rgbcolor8to16(color & 0xFF, max_pixel_value);
       uint16_t r = color_is_array ? clamp(colors[0], 0, max_pixel_value) : rgbcolor8to16((color >> 16) & 0xFF, max_pixel_value);
       uint16_t g = color_is_array ? clamp(colors[1], 0, max_pixel_value) : rgbcolor8to16((color >> 8 ) & 0xFF, max_pixel_value);
-      const uint32_t color_rg = (r << 16) + (g);
       const int rowsize = frame->GetRowSize() / sizeof(uint16_t);
       const int pitch = frame->GetPitch() / sizeof(uint16_t);
       uint16_t* p16 = reinterpret_cast<uint16_t*>(p);
       for (int y=frame->GetHeight();y>0;y--) {
           for (int i=0; i<rowsize; i+=3) {
               p16[i] = color_b;   // b
-              *reinterpret_cast<uint32_t*>(p16+i+1) = color_rg; // gr
+              p16[i+1] = g;
+              p16[i+2] = r;
           }
           p16 += pitch;
       }

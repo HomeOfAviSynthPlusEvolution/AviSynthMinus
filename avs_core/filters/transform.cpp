@@ -556,7 +556,8 @@ PVideoFrame AddBorders::GetFrame(int n, IScriptEnvironment* env)
     }
   } else if (vi.IsRGB24()) {
     const unsigned char  clr0 = (unsigned char)(clr & 0xFF);
-    const unsigned short clr1 = (unsigned short)(clr >> 8);
+    const unsigned char clr1 = (unsigned char)(clr >> 8);
+    const unsigned char clr2 = (unsigned char)(clr >> 16);
     const int leftbytes = vi.BytesFromPixels(left);
     const int leftrow = src_row_size + leftbytes;
     const int rightbytes = vi.BytesFromPixels(right);
@@ -567,26 +568,30 @@ PVideoFrame AddBorders::GetFrame(int n, IScriptEnvironment* env)
     for (int y = top; y>0; --y) {
       for (int i = 0; i<dst_row_size; i += 3) {
         dstp[i] = clr0;
-        *(uint16_t*)(dstp+i+1) = clr1;
+        dstp[i+1] = clr1;
+        dstp[i+2] = clr2;
       }
       dstp += dst_pitch;
     }
     for (int y = src_height; y>0; --y) {
       for (int i = 0; i<leftbytes; i += 3) {
         dstp[i] = clr0;
-        *(uint16_t*)(dstp+i+1) = clr1;
+        dstp[i+1] = clr1;
+        dstp[i+2] = clr2;
       }
       dstp += leftrow;
       for (int i = 0; i<rightbytes; i += 3) {
         dstp[i] = clr0;
-        *(uint16_t*)(dstp+i+1) = clr1;
+        dstp[i+1] = clr1;
+        dstp[i+2] = clr2;
       }
       dstp += rightrow;
     }
     for (int y = bot; y>0; --y) {
       for (int i = 0; i<dst_row_size; i += 3) {
         dstp[i] = clr0;
-        *(uint16_t*)(dstp+i+1) = clr1;
+        dstp[i+1] = clr1;
+        dstp[i+2] = clr2;
       }
       dstp += dst_pitch;
     }
@@ -608,9 +613,8 @@ PVideoFrame AddBorders::GetFrame(int n, IScriptEnvironment* env)
     }
   } else if (vi.IsRGB48()) {
     const uint16_t  clr0 = GetHbdColorFromByte<uint16_t>(clr & 0xFF, true, 16, false);
-    uint32_t clr1 =
-      ((uint32_t)GetHbdColorFromByte<uint16_t>((clr >> 16) & 0xFF, true, 16, false) << (8 * 2)) +
-      ((uint32_t)GetHbdColorFromByte<uint16_t>((clr >> 8) & 0xFF, true, 16, false));
+    const uint16_t clr1 = GetHbdColorFromByte<uint16_t>((clr >> 8) & 0xFF, true, 16, false);
+    const uint16_t clr2 = GetHbdColorFromByte<uint16_t>((clr >> 16) & 0xFF, true, 16, false);
     const int leftbytes = vi.BytesFromPixels(left);
     const int leftrow = src_row_size + leftbytes;
     const int rightbytes = vi.BytesFromPixels(right);
@@ -621,26 +625,30 @@ PVideoFrame AddBorders::GetFrame(int n, IScriptEnvironment* env)
     for (int y = top; y>0; --y) {
       for (int i = 0; i<dst_row_size; i += 6) {
         *(uint16_t*)(dstp+i) = clr0;
-        *(uint32_t*)(dstp+i+2) = clr1;
+        *(uint16_t*)(dstp+i+2) = clr1;
+        *(uint16_t*)(dstp+i+4) = clr2;
       }
       dstp += dst_pitch;
     }
     for (int y = src_height; y>0; --y) {
       for (int i = 0; i<leftbytes; i += 6) {
         *(uint16_t*)(dstp+i) = clr0;
-        *(uint32_t*)(dstp+i+2) = clr1;
+        *(uint16_t*)(dstp+i+2) = clr1;
+        *(uint16_t*)(dstp+i+4) = clr2;
       }
       dstp += leftrow;
       for (int i = 0; i<rightbytes; i += 6) {
         *(uint16_t*)(dstp+i) = clr0;
-        *(uint32_t*)(dstp+i+2) = clr1;
+        *(uint16_t*)(dstp+i+2) = clr1;
+        *(uint16_t*)(dstp+i+4) = clr2;
       }
       dstp += rightrow;
     }
     for (int y = bot; y>0; --y) {
       for (int i = 0; i<dst_row_size; i += 6) {
         *(uint16_t*)(dstp+i) = clr0;
-        *(uint32_t*)(dstp+i+2) = clr1;
+        *(uint16_t*)(dstp+i+2) = clr1;
+        *(uint16_t*)(dstp+i+4) = clr2;
       }
       dstp += dst_pitch;
     }

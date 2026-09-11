@@ -825,7 +825,9 @@ PVideoFrame __stdcall ConvertYUV444ToRGB::GetFrame(int n, IScriptEnvironment* en
 #endif
 
   //Slow C-code.
-  auto round_mask_plus_rgb_offset_i = 4096 + (matrix.offset_rgb << 13);
+  // Float matrices do not initialize the integer coefficients. Only the packed
+  // integer branches below need this offset; planar conversion computes its own.
+  const int round_mask_plus_rgb_offset_i = pixel_step > 0 ? 4096 + matrix.offset_rgb * 8192 : 0;
 
   dstp += dst_pitch * (vi.height-1);  // We start at last line. Not for Planar RGB
   bool srcHasAlpha = (src_pitch_a != 0);

@@ -38,6 +38,7 @@
 
 #include <avs/alignment.h>
 #include <avs/minmax.h>
+#include <cstring>
 
 // experimental simd includes for avx2 compiled files
 #if defined (__GNUC__) && ! defined (__INTEL_COMPILER)
@@ -151,12 +152,16 @@ AVS_FORCEINLINE static void process_two_pixels_h_uint8(const uint8_t* src_ptr, i
     // Process 4 elements if needed
     if (i < ksmod4) {
       // Process 4 elements for first pixel
-      __m128i data_1 = _mm_cvtepu8_epi16(_mm_cvtsi32_si128(*reinterpret_cast<const int*>(src_ptr1 + i)));
+      int packed_1;
+      std::memcpy(&packed_1, src_ptr1 + i, sizeof(packed_1));
+      __m128i data_1 = _mm_cvtepu8_epi16(_mm_cvtsi32_si128(packed_1));
       __m128i coeff_1 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(current_coeff + i));
       __m128i temp_result1 = _mm_madd_epi16(data_1, coeff_1);
 
       // Process 4 elements for second pixel
-      __m128i data_2 = _mm_cvtepu8_epi16(_mm_cvtsi32_si128(*reinterpret_cast<const int*>(src_ptr2 + i)));
+      int packed_2;
+      std::memcpy(&packed_2, src_ptr2 + i, sizeof(packed_2));
+      __m128i data_2 = _mm_cvtepu8_epi16(_mm_cvtsi32_si128(packed_2));
       __m128i coeff_2 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(current_coeff2 + i));
       __m128i temp_result2 = _mm_madd_epi16(data_2, coeff_2);
 
