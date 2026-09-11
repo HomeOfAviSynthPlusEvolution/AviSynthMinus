@@ -274,9 +274,10 @@ TEST_P(MaskHsYuv444Test, SelectsWrappedHueAndSaturationWithIndependentOutputRang
           << "realcalc=" << realcalc << " x=" << x << " y=" << y;
     }
   }
-  const auto output_before = FrameSnapshot::capture(output, filter.GetVideoInfo());
+  // Output padding is unspecified; compare only the initialized mask pixels.
+  const auto output_before = read_frame_plane_active<std::uint8_t>(output, PLANAR_Y);
   const PVideoFrame repeat = filter.GetFrame(0, environment.get());
-  EXPECT_EQ(FrameSnapshot::capture(repeat, filter.GetVideoInfo()), output_before);
+  EXPECT_EQ(read_frame_plane_active<std::uint8_t>(repeat, PLANAR_Y), output_before);
   EXPECT_NE(output->CheckMemory(), 1);
   EXPECT_NE(repeat->CheckMemory(), 1);
   EXPECT_EQ(source_clip->frame_requests(), std::vector<int>({0, 0}));
