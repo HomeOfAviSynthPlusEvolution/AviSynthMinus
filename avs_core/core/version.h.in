@@ -12,7 +12,7 @@
 #define       AVS_BUGFIX_VER    5
 #define       AVS_MINUS_MAJOR_VER  0
 #define       AVS_MINUS_MINOR_VER  2
-#define       AVS_MINUS_BUGFIX_VER 0
+#define       AVS_MINUS_BUGFIX_VER 1
 #define       AVS_MINUS_VERSION "@AVS_MINUS_VERSION@"
 #define       AVS_MINUS_FILEVERSION @AVS_MINUS_FILEVERSION@
 #define       AVS_DEV_REVDATE   @AVS_DEV_REVDATE@
