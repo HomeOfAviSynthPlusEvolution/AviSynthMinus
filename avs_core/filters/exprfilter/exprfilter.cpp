@@ -7203,6 +7203,23 @@ Exprfilter::Exprfilter(const std::vector<PClip>& _child_array, const std::vector
 #ifdef VS_TARGET_CPU_X86
     // optAvx2 can only disable avx2 when available
 
+    const auto installCode = [&](int plane, const void* code, size_t size) {
+      if (!code || !size)
+        throw std::runtime_error("could not generate executable code");
+#ifdef VS_TARGET_OS_WINDOWS
+      void* memory = VirtualAlloc(nullptr, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+      if (!memory)
+#else
+      void* memory = mmap(nullptr, size, PROT_READ | PROT_WRITE | PROT_EXEC,
+                          MAP_ANON | MAP_PRIVATE, -1, 0);
+      if (memory == MAP_FAILED)
+#endif
+        throw std::runtime_error("could not allocate executable memory");
+      memcpy(memory, code, size);
+      d.proc[plane] = (ExprData::ProcessLineProc)memory;
+      d.procSize[plane] = size;
+    };
+
     for (int i = 0; i < d.vi.NumComponents(); i++) {
       if (d.plane[i] == poProcess) {
 
@@ -7218,26 +7235,15 @@ Exprfilter::Exprfilter(const std::vector<PClip>& _child_array, const std::vector
 
           // avx2
           ExprEvalAvx2 ExprObj(d.ops[i], d.numInputs, env->GetCPUFlags(), planewidth_real_or_lut, planeheight, optSingleMode);
-          if (ExprObj.GetCode(true) && ExprObj.GetCodeSize()) { // PF modded jitasm. true: epilog with vmovaps, and vzeroupper
-#ifdef VS_TARGET_OS_WINDOWS
-            d.proc[i] = (ExprData::ProcessLineProc)VirtualAlloc(nullptr, ExprObj.GetCodeSize(), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-#else
-            d.proc[i] = (ExprData::ProcessLineProc)mmap(nullptr, ExprObj.GetCodeSize(), PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, 0, 0);
-#endif
-            memcpy((void *)d.proc[i], ExprObj.GetCode(), ExprObj.GetCodeSize());
-          }
+          // true requests the AVX epilog, including vzeroupper.
+          const void* code = ExprObj.GetCode(true);
+          installCode(i, code, ExprObj.GetCodeSize());
         }
         else if (optSSE2 && d.planeOptSSE2[i]) {
           // sse2, sse4
           ExprEval ExprObj(d.ops[i], d.numInputs, env->GetCPUFlags(), planewidth_real_or_lut, planeheight, optSingleMode);
-          if (ExprObj.GetCode() && ExprObj.GetCodeSize()) {
-#ifdef VS_TARGET_OS_WINDOWS
-            d.proc[i] = (ExprData::ProcessLineProc)VirtualAlloc(nullptr, ExprObj.GetCodeSize(), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-#else
-            d.proc[i] = (ExprData::ProcessLineProc)mmap(nullptr, ExprObj.GetCodeSize(), PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, 0, 0);
-#endif
-            memcpy((void *)d.proc[i], ExprObj.GetCode(), ExprObj.GetCodeSize());
-          }
+          const void* code = ExprObj.GetCode();
+          installCode(i, code, ExprObj.GetCodeSize());
         }
 
       } // if plane is to be processed
