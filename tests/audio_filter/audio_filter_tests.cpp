@@ -48,6 +48,9 @@ using avsut::test::make_video_info;
 using avsut::test::read_audio_sample;
 using avsut::test::VideoInfoSpec;
 
+// Keep typed audio naturally aligned while offsetting it from SIMD alignment.
+constexpr std::size_t kAudioAlignmentOffset = alignof(float);
+
 int amplify_int16_reference(std::int16_t sample, int factor) {
   const auto scaled = (static_cast<std::int64_t>(sample) * factor + 65536) >> 17;
   return static_cast<int>(std::clamp<std::int64_t>(scaled, std::numeric_limits<std::int16_t>::min(),
@@ -90,7 +93,7 @@ TEST(ConvertAudioFilter, ConvertsSigned16ToFloatForRequestedInterleavedWindow) {
   const auto source_before = source_clip->audio();
 
   ConvertAudio filter(source, SAMPLE_FLOAT);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 1, 2, environment.get());
 
   expect_float_audio(output, {-1.0F, 16384.0F / 32768.0F, -16384.0F / 32768.0F, 1.0F / 32768.0F});
@@ -111,7 +114,7 @@ TEST(ConvertAudioFilter, ConvertsFloatToSigned16WithEndpointClamping) {
   const auto source_before = source_clip->audio();
 
   ConvertAudio filter(source, SAMPLE_INT16);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(5), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(5), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 5, environment.get());
 
   expect_exact_audio<std::int16_t>(output, {-32768, -32768, -16384, 16384, 32767});
@@ -130,7 +133,7 @@ TEST(ConvertToMonoFilter, AveragesAllFloatChannelsAndSetsMonoLayout) {
   const auto source_before = source_clip->audio();
 
   ConvertToMono filter(source);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 1, 2, environment.get());
 
   expect_float_audio(output, {0.5F, (-0.5F - 0.25F + 0.25F) / 3.0F});
@@ -153,7 +156,7 @@ TEST(GetChannelFilter, SelectsRequestedChannelsInOrderForSigned16) {
   auto* selected_channels = new int[2]{2, 0};
 
   GetChannel filter(source, selected_channels, 2);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 3, environment.get());
 
   expect_exact_audio<std::int16_t>(output, {3, 1, 6, 4, 9, 7});
@@ -183,7 +186,7 @@ TEST(MergeChannelsFilter, InterleavesMonoSourcesAfterConvertingTheSecondFormat) 
   children[0] = first;
   children[1] = second;
   MergeChannels filter(first, 2, children, environment.get());
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 3, environment.get());
 
   expect_exact_audio<std::int16_t>(output, {100, 16384, -200, -8192, 300, 32767});
@@ -209,7 +212,7 @@ TEST(DelayAudioFilter, ZeroFillsTheDelayedPrefixAndOffsetsTheChildRequest) {
 
   DelayAudio filter(0.5, source);
   ASSERT_EQ(filter.GetVideoInfo().num_audio_samples, 6);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(4), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(4), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 4, environment.get());
 
   expect_float_audio(output, {0.0F, 0.0F, 0.1F, 0.2F});
@@ -230,7 +233,7 @@ TEST(AmplifyFilter, AppliesPerChannelIntegerFactorsWithSaturation) {
                              static_cast<int>(0.5F * 131072.0F + 0.5F)};
 
   Amplify filter(source, volumes, factors);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 3, environment.get());
 
   const std::vector<std::int16_t> expected{
@@ -258,7 +261,7 @@ TEST(AmplifyFilter, AppliesPerChannelFloatFactorsWithoutClamping) {
                              static_cast<int>(0.5F * 131072.0F + 0.5F)};
 
   Amplify filter(source, volumes, factors);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 2, environment.get());
 
   expect_float_audio(output, {1.5F, -0.375F, -1.0F, 0.25F});
@@ -280,7 +283,7 @@ TEST(MixAudioFilter, MixesFloatTracksWithIndependentFactors) {
   const auto second_before = second_clip->audio();
 
   MixAudio filter(first, second, 0.25, 0.75, environment.get());
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 3, environment.get());
 
   expect_float_audio(output, {0.05F, 0.35F, 0.35F, -0.3F, 0.75F, -0.05F});
@@ -303,7 +306,7 @@ TEST(MixAudioFilter, SaturatesSigned16Results) {
   PClip second(second_clip);
 
   MixAudio filter(first, second, 0.75, 0.75, environment.get());
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 2, environment.get());
 
   const int factor = static_cast<int>(0.75 * 131072.0 + 0.5);
@@ -323,7 +326,7 @@ TEST(NormalizeFilter, ScansFloatStreamBeforeNormalizingRequestedWindow) {
   const auto source_before = source_clip->audio();
 
   Normalize filter(source, 1.0F, false);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 1, 2, environment.get());
 
   expect_float_audio(output, {-1.0F, 0.25F});
@@ -342,7 +345,7 @@ TEST(NormalizeFilter, ScansSigned16PeaksAndSaturatesOutput) {
   const auto source_before = source_clip->audio();
 
   Normalize filter(source, 1.0F, false);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 3, environment.get());
 
   expect_exact_audio<std::int16_t>(output, {-32768, 16384, 8192});
@@ -358,9 +361,9 @@ TEST(EnsureVBRMP3SyncFilter, ReplaysSkippedAndRewoundAudioBeforeServingOutput) {
   auto* source_clip = new AudioSequenceClip(vi, make_audio_bytes(samples));
   PClip source(source_clip);
   EnsureVBRMP3Sync filter(source);
-  GuardedAudioBuffer first(vi.BytesFromAudioSamples(4), 64, 64, 1);
-  GuardedAudioBuffer skipped(vi.BytesFromAudioSamples(2), 64, 64, 1);
-  GuardedAudioBuffer rewound(vi.BytesFromAudioSamples(2), 64, 64, 1);
+  GuardedAudioBuffer first(vi.BytesFromAudioSamples(4), 64, 64, kAudioAlignmentOffset);
+  GuardedAudioBuffer skipped(vi.BytesFromAudioSamples(2), 64, 64, kAudioAlignmentOffset);
+  GuardedAudioBuffer rewound(vi.BytesFromAudioSamples(2), 64, 64, kAudioAlignmentOffset);
 
   filter.GetAudio(first.data(), 0, 4, environment.get());
   filter.GetAudio(skipped.data(), 8, 2, environment.get());
@@ -387,7 +390,7 @@ TEST(AssumeRateFilter, ChangesOnlyTheDeclaredSampleRate) {
   const auto source_before = source_clip->audio();
 
   AssumeRate filter(source, 48000);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 2, environment.get());
 
   expect_float_audio(output, {0.1F, 0.2F, 0.3F, 0.4F});
@@ -409,7 +412,7 @@ TEST(SetChannelMaskFilter, SetsAndClearsAudioChannelMaskMetadata) {
   EXPECT_TRUE(known_filter.GetVideoInfo().IsChannelMaskKnown());
   EXPECT_EQ(known_filter.GetVideoInfo().GetChannelMask(), AVS_CHANNEL_LAYOUT_STEREO);
 
-  GuardedAudioBuffer output(known_filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, 1);
+  GuardedAudioBuffer output(known_filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, kAudioAlignmentOffset);
   known_filter.GetAudio(output.data(), 0, 2, environment.get());
   expect_float_audio(output, {0.1F, 0.2F, 0.3F, 0.4F});
 
@@ -431,7 +434,7 @@ TEST(KillAudioFilter, RemovesAudioMetadataWithoutRequestingTheSource) {
   EXPECT_FALSE(filter.GetVideoInfo().HasAudio());
   EXPECT_EQ(filter.GetVideoInfo().AudioChannels(), 0);
   EXPECT_EQ(filter.GetVideoInfo().num_audio_samples, 0);
-  GuardedAudioBuffer output(8, 64, 64, 1);
+  GuardedAudioBuffer output(8, 64, 64, kAudioAlignmentOffset);
   output.fill_active(0x5A);
   filter.GetAudio(output.data(), 0, 2, environment.get());
   EXPECT_EQ(output.snapshot_active(), std::vector<std::uint8_t>(8, 0x5A));
@@ -458,7 +461,7 @@ TEST(KillVideoFilter, RemovesVideoMetadataWhilePreservingAudio) {
   EXPECT_EQ(filter.GetVideoInfo().SamplesPerSecond(), 44100);
   EXPECT_EQ(filter.GetVideoInfo().num_audio_samples, 3);
 
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 3, environment.get());
   expect_float_audio(output, samples);
   expect_audio_requests(*source_clip, {{0, 3}});
@@ -475,7 +478,7 @@ TEST(AudioEditFilters, TrimsAudioByTimeInLengthMode) {
   Trim filter(0.2, 0.3, source, Trim::Length, false, environment.get());
 
   ASSERT_EQ(filter.GetVideoInfo().num_audio_samples, 3);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 3, environment.get());
 
   expect_float_audio(output, {0.2F, 0.3F, 0.4F});
@@ -496,7 +499,7 @@ TEST(AudioEditFilters, SplicesAudioAtTheSampleBoundary) {
   Splice filter(first, second, false, true, environment.get());
 
   ASSERT_EQ(filter.GetVideoInfo().num_audio_samples, 8);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(4), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(4), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 2, 4, environment.get());
 
   expect_float_audio(output, {3.0F, 4.0F, 10.0F, 20.0F});
@@ -518,7 +521,7 @@ TEST(AudioEditFilters, DissolvesAudioOnlyClipsWithAStableRamp) {
   Dissolve filter(first, second, 2, 5.0, environment.get());
 
   ASSERT_EQ(filter.GetVideoInfo().num_audio_samples, 12);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(4), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(4), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 4, 4, environment.get());
 
   for (int index = 0; index < 4; ++index) {
@@ -557,7 +560,7 @@ TEST(AudioEditFilters, AudioDubUsesVideoGeometryAndAudioSamples) {
   EXPECT_EQ(filter.GetVideoInfo().SampleType(), SAMPLE_INT16);
   EXPECT_EQ(filter.GetVideoInfo().AudioChannels(), 2);
 
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 3, environment.get());
   expect_exact_audio<std::int16_t>(output, {100, -100, 200, -200, 300, -300});
   expect_audio_requests(*audio_clip, {{0, 3}});
@@ -573,7 +576,7 @@ TEST(AudioEditFilters, ReversesInterleavedAudioFrames) {
   PClip source(source_clip);
   Reverse filter(source);
 
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(4), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(4), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 4, environment.get());
 
   expect_exact_audio<std::int16_t>(output, {40, 400, 30, 300, 20, 200, 10, 100});
@@ -593,7 +596,7 @@ TEST(AudioEditFilters, ReversesTwentyFourBitAudioFrames) {
   PClip source(source_clip);
   Reverse filter(source);
 
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(3), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 3, environment.get());
 
   const std::vector<std::uint8_t> expected_bytes{
@@ -614,7 +617,7 @@ TEST(AudioEditFilters, LoopsAnAudioOnlyClipAcrossBoundaries) {
   Loop filter(source, 3, 0, 10000000, environment.get());
 
   ASSERT_EQ(filter.GetVideoInfo().num_audio_samples, 12);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(10), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(10), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 1, 10, environment.get());
 
   expect_float_audio(output, {2.0F, 3.0F, 4.0F, 1.0F, 2.0F, 3.0F, 4.0F, 1.0F, 2.0F, 3.0F});
@@ -640,9 +643,8 @@ TEST(AudioMetadataFilter, SynchronizesAudioMetadataWithAssumeFPSVariants) {
   EXPECT_EQ(scaled_filter.GetVideoInfo().SamplesPerSecond(), 96000);
   EXPECT_EQ(scaled_filter.GetVideoInfo().fps_numerator, 50U);
 
-  GuardedAudioBuffer fps_output(fps_filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, 1);
-  GuardedAudioBuffer scaled_output(scaled_filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64,
-                                   1);
+  GuardedAudioBuffer fps_output(fps_filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, kAudioAlignmentOffset);
+  GuardedAudioBuffer scaled_output(scaled_filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, kAudioAlignmentOffset);
   fps_filter.GetAudio(fps_output.data(), 0, 2, environment.get());
   scaled_filter.GetAudio(scaled_output.data(), 0, 2, environment.get());
   expect_float_audio(fps_output, {0.1F, 0.2F});
@@ -669,10 +671,8 @@ TEST(ResampleAudioFilter, ProducesContinuousFloatOutputAcrossChunkedRequests) {
   ASSERT_EQ(one_shot.GetVideoInfo().SamplesPerSecond(), 6);
   const auto output_samples = one_shot.GetVideoInfo().num_audio_samples;
   ASSERT_EQ(output_samples, 12);
-  GuardedAudioBuffer expected(one_shot.GetVideoInfo().BytesFromAudioSamples(output_samples), 64, 64,
-                              1);
-  GuardedAudioBuffer actual(chunked.GetVideoInfo().BytesFromAudioSamples(output_samples), 64, 64,
-                            1);
+  GuardedAudioBuffer expected(one_shot.GetVideoInfo().BytesFromAudioSamples(output_samples), 64, 64, kAudioAlignmentOffset);
+  GuardedAudioBuffer actual(chunked.GetVideoInfo().BytesFromAudioSamples(output_samples), 64, 64, kAudioAlignmentOffset);
   one_shot.GetAudio(expected.data(), 0, output_samples, environment.get());
   chunked.GetAudio(actual.data(), 0, 5, environment.get());
   chunked.GetAudio(actual.data() + 5 * sizeof(float), 5, output_samples - 5, environment.get());
@@ -703,10 +703,8 @@ TEST(ResampleAudioFilter, ProducesContinuousSigned16OutputAcrossChunkedRequests)
   ASSERT_EQ(one_shot.GetVideoInfo().SampleType(), SAMPLE_INT16);
   const auto output_samples = one_shot.GetVideoInfo().num_audio_samples;
   ASSERT_EQ(output_samples, 12);
-  GuardedAudioBuffer expected(one_shot.GetVideoInfo().BytesFromAudioSamples(output_samples), 64, 64,
-                              1);
-  GuardedAudioBuffer actual(chunked.GetVideoInfo().BytesFromAudioSamples(output_samples), 64, 64,
-                            1);
+  GuardedAudioBuffer expected(one_shot.GetVideoInfo().BytesFromAudioSamples(output_samples), 64, 64, kAudioAlignmentOffset);
+  GuardedAudioBuffer actual(chunked.GetVideoInfo().BytesFromAudioSamples(output_samples), 64, 64, kAudioAlignmentOffset);
   one_shot.GetAudio(expected.data(), 0, output_samples, environment.get());
   chunked.GetAudio(actual.data(), 0, 5, environment.get());
   chunked.GetAudio(actual.data() + 5 * sizeof(std::int16_t), 5, output_samples - 5,
@@ -755,7 +753,7 @@ TEST(NormalizeFilter, ShowsAmplifyFactorOnVideoFrameAfterPeakScan) {
   EXPECT_NE(pending->CheckMemory(), 1);
   EXPECT_FALSE(FrameSnapshot::capture(pending, video) == frame0_before);
 
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(4), 64, 64, 1);
+  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(4), 64, 64, kAudioAlignmentOffset);
   filter.GetAudio(output.data(), 0, 4, environment.get());
   // Peak magnitude is 0.5, so factor becomes 1.0 / 0.5 = 2.0.
   expect_float_audio(output, {0.5F, -1.0F, 1.0F, 0.25F}, 1e-6F);

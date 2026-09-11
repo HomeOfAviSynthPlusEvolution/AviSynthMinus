@@ -61,6 +61,16 @@ void operator delete(void* p, std::size_t) noexcept { ::operator delete(p); }
 void* operator new[](std::size_t size) { return ::operator new(size); }
 void operator delete[](void* p) noexcept { ::operator delete(p); }
 void operator delete[](void* p, std::size_t) noexcept { ::operator delete(p); }
+// Keep nothrow allocations in the same malloc/free family under ASan too.
+void* operator new(std::size_t size, const std::nothrow_t&) noexcept {
+  try { return ::operator new(size); }
+  catch (...) { return nullptr; }
+}
+void* operator new[](std::size_t size, const std::nothrow_t& tag) noexcept {
+  return ::operator new(size, tag);
+}
+void operator delete(void* p, const std::nothrow_t&) noexcept { ::operator delete(p); }
+void operator delete[](void* p, const std::nothrow_t&) noexcept { ::operator delete(p); }
 
 namespace avsut::test {
 namespace {
