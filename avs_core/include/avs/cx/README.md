@@ -33,7 +33,17 @@ For an existing CMake target:
 target_include_directories(my_plugin PRIVATE "${AVS_SDK}/include")
 target_sources(my_plugin PRIVATE "${AVS_SDK}/include/avs/cx/legacy.cpp")
 target_compile_features(my_plugin PRIVATE cxx_std_17)
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+  set_property(TARGET my_plugin APPEND_STRING PROPERTY LINK_FLAGS " -Wl,-Bsymbolic")
+endif()
 ```
+
+On FreeBSD, `-Bsymbolic` keeps the plugin's SDK state and adapter definitions
+bound to that plugin. Without it, the shared core's exported `AVS_linkage`
+can replace the plugin's writable pointer and crash initialization. This also
+applies to legacy Init3 plugins; existing binaries built without symbol
+isolation need to be relinked. The bundled plugins and test fixtures enable
+this flag automatically.
 
 Keep the original `AVS_linkage` definition and `AvisynthPluginInit3` export.
 The SDK adds `AvisynthPluginInitCX1`; it does not replace the legacy entry.

@@ -101,18 +101,20 @@ TEST(CxCompatibility, PreservesRegistrationTypesIdentityAndWriteProbe) {
 
 TEST(CxCompatibility, AlternatingCompilerChain) {
   const char *other = std::getenv("AVS_CX_OTHER_DUAL_PATH");
-  if (!other || !*other) GTEST_SKIP() << "Run run_matrix.ps1 to supply the other compiler DLL";
+  if (!other || !*other) GTEST_SKIP() << "Set AVS_CX_OTHER_DUAL_PATH to the other compiler's plugin";
   AviSynthEnvironment environment;
   auto *env = environment.get();
   LoadPlugin(env, CX_SMOKE_DUAL_PATH);
   LoadPlugin(env, other);
-  ASSERT_TRUE(env->FunctionExists("CXMsvcCheckerInvert"));
+  const char *non_gcc = env->FunctionExists("CXMsvcCheckerInvert")
+      ? "CXMsvcCheckerInvert" : "CXClangCheckerInvert";
+  ASSERT_TRUE(env->FunctionExists(non_gcc));
   ASSERT_TRUE(env->FunctionExists("CXGccCheckerInvert"));
   const PClip original = CreateY8Clip(env, 70, 52);
   PClip chain = original;
   for (int i = 0; i < 6; ++i) {
     const AVSValue args[] = {chain, 16};
-    chain = env->Invoke(i % 2 ? "CXGccCheckerInvert" : "CXMsvcCheckerInvert",
+    chain = env->Invoke(i % 2 ? "CXGccCheckerInvert" : non_gcc,
                         AVSValue(args, 2)).AsClip();
   }
   const auto expected = CopyPlane(original->GetFrame(0, env));

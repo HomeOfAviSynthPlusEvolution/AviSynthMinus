@@ -41,6 +41,15 @@ Record the source revision, compiler versions, build configuration, and complete
 output with each validation run. Test counts depend on the revision and optional
 dependencies; the table describes the required routes, not a recorded pass result.
 
+On Unix hosts, the mixed chain also supports Clang/libc++ and GCC/libstdc++.
+Build separate trees with the same source revision, then set
+`AVS_CX_OTHER_DUAL_PATH` to the absolute path of the other compiler's
+`cx_smoke_dual.so` before running CTest. The fixture registers distinct Clang
+and GCC functions so the chain actually alternates between the two plugins.
+On FreeBSD, the GCC package's runtime libraries may need to be selected with
+`LD_LIBRARY_PATH` (for example, `/usr/local/lib/gcc14` for the GCC 14 package).
+Keep legacy Init3-only plugins matched to the core's C++ ABI.
+
 ## Correctness coverage
 
 The generated-value parity check is registered when Python is available.

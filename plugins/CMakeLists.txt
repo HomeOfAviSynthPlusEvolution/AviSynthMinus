@@ -1,5 +1,11 @@
 include_directories(${AvsCore_SOURCE_DIR}/include)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+  # Keep plugin SDK state (notably AVS_linkage) bound to the plugin, rather
+  # than interposing the shared core's same-named exported symbols.
+  string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl,-Bsymbolic")
+endif()
+
 if (WIN32)
 # These plugins are for Windows only
 option(BUILD_DIRECTSHOWSOURCE "Build DirectShowSource plugin" OFF)
