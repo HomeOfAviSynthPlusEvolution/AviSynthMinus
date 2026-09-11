@@ -46,6 +46,7 @@
 #include <ctime>
 #include <cmath>
 #include <new>
+#include <memory>
 #include <cassert>
 #include <stdint.h>
 #include <algorithm>
@@ -1980,6 +1981,7 @@ AVSValue __cdecl Create_SegmentedSource(AVSValue args, void* use_directshow, ISc
 class SampleGenerator {
 public:
   SampleGenerator() {}
+  virtual ~SampleGenerator() = default;
   virtual SFLOAT getValueAt(double where) {
     AVS_UNUSED(where);
     return 0.0f;}
@@ -2043,7 +2045,7 @@ public:
 
 class Tone : public IClip {
   VideoInfo vi;
-  SampleGenerator *s;
+  std::unique_ptr<SampleGenerator> s;
   const double freq;            // Frequency in Hz
   const double samplerate;      // Samples per second
   const int ch;                 // Number of channels
@@ -2061,17 +2063,17 @@ public:
     vi.num_audio_samples=(int64_t)(_length*vi.audio_samples_per_second+0.5);
 
     if (!lstrcmpi(_type, "Sine"))
-      s = new SineGenerator();
+      s = std::make_unique<SineGenerator>();
     else if (!lstrcmpi(_type, "Noise"))
-      s = new NoiseGenerator();
+      s = std::make_unique<NoiseGenerator>();
     else if (!lstrcmpi(_type, "Square"))
-      s = new SquareGenerator();
+      s = std::make_unique<SquareGenerator>();
     else if (!lstrcmpi(_type, "Triangle"))
-      s = new TriangleGenerator();
+      s = std::make_unique<TriangleGenerator>();
     else if (!lstrcmpi(_type, "Sawtooth"))
-      s = new SawtoothGenerator();
+      s = std::make_unique<SawtoothGenerator>();
     else if (!lstrcmpi(_type, "Silence"))
-      s = new SampleGenerator();
+      s = std::make_unique<SampleGenerator>();
     else
       env->ThrowError("Tone: Type was not recognized!");
   }
