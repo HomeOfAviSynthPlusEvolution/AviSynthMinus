@@ -4,7 +4,7 @@ AviSynthMinus 0.1 series
 This page covers the 0.1.x mainline series, starting with development based on
 AviSynth+ 3.7.5. Changes are grouped by release, newest first. Minor versions
 have separate change lists: ``changelist001`` covers 0.1.x (major 0 is written
-as ``00`` in the filename), and ``changelist002`` will cover 0.2.x.
+as ``00`` in the filename), and :doc:`changelist002` covers 0.2.x.
 
 Only changes included in AviSynthMinus are listed here. Selected upstream
 fixes are identified separately; this series does not include all features
