@@ -122,7 +122,7 @@ TEST(Histogram, DrawsClassicPerRowHistogramWithStableMapping) {
     EXPECT_TRUE(std::equal(expected.begin(), expected.end(), output_row)) << "row=" << y;
   }
   EXPECT_NE(output->CheckMemory(), 1);
-  const std::vector<int> first_requests{0, 0};
+  const std::vector<int> first_requests{0};
   EXPECT_EQ(source_clip->frame_requests(), first_requests);
   EXPECT_EQ(FrameSnapshot::capture(source, vi), source_before);
 
@@ -133,7 +133,7 @@ TEST(Histogram, DrawsClassicPerRowHistogramWithStableMapping) {
                            repeat->GetReadPtr(PLANAR_Y) + y * repeat->GetPitch(PLANAR_Y)))
         << "row=" << y;
   }
-  const std::vector<int> repeated_requests{0, 0, 0};
+  const std::vector<int> repeated_requests{0, 0};
   EXPECT_EQ(source_clip->frame_requests(), repeated_requests);
 }
 
@@ -165,7 +165,7 @@ TEST(Histogram, KeepsSourceToTheLeftOfClassicPanel) {
     EXPECT_TRUE(std::equal(expected.begin(), expected.end(), output_row + vi.width)) << "row=" << y;
   }
   EXPECT_NE(output->CheckMemory(), 1);
-  const std::vector<int> expected_requests{0, 0};
+  const std::vector<int> expected_requests{0};
   EXPECT_EQ(source_clip->frame_requests(), expected_requests);
   EXPECT_EQ(FrameSnapshot::capture(source, vi), source_before);
 }
@@ -252,7 +252,7 @@ TEST(Histogram, DrawsLevelsForEachYuvPlaneBesideKeptSource) {
   expect_bar(144, 3, 114);
   expect_bar(224, 12, 194);  // One V sample at the V baseline.
   EXPECT_NE(output->CheckMemory(), 1);
-  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>({0, 0}));
+  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>{0});
   EXPECT_EQ(FrameSnapshot::capture(source, vi), source_before);
 }
 
@@ -303,13 +303,14 @@ TEST(Histogram, PlotsSubsampledChromaInColorMode) {
       EXPECT_EQ(y_panel[v * y_pitch + u], 17) << "u=" << u << " v=" << v;
     }
   }
-  EXPECT_EQ(y_panel[1 * y_pitch + 1], 16);
+  EXPECT_EQ(y_panel[1 * y_pitch + 1], 0); // Outside the nominal chroma range.
+  EXPECT_EQ(y_panel[128 * y_pitch + 128], 16); // Empty bin within the nominal range.
   EXPECT_EQ(output->GetReadPtr(PLANAR_U)[0], 0);
   EXPECT_EQ(output->GetReadPtr(PLANAR_U)[127], 254);
   EXPECT_EQ(output->GetReadPtr(PLANAR_V)[0], 0);
   EXPECT_EQ(output->GetReadPtr(PLANAR_V)[127 * output->GetPitch(PLANAR_V)], 254);
   EXPECT_NE(output->CheckMemory(), 1);
-  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>({0, 0}));
+  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>{0});
   EXPECT_EQ(FrameSnapshot::capture(source, vi), source_before);
 }
 
@@ -390,7 +391,7 @@ TEST(Histogram, PlotsSamplesInColor2VectorscopeWithGraticule) {
   EXPECT_EQ(output->GetReadPtr(PLANAR_U)[0], 128);
   EXPECT_EQ(output->GetReadPtr(PLANAR_V)[0], 128);
   EXPECT_NE(output->CheckMemory(), 1);
-  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>({0, 0}));
+  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>{0});
   EXPECT_EQ(FrameSnapshot::capture(source, vi), source_before);
 }
 
@@ -448,7 +449,7 @@ TEST(Histogram, AmplifiesLumaAndRestoresNeutralChromaAndAlpha) {
     }
   }
   EXPECT_NE(output->CheckMemory(), 1);
-  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>({0, 0}));
+  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>{0});
   EXPECT_EQ(FrameSnapshot::capture(source, vi), source_before);
 }
 
@@ -479,7 +480,7 @@ TEST(Histogram, RejectsInvalidDisplayBitsBeforeFrameRequest) {
   EXPECT_EQ(FrameSnapshot::capture(source, vi), source_before);
 }
 
-TEST(Histogram, RejectsColor2ForGreyscaleAfterPropertyProbe) {
+TEST(Histogram, RejectsColor2ForGreyscaleWithoutRequestingFrame) {
   AviSynthEnvironment environment;
   const auto vi = make_video_info(VideoInfoSpec{4, 2, VideoInfo::CS_Y8, 1, 25, 1});
   PVideoFrame source = environment.get()->NewVideoFrame(vi);
@@ -494,7 +495,7 @@ TEST(Histogram, RejectsColor2ForGreyscaleAfterPropertyProbe) {
                          no_color_overlays(), environment.get());
       },
       AvisynthError);
-  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>{0});
+  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>{});
   EXPECT_EQ(FrameSnapshot::capture(source, vi), source_before);
 }
 
@@ -684,8 +685,8 @@ TEST(Histogram, DrawsAudioLevelsBarsFromPerFrameInt16PeaksAndRms) {
   // Far-right column is outside the meter and the dB text columns.
   EXPECT_EQ(y_base[(vi.width - 1) + (vi.height / 2) * y_pitch], 0x40);
   EXPECT_NE(output->CheckMemory(), 1);
-  // Constructor property probe plus GetFrame request.
-  EXPECT_EQ(source_clip->frame_requests(), (std::vector<int>({0, 0})));
+  // Only rendering requests a video frame.
+  EXPECT_EQ(source_clip->frame_requests(), (std::vector<int>{0}));
   EXPECT_EQ(source_clip->audio_requests(), (std::vector<AudioRequest>{{0, samples_per_frame}}));
   EXPECT_EQ(FrameSnapshot::capture(source, vi), source_before);
 }
@@ -748,8 +749,8 @@ TEST(Histogram, DrawsStereoY8LissajousFromInterleavedInt16Pairs) {
   EXPECT_EQ(pixel_at(expected_x, expected_y + 1), 16);
 
   EXPECT_NE(output->CheckMemory(), 1);
-  // Construction may probe frame 0 for matrix/color-range properties.
-  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>({0}));
+  // Audio-only rendering does not request a video frame.
+  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>());
   EXPECT_EQ(source_clip->audio_requests(), (std::vector<AudioRequest>{{0, samples_per_frame}}));
   EXPECT_EQ(FrameSnapshot::capture(source, vi), source_before);
 }
@@ -834,8 +835,8 @@ TEST(Histogram, DrawsStereoOverlayLissajousOnSourcePanel) {
   EXPECT_EQ(v_at(0, 4), 128);
 
   EXPECT_NE(output->CheckMemory(), 1);
-  // Construction may probe frame 0 for matrix/color-range properties.
-  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>({0, 0}));
+  // Rendering the overlay requests the source video frame once.
+  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>{0});
   EXPECT_EQ(source_clip->audio_requests(), (std::vector<AudioRequest>{{0, samples_per_frame}}));
   EXPECT_EQ(FrameSnapshot::capture(source, vi), source_before);
 }
@@ -856,8 +857,8 @@ TEST(Histogram, RejectsStereoWithoutTwoAudioChannels) {
                          classic_params(), environment.get());
       },
       AvisynthError);
-  // Construction may probe frame 0 for matrix/color-range properties before rejecting.
-  EXPECT_EQ(mono_clip->frame_requests(), std::vector<int>({0}));
+  // Invalid audio is rejected without requesting a video frame.
+  EXPECT_EQ(mono_clip->frame_requests(), std::vector<int>());
   EXPECT_EQ(FrameSnapshot::capture(mono_frame, mono), mono_before);
 
   auto silent = make_video_info(VideoInfoSpec{8, 8, VideoInfo::CS_Y8, 1, 25, 1});
@@ -872,7 +873,7 @@ TEST(Histogram, RejectsStereoWithoutTwoAudioChannels) {
                          nullptr, classic_params(), environment.get());
       },
       AvisynthError);
-  EXPECT_EQ(silent_clip->frame_requests(), std::vector<int>({0}));
+  EXPECT_EQ(silent_clip->frame_requests(), std::vector<int>());
   EXPECT_EQ(FrameSnapshot::capture(silent_frame, silent), silent_before);
 }
 
