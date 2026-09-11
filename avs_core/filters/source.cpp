@@ -243,7 +243,7 @@ static PVideoFrame CreateBlankFrame(const VideoInfo& vi, int color, int mode, co
     if (color_is_array) {
       color_yuv = (clamp(colors[0], 0, max_pixel_value) << 16) | (clamp(colors[1], 0, max_pixel_value) << 8) | (clamp(colors[2], 0, max_pixel_value));
     }
-    uint32_t d = ((color_yuv>>16)&255) * 0x010001 + ((color_yuv>>8)&255) * 0x0100 + (color_yuv&255) * 0x01000000;
+    uint32_t d = ((color_yuv>>16)&255) * 0x010001u + ((color_yuv>>8)&255) * 0x0100u + (color_yuv&255) * 0x01000000u;
     for (int i=0; i<size; i+=4)
       *(uint32_t *)(p+i) = d;
   } else if (vi.IsRGB24()) {
