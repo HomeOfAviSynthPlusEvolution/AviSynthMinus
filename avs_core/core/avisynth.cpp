@@ -3019,7 +3019,7 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
     else if (streqi(t, "i8mm")) cpulevel = CL_I8MM;
     else if (streqi(t, "sve2.1")) cpulevel = CL_SVE2_1;
     // i8mm is just an optional level may not dependent on sve2 and vice versa
-    else ThrowError("SetMaxCPU error: cpu level must be empty or none, neon, dotprod or sve2 (%s)", t);
+    else ThrowError("SetMaxCPU error: cpu level must be empty or none, neon, dotprod, sve2, i8mm or sve2.1 (%s)", t);
 #elif defined(X86_32) || defined(X86_64)
     else if (streqi(t, "mmx")) cpulevel = CL_MMX;
     else if (streqi(t, "sse")) cpulevel = CL_SSE;
@@ -3040,11 +3040,11 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
     if (0 == mode) { // limit
       // always switch off the more advanced features compared to previous check if limiting
 #if defined(ARM64)
-      if (cpulevel <= CL_SVE2_1) {
-        // already max level, nothing to do
-      }
-      if (cpulevel <= CL_SVE2) {
+      if (cpulevel < CL_SVE2_1) {
         cpu_flags &= ~CPUF_ARM_SVE2_1;
+      }
+      if (cpulevel < CL_I8MM) {
+        cpu_flags &= ~CPUF_ARM_I8MM;
       }
       if (cpulevel <= CL_DOTPROD) {
         cpu_flags &= ~CPUF_ARM_SVE2;

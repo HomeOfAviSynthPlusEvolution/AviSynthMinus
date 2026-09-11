@@ -48,6 +48,33 @@ TEST(V12CpuPolicy, LimitsNeverEnableFlagsOrAffectOtherEnvironments) {
   }
 }
 
+#if defined(ARM64)
+TEST(V12CpuPolicy, ArmLimitsClearEveryHigherFeature) {
+  AviSynthEnvironment environment, independent;
+  auto* env = environment.get();
+  const int64_t native = independent.get()->GetCPUFlagsEx();
+  const char* limits[] = {"none", "neon", "dotprod", "sve2", "i8mm", "sve2.1"};
+  const int64_t masks[] = {0, CPUF_ARM_NEON,
+      CPUF_ARM_NEON | CPUF_ARM_DOTPROD,
+      CPUF_ARM_NEON | CPUF_ARM_DOTPROD | CPUF_ARM_SVE2,
+      CPUF_ARM_NEON | CPUF_ARM_DOTPROD | CPUF_ARM_SVE2 | CPUF_ARM_I8MM,
+      CPUF_ARM_NEON | CPUF_ARM_DOTPROD | CPUF_ARM_SVE2 | CPUF_ARM_I8MM | CPUF_ARM_SVE2_1};
+  for (int i = 0; i < 6; ++i) {
+    // Force flags only for querying policy; never execute unsupported instructions.
+    env->Invoke("SetMaxCPU", AVSValue("neon+,dotprod+,sve2+,i8mm+,sve2.1+"));
+    env->Invoke("SetMaxCPU", AVSValue(limits[i]));
+    EXPECT_EQ(env->GetCPUFlagsEx(), masks[i]) << limits[i];
+    EXPECT_EQ(independent.get()->GetCPUFlagsEx(), native);
+  }
+  env->Invoke("SetMaxCPU", AVSValue("none,i8mm+"));
+  EXPECT_EQ(env->GetCPUFlagsEx(), CPUF_ARM_I8MM);
+  env->Invoke("SetMaxCPU", AVSValue("sve2.1"));
+  EXPECT_EQ(env->GetCPUFlagsEx(), CPUF_ARM_I8MM); // A limit does not add dependencies.
+  env->Invoke("SetMaxCPU", AVSValue("i8mm-"));
+  EXPECT_EQ(env->GetCPUFlagsEx(), 0);
+}
+#endif
+
 TEST(WorkingDirectory, GetCurrentWorkingDirectoryReturnsNonEmpty) {
 #ifdef AVS_WINDOWS
   const std::wstring cwd = CWDChanger::GetCurrentWorkingDirectory();
