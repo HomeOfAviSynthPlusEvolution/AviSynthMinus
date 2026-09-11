@@ -1523,7 +1523,6 @@ namespace detail
 #if defined(JITASM_WIN)
 				void* pbuff = ::VirtualAlloc(NULL, codesize, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 				if (!pbuff) {
-					JITASM_ASSERT(0);
 					return false;
 				}
 				MEMORY_BASIC_INFORMATION info;
@@ -1533,8 +1532,7 @@ namespace detail
 				int pagesize = getpagesize();
 				size_t buffsize = (codesize + pagesize - 1) / pagesize * pagesize;
 				void* pbuff = mmap(NULL, buffsize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANON, -1, 0);
-				if (!pbuff) {
-					JITASM_ASSERT(0);
+				if (pbuff == MAP_FAILED) {
 					return false;
 				}
 				buffsize_ = buffsize;
@@ -1848,7 +1846,8 @@ struct Frontend
 		size_t codesize = pre.GetSize();
 
 		// Write machine code to the buffer
-		codebuff_.Reset(codesize);
+		if (!codebuff_.Reset(codesize))
+			return;
 		Backend backend(codebuff_.GetPointer(), codebuff_.GetBufferSize());
 		for (InstrList::const_iterator it = instrs_.begin(); it != instrs_.end(); ++it) {
 			backend.Assemble(*it);
