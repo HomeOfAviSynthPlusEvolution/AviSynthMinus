@@ -112,6 +112,11 @@ std::vector<PVideoFrame> make_seeded_lut_frames(AviSynthEnvironment& environment
 }
 
 void skip_unavailable_variant(const ExprExecutionVariant& variant, IScriptEnvironment* environment) {
+#ifndef VS_TARGET_CPU_X86
+  if (variant.opt_avx2 || variant.opt_sse2) {
+    GTEST_SKIP() << "Expr variant " << variant.name << " requires x86 SIMD";
+  }
+#endif
   if (variant.required_cpu_flag != 0 &&
       (environment->GetCPUFlags() & variant.required_cpu_flag) == 0) {
     GTEST_SKIP() << "Expr variant " << variant.name << " requires CPU flag 0x"
@@ -133,6 +138,7 @@ TEST_P(ExprYuvVariantTest, EvaluatesSeededYuvPlanesAcrossTailWidth) {
   const auto& variant = GetParam();
   AviSynthEnvironment environment;
   skip_unavailable_variant(variant, environment.get());
+  if (IsSkipped()) return;
 
   constexpr int width = 23;
   constexpr int height = 5;
@@ -190,6 +196,7 @@ TEST_P(ExprRgbVariantTest, PreservesPlanarGbrOrderAndCopiesAlphaAtSixteenBits) {
   const auto& variant = GetParam();
   AviSynthEnvironment environment;
   skip_unavailable_variant(variant, environment.get());
+  if (IsSkipped()) return;
 
   constexpr int width = 17;
   constexpr int height = 3;

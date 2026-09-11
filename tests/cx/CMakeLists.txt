@@ -38,6 +38,11 @@ target_include_directories(cx_smoke_reject PRIVATE "${CX_SMOKE_INCLUDE_DIR}")
 set_target_properties(cx_smoke_reject PROPERTIES PREFIX "" OUTPUT_NAME "cx_smoke_reject")
 
 add_executable(cx_tests cx_tests.cpp)
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+  # Expose the static core's symbols like a shared-core host, so plugin
+  # linkage interposition is covered by ordinary (non-sanitized) tests too.
+  set_target_properties(cx_tests PROPERTIES ENABLE_EXPORTS ON)
+endif()
 target_include_directories(cx_tests PRIVATE
   "${PROJECT_SOURCE_DIR}/tests"
   "${CX_SMOKE_INCLUDE_DIR}"
@@ -111,7 +116,9 @@ add_library(cx_convert_stacked SHARED
   smoke_plugin/simple_sdk_entry.cpp
   "${CX_SMOKE_INCLUDE_DIR}/avs/cx/legacy.cpp")
 target_include_directories(cx_convert_stacked PRIVATE "${CX_SMOKE_INCLUDE_DIR}")
-target_compile_definitions(cx_convert_stacked PRIVATE INTEL_INTRINSICS)
+if(ENABLE_INTEL_SIMD)
+  target_compile_definitions(cx_convert_stacked PRIVATE INTEL_INTRINSICS)
+endif()
 set_target_properties(cx_convert_stacked PROPERTIES PREFIX "")
 add_dependencies(cx_tests cx_convert_stacked)
 target_compile_definitions(cx_tests PRIVATE CX_STACKED_PATH="$<TARGET_FILE:cx_convert_stacked>")
