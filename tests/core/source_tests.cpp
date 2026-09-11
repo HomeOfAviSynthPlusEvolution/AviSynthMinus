@@ -6,6 +6,24 @@
 namespace avsut::test {
 namespace {
 
+TEST(BlankClipFilter, Yuy2FillPreservesHighChromaBytes) {
+  AviSynthEnvironment environment;
+  for (int chroma : {0, 127, 128, 255}) {
+    // color_yuv encodes Y:U:V. V occupies the high byte of each YUYV word.
+    const int color = (42 << 16) | (173 << 8) | chroma;
+    const AVSValue args[] = {16, 8, "YUY2", color};
+    const char* names[] = {"width", "height", "pixel_type", "color_yuv"};
+    PClip clip = environment.get()->Invoke("BlankClip", AVSValue(args, 4), names).AsClip();
+    PVideoFrame frame = clip->GetFrame(0, environment.get());
+    const uint8_t expected[] = {42, 173, 42, static_cast<uint8_t>(chroma)};
+    for (int y = 0; y < frame->GetHeight(); ++y) {
+      const auto* row = frame->GetReadPtr() + y * frame->GetPitch();
+      for (int x = 0; x < frame->GetRowSize(); ++x)
+        ASSERT_EQ(row[x], expected[x % 4]) << "V=" << chroma;
+    }
+  }
+}
+
 TEST(ColorBarsFilter, FramePropertyMatrixIs601LikeForStandardYuv) {
   AviSynthEnvironment environment;
   const AVSValue pixel_type("YV12");
