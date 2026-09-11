@@ -48,6 +48,30 @@ Run `v12_tests`, `core_tests`, and `cx_tests` with CTest. The broader CX compile
 matrix is available through `tests/cx/run_matrix.ps1`. Runtime validation on
 Windows x64 does not establish Linux, ARM64, or 32-bit runtime correctness.
 
+### Validation of this port
+
+Windows x64, MSVC 14.51 and GCC 16.1.0:
+
+- MSVC full build succeeded. The full regression run contained 1,261 tests,
+  with 33 failures and one optional compiler-chain skip. An independent build
+  of the pre-port `c11f4d1e` baseline reran the affected suites (250 tests) and
+  reproduced exactly the same 33 failing test names; this run added no failures.
+- GCC built and passed the 67 selected V12/CX/core tests, with the optional
+  compiler-chain test skipped in this invocation.
+- The separate CX matrix passed all four MSVC/GCC host/plugin combinations
+  (41, 41, 40, and 40 tests), including alternating compiler chains.
+- The `release/0.2` shared DLL built successfully. A separate DLL-linked
+  consumer ran all six V12 tests successfully with MSVC plugins, then again
+  with GCC-built current/0.2.0 CX and missing-feature plugins. This exercised
+  the actual release DLL rather than the static test core. Its exported
+  `avs_get_cpu_flags_ex` and global-lock functions were also checked.
+- Generated CX value methods matched the core. Both branch trees retained
+  only their pre-existing version-macro difference after the backport.
+
+The baseline failures are in Overlay, planar conversion, levels, histogram,
+packed RGB channel extraction, and Expr tests. They are not counted as passing
+coverage and were not changed as part of the interface port.
+
 ## Upstream provenance
 
 Upstream baseline: `5c82777b374bdef16e13007a11e77d735ac1e4eb`.
