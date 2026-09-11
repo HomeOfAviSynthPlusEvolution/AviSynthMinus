@@ -240,9 +240,9 @@ Levels::Levels(PClip _child, float _in_min, double _gamma, float _in_max, float 
 
   // No lookup for float. Only slow pixel-by-pixel realtime calculation
 
-  int lookup_size = 1 << bits_per_pixel; // 256, 1024, 4096, 16384, 65536
+  int lookup_size = pixelsize == 4 ? 0 : 1 << bits_per_pixel; // no LUT for float
   real_lookup_size = (pixelsize == 1) ? 256 : 65536; // avoids lut overflow in case of non-standard content of a 10 bit clip
-  int max_pixel_value = (1 << bits_per_pixel) - 1;
+  int max_pixel_value = pixelsize == 4 ? 1 : lookup_size - 1;
 
   use_lut = bits_per_pixel != 32; // for float: realtime only
 
@@ -1623,8 +1623,8 @@ Tweak::Tweak(PClip _child, double _hue, double _sat, double _bright, double _con
 
   pixelsize = vi.ComponentSize();
   bits_per_pixel = vi.BitsPerComponent();
-  max_pixel_value = (1 << bits_per_pixel) - 1;
-  lut_size = 1 << bits_per_pixel;
+  lut_size = pixelsize == 4 ? 0 : 1 << bits_per_pixel;
+  max_pixel_value = pixelsize == 4 ? 1 : lut_size - 1;
   int safe_luma_lookup_size = (pixelsize == 1) ? 256 : 65536; // avoids lut overflow in case of non-standard content of a 10 bit clip
 
   get_limits(limits, bits_per_pixel); // tv range limits
@@ -2210,8 +2210,8 @@ MaskHS::MaskHS(PClip _child, double _startHue, double _endHue, double _maxSat, d
 
     pixelsize = vi.ComponentSize();
     bits_per_pixel = vi.BitsPerComponent();
-    max_pixel_value = (1 << bits_per_pixel) - 1;
-    lut_size = 1 << bits_per_pixel;
+    lut_size = pixelsize == 4 ? 0 : 1 << bits_per_pixel;
+    max_pixel_value = pixelsize == 4 ? 1 : lut_size - 1;
 
     get_limits(limits, bits_per_pixel);
 

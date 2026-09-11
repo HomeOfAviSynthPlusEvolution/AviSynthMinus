@@ -39,6 +39,7 @@
 #include "intel/convert_rgb_avx2.h"
 #endif
 #include <avs/alignment.h>
+#include <cstring>
 
 
 /*************************************
@@ -54,7 +55,8 @@ RGBtoRGBA::RGBtoRGBA(PClip src)
 static void convert_rgb24_to_rgb32_c(const BYTE *srcp, BYTE *dstp, size_t src_pitch, size_t dst_pitch, size_t width, size_t height) {
   for (size_t y = height; y > 0; --y) {
     for (size_t x = 0; x < width; ++x) {
-      *reinterpret_cast<int*>(dstp + x*4) = *reinterpret_cast<const int*>(srcp+x*3) | 0xFF000000;
+      std::memcpy(dstp + x*4, srcp + x*3, 3);
+      dstp[x*4+3] = 0xFF;
     }
     srcp += src_pitch;
     dstp += dst_pitch;
@@ -64,7 +66,8 @@ static void convert_rgb24_to_rgb32_c(const BYTE *srcp, BYTE *dstp, size_t src_pi
 static void convert_rgb48_to_rgb64_c(const BYTE *srcp, BYTE *dstp, size_t src_pitch, size_t dst_pitch, size_t width, size_t height) {
   for (size_t y = height; y > 0; --y) {
     for (size_t x = 0; x < width; ++x) {
-      *reinterpret_cast<uint64_t*>(dstp + x*8) = *reinterpret_cast<const uint64_t*>(srcp+x*6) | 0xFFFF000000000000ULL;
+      std::memcpy(dstp + x*8, srcp + x*6, 6);
+      dstp[x*8+6] = dstp[x*8+7] = 0xFF;
     }
     srcp += src_pitch;
     dstp += dst_pitch;
@@ -118,14 +121,9 @@ RGBAtoRGB::RGBAtoRGB(PClip src)
 
 static void convert_rgb32_to_rgb24_c(const BYTE *srcp, BYTE *dstp, size_t src_pitch, size_t dst_pitch, size_t width, size_t height) {
   for (size_t y = height; y > 0; --y) {
-    size_t x;
-    for (x = 0; x < width-1; ++x) {
-      *reinterpret_cast<int*>(dstp+x*3) = *reinterpret_cast<const int*>(srcp+x*4);
+    for (size_t x = 0; x < width; ++x) {
+      std::memcpy(dstp + x*3, srcp + x*4, 3);
     }
-    //last pixel
-    dstp[x*3+0] = srcp[x*4+0];
-    dstp[x*3+1] = srcp[x*4+1];
-    dstp[x*3+2] = srcp[x*4+2];
 
     srcp += src_pitch;
     dstp += dst_pitch;
@@ -134,14 +132,9 @@ static void convert_rgb32_to_rgb24_c(const BYTE *srcp, BYTE *dstp, size_t src_pi
 
 static void convert_rgb64_to_rgb48_c(const BYTE *srcp, BYTE *dstp, size_t src_pitch, size_t dst_pitch, size_t width, size_t height) {
   for (size_t y = height; y > 0; --y) {
-    size_t x;
-    for (x = 0; x < width-1; ++x) { // width-1 really!
-      *reinterpret_cast<uint64_t*>(dstp+x*6) = *reinterpret_cast<const uint64_t*>(srcp+x*8);
+    for (size_t x = 0; x < width; ++x) {
+      std::memcpy(dstp + x*6, srcp + x*8, 6);
     }
-    //last pixel
-    reinterpret_cast<uint16_t*>(dstp)[x*3+0] = reinterpret_cast<const uint16_t*>(srcp)[x*4+0];
-    reinterpret_cast<uint16_t*>(dstp)[x*3+1] = reinterpret_cast<const uint16_t*>(srcp)[x*4+1];
-    reinterpret_cast<uint16_t*>(dstp)[x*3+2] = reinterpret_cast<const uint16_t*>(srcp)[x*4+2];
 
     srcp += src_pitch;
     dstp += dst_pitch;

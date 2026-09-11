@@ -847,6 +847,26 @@ TEST(AddBordersFilter, AddsPackedBgr24LogicalBorders) {
   EXPECT_EQ(FrameSnapshot::capture(source, vi), source_before);
 }
 
+TEST(AddBordersFilter, AddsPackedBgr48BordersAtTwoByteAlignedPixelOffsets) {
+  AviSynthEnvironment environment;
+  const auto vi = make_video_info(VideoInfoSpec{5, 3, VideoInfo::CS_BGR48, 1, 25, 1});
+  PVideoFrame source = environment.get()->NewVideoFrame(vi);
+  fill_plane_full_pitch(source, 0xb2, DEFAULT_PLANE);
+  fill_packed_pattern<std::uint16_t>(source, 3, 1000);
+  const auto source_before = FrameSnapshot::capture(source, vi);
+  auto* source_clip = new StaticFrameClip(vi, source);
+  const PClip clip(source_clip);
+
+  AddBorders filter(1, 1, 2, 2, 0x00112233, false, clip, environment.get());
+  const PVideoFrame output = filter.GetFrame(0, environment.get());
+
+  expect_bordered_packed<std::uint16_t>(source, output, 1, 1, 2, 2, 3,
+      std::array<std::uint16_t, 4>{0x3333, 0x2222, 0x1111, 0});
+  EXPECT_NE(output->CheckMemory(), 1);
+  EXPECT_EQ(source_clip->frame_requests(), std::vector<int>{0});
+  EXPECT_EQ(FrameSnapshot::capture(source, vi), source_before);
+}
+
 TEST(AddBordersFilter, AddsPackedBgr64SixteenBitBorders) {
   AviSynthEnvironment environment;
   constexpr int source_width = 3;
