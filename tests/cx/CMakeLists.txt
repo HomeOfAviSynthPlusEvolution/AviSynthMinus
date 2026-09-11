@@ -38,7 +38,7 @@ target_include_directories(cx_smoke_reject PRIVATE "${CX_SMOKE_INCLUDE_DIR}")
 set_target_properties(cx_smoke_reject PROPERTIES PREFIX "" OUTPUT_NAME "cx_smoke_reject")
 
 add_executable(cx_tests cx_tests.cpp)
-if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$")
   # Expose the static core's symbols like a shared-core host, so plugin
   # linkage interposition is covered by ordinary (non-sanitized) tests too.
   set_target_properties(cx_tests PROPERTIES ENABLE_EXPORTS ON)

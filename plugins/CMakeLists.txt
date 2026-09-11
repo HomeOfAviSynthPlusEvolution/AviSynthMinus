@@ -1,6 +1,6 @@
 include_directories(${AvsCore_SOURCE_DIR}/include)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$")
   # Keep plugin SDK state (notably AVS_linkage) bound to the plugin, rather
   # than interposing the shared core's same-named exported symbols.
   string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl,-Bsymbolic")
