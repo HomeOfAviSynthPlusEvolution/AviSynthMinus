@@ -1,7 +1,8 @@
 add_executable(convert_planar_tests
   convert_to_planar_tests.cpp
-  convert_yv24_rgb_tests.cpp
+  yuy2_api_tests.cpp
 )
+
 target_include_directories(convert_planar_tests PRIVATE
   ${PROJECT_SOURCE_DIR}/tests
   ${PROJECT_SOURCE_DIR}/avs_core/include

@@ -44,8 +44,6 @@ struct ConversionMatrix {
   int v_r, v_g, v_b;
 
   // used in YUY2 RGB->YUY2 asm
-  int ku, ku_luma;
-  int kv, kv_luma;
 
   float y_r_f, y_g_f, y_b_f;
   float u_r_f, u_g_f, u_b_f;
@@ -57,6 +55,7 @@ struct ConversionMatrix {
   float offset_rgb_f;
 };
 
+bool GetKrKb(int matrix, double& kr, double& kb);
 bool do_BuildMatrix_Rgb2Yuv(int _Matrix, int _ColorRange, int _ColorRange_Out, int int_arith_shift, int bits_per_pixel, ConversionMatrix& matrix);
 bool do_BuildMatrix_Yuv2Rgb(int _Matrix, int _ColorRange, int _ColorRange_Out, int int_arith_shift, int bits_per_pixel, ConversionMatrix& matrix);
 

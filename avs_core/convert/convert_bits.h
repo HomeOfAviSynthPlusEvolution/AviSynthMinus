@@ -38,42 +38,9 @@
 #include <avisynth.h>
 #include <stdint.h>
 #include "convert.h"
+#include "avs_video_convert/depth.h"
+#include "avs_video_convert/dither.h"
 
-
-// in convert_bits.cpp
-// repeated 8x for sse size 16
-extern const BYTE dither2x2a_data[4];
-// cycle: 2
-extern const BYTE dither2x2a_data_sse2[2 * 16];
-// e.g. 10->8 bits
-// repeated 8x for sse size 16
-extern const BYTE dither2x2_data[4];
-// cycle: 2
-extern const BYTE dither2x2_data_sse2[2 * 16];
-// e.g. 8->5 bits
-extern const BYTE dither4x4a_data[16];
-// cycle: 4
-extern const BYTE dither4x4a_data_sse2[4 * 16];
-// e.g. 12->8 bits
-extern const BYTE dither4x4_data[16];
-// cycle: 4
-extern const BYTE dither4x4_data_sse2[4 * 16];
-// e.g. 14->9 bits
-extern const BYTE dither8x8a_data[8][8];
-// cycle: 8
-extern const BYTE dither8x8a_data_sse2[8][16];
-// e.g. 14->8 bits
-extern const BYTE dither8x8_data[8][8];
-// cycle: 8
-extern const BYTE dither8x8_data_sse2[8][16];
-// e.g. 16->9 or 8->1 bits
-// cycle: 16x. No special 16 byte sse2
-extern const BYTE dither16x16a_data[16][16];
-// 16->8
-// cycle: 16x. No special 16 byte sse2
-extern const BYTE dither16x16_data[16][16];
-
-typedef void (*BitDepthConvFuncPtr)(const BYTE *srcp, BYTE *dstp, int src_rowsize, int src_height, int src_pitch, int dst_pitch, int source_bitdepth, int target_bitdepth, int dither_target_bitdepth);
 
 class ConvertBits : public GenericVideoFilter
 {
@@ -88,11 +55,8 @@ public:
 
   static AVSValue __cdecl Create(AVSValue args, void*, IScriptEnvironment* env);
 private:
-  BitDepthConvFuncPtr conv_function;
-  BitDepthConvFuncPtr conv_function_chroma; // 32bit float YUV chroma
-  BitDepthConvFuncPtr conv_function_a;
-  BitDepthConvFuncPtr conv_function_alternate;
-  BitDepthConvFuncPtr conv_function_chroma_alternate;
+  std::unique_ptr<avs_video_convert::DepthPlans> depth_plans;
+  std::unique_ptr<avs_video_convert::DitherPlans> dither_plans;
   int target_bitdepth;
   int dither_mode;
   int dither_bitdepth;

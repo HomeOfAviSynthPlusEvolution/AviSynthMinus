@@ -3,6 +3,9 @@ if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$")
   # Match the symbol isolation used for the shipped plugins.
   string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl,-Bsymbolic")
 endif()
+# Keep executable discovery configuration-specific for multi-config generators.
+set(CMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST)
+
 include(FetchContent)
 
 set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
@@ -42,7 +45,6 @@ add_subdirectory(limiter)
 add_subdirectory(overlay)
 add_subdirectory(overlay_filter)
 add_subdirectory(planeswap)
-add_subdirectory(greyscale)
 add_subdirectory(focus)
 # add_subdirectory(layer) -- tests 3.7.6-dev new Layer placement and AVX2 features
 # add_subdirectory(layer_filter) -- tests 3.7.6-dev new Layer placement features
@@ -52,10 +54,9 @@ add_subdirectory(resize)
 add_subdirectory(resize_filter)
 add_subdirectory(transform_filter)
 add_subdirectory(conditional)
-add_subdirectory(convert_bits)
+add_subdirectory(convert_bits_api)
 add_subdirectory(convert_matrix)
 add_subdirectory(convert_planar)
-add_subdirectory(convert_rgb)
 add_subdirectory(convert_rgb_filter)
 add_subdirectory(text_overlay)
 add_subdirectory(avi_helper)

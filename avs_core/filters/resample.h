@@ -36,90 +36,7 @@
 #define __Resample_H__
 
 #include <avisynth.h>
-#include "resample_functions.h"
-
-void resize_prepare_coeffs(ResamplingProgram* p, IScriptEnvironment* env, int alignFilterSize8or16);
-
-// Resizer function pointer
-typedef void (*ResamplerV)(BYTE* dst, const BYTE* src, int dst_pitch, int src_pitch, ResamplingProgram* program, int width, int target_height, int bits_per_pixel);
-typedef void (*ResamplerH)(BYTE* dst, const BYTE* src, int dst_pitch, int src_pitch, ResamplingProgram* program, int width, int target_height, int bits_per_pixel);
-
-// Turn function pointer -- copied from turn.h
-typedef void (*TurnFuncPtr) (const BYTE* srcp, BYTE* dstp, int width, int height, int src_pitch, int dst_pitch);
-
-/**
-  * Class to resize in the horizontal direction using a specified sampling filter
-  * Helper for resample functions
- **/
-class FilteredResizeH : public GenericVideoFilter
-{
-public:
-  FilteredResizeH(PClip _child, double subrange_left, double subrange_width, int target_width, ResamplingFunction* func, 
-    bool preserve_center, int chroma_placement, IScriptEnvironment* env);
-  virtual ~FilteredResizeH(void);
-  PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
-
-  int __stdcall SetCacheHints(int cachehints, int frame_range) override {
-    AVS_UNUSED(frame_range);
-    return cachehints == CACHE_GET_MTMODE ? MT_NICE_FILTER : 0;
-  }
-
-  static ResamplerH GetResampler(int CPU, int pixelsize, int bits_per_pixel, ResamplingProgram* program, IScriptEnvironment* env);
-
-private:
-  // Resampling
-  ResamplingProgram* resampling_program_luma;
-  ResamplingProgram* resampling_program_chroma;
-
-  int temp_1_pitch, temp_2_pitch;
-
-  int src_width, src_height, dst_width, dst_height;
-  bool grey;
-  int pixelsize; // AVS16
-  int bits_per_pixel;
-
-  ResamplerH resampler_h_luma;
-  ResamplerH resampler_h_chroma;
-  bool fast_resize;
-
-  ResamplerV resampler_luma;
-  ResamplerV resampler_chroma;
-
-  TurnFuncPtr turn_left, turn_right;
-};
-
-
-/**
-  * Class to resize in the vertical direction using a specified sampling filter
-  * Helper for resample functions
- **/
-class FilteredResizeV : public GenericVideoFilter
-{
-public:
-  FilteredResizeV(PClip _child, double subrange_top, double subrange_height, int target_height, ResamplingFunction* func, 
-    bool preserve_center, int chroma_placement, IScriptEnvironment* env);
-  virtual ~FilteredResizeV(void);
-  PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
-
-  int __stdcall SetCacheHints(int cachehints, int frame_range) override {
-    AVS_UNUSED(frame_range);
-    return cachehints == CACHE_GET_MTMODE ? MT_NICE_FILTER : 0;
-  }
-
-  static ResamplerV GetResampler(int CPU, int pixelsize, int bits_per_pixel, ResamplingProgram* program, IScriptEnvironment* env);
-
-private:
-  bool grey;
-  int pixelsize; // AVS16
-  int bits_per_pixel;
-
-  ResamplingProgram* resampling_program_luma;
-  ResamplingProgram* resampling_program_chroma;
-
-  ResamplerV resampler_luma;
-  ResamplerV resampler_chroma;
-};
-
+#include <video_convert/resample.h>
 
 /*** Resample factory methods ***/
 
@@ -130,17 +47,17 @@ class FilteredResize
 {
 public:
   static PClip CreateResizeH(PClip clip, double subrange_left, double subrange_width, int target_width, bool force,
-    ResamplingFunction* func, 
+    const vc_filter_spec& func,
     bool preserve_center, int chroma_placement,
     IScriptEnvironment* env);
 
   static PClip CreateResizeV(PClip clip, double subrange_top, double subrange_height, int target_height, bool force,
-    ResamplingFunction* func, 
+    const vc_filter_spec& func,
     bool preserve_center, int chroma_placement,
     IScriptEnvironment* env);
 
   static PClip CreateResize(PClip clip, int target_width, int target_height, const AVSValue* args, int force,
-    ResamplingFunction* f, 
+    const vc_filter_spec& f,
     bool preserve_center, const char *placement_name, int forced_chroma_placement,
     IScriptEnvironment* env);
 

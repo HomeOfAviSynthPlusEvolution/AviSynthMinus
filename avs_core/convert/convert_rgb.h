@@ -38,13 +38,16 @@
 #include <avisynth.h>
 
 
+struct vc_layout_functions;
+
 class RGBtoRGBA : public GenericVideoFilter
 /**
   * RGB -> RGBA, setting alpha channel to 255/65535
   */
 {
 public:
-  RGBtoRGBA(PClip src);
+  RGBtoRGBA(PClip src, IScriptEnvironment* env);
+  const vc_layout_functions* layout;
   PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
 
   int __stdcall SetCacheHints(int cachehints, int frame_range) override {
@@ -60,7 +63,8 @@ class RGBAtoRGB : public GenericVideoFilter
   */
 {
 public:
-  RGBAtoRGB(PClip src);
+  RGBAtoRGB(PClip src, IScriptEnvironment* env);
+  const vc_layout_functions* layout;
   PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
 
   int __stdcall SetCacheHints(int cachehints, int frame_range) override {
@@ -75,7 +79,8 @@ class PackedRGBtoPlanarRGB : public GenericVideoFilter
   */
 {
 public:
-  PackedRGBtoPlanarRGB(PClip src, bool _sourceHasAlpha, bool _targetHasAlpha);
+  PackedRGBtoPlanarRGB(PClip src, bool _sourceHasAlpha, bool _targetHasAlpha, IScriptEnvironment* env);
+  const vc_layout_functions* layout;
   PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
 
   int __stdcall SetCacheHints(int cachehints, int frame_range) override {
@@ -93,7 +98,8 @@ class PlanarRGBtoPackedRGB : public GenericVideoFilter
   */
 {
 public:
-  PlanarRGBtoPackedRGB(PClip src, bool _targetHasAlpha);
+  PlanarRGBtoPackedRGB(PClip src, bool _targetHasAlpha, IScriptEnvironment* env);
+  const vc_layout_functions* layout;
   PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
 
   int __stdcall SetCacheHints(int cachehints, int frame_range) override {

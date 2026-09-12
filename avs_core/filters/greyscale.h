@@ -55,14 +55,13 @@ public:
   }
 
 private:
-  void BuildGreyMatrix(IScriptEnvironment *env);
-  ConversionMatrix greyMatrix;
+  const vc_layout_functions* layout = nullptr;
+  std::unique_ptr<avs_video_convert::MatrixPlan> matrix_plan;
   int theMatrix;
   int theColorRange;
   int theOutColorRange;
   int pixelsize;
   int bits_per_pixel;
-  bool coeff_int16_overflow;
 
 };
 

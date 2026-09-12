@@ -205,7 +205,7 @@ AVSValue __cdecl SwapUVToY::CreateAnyToY8(AVSValue args, void* user_data, IScrip
   // We convert them to planar RGB (R,G,B plane reqest) or planar RGBA (only if A plane requested)
   if (vi_input.IsRGB() && !vi_input.IsPlanarRGB() && !vi_input.IsPlanarRGBA()) {
     if (mode == AToY8 || mode == RToY8 || mode == GToY8 || mode == BToY8) {
-      clip = new PackedRGBtoPlanarRGB(clip, vi_input.IsRGB32() || vi_input.IsRGB64(), mode == AToY8);
+      clip = new PackedRGBtoPlanarRGB(clip, vi_input.IsRGB32() || vi_input.IsRGB64(), mode == AToY8, env);
     }
   }
 
@@ -670,7 +670,7 @@ CombinePlanes::CombinePlanes(PClip _child, PClip _clip2, PClip _clip3, PClip _cl
     const VideoInfo &vi_test = clips[i]->GetVideoInfo();
     if (vi_test.IsRGB() && !vi_test.IsPlanar()) {
       bool hasAlpha = vi_test.NumComponents() == 4;
-      clips[i] = new PackedRGBtoPlanarRGB(clips[i], hasAlpha, hasAlpha);
+      clips[i] = new PackedRGBtoPlanarRGB(clips[i], hasAlpha, hasAlpha, env);
     }
     else if (vi_test.IsYUY2()) {
       AVSValue emptyValue;

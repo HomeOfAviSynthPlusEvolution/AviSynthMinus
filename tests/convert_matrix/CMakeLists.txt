@@ -1,6 +1,9 @@
 add_executable(convert_matrix_tests
   convert_matrix_properties_tests.cpp
   convert_matrix_parser_tests.cpp
+  convert_matrix_gain_tests.cpp
+  convert_matrix_planar_tests.cpp
+  convert_matrix_packed_tests.cpp
 )
 target_include_directories(convert_matrix_tests PRIVATE
   ${PROJECT_SOURCE_DIR}/tests

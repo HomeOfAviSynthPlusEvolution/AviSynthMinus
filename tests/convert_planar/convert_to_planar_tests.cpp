@@ -1510,7 +1510,7 @@ TEST(ConvertToPlanarGeneric, UpsamplesYuv420PsToYuv444PsWithPointFilter) {
   EXPECT_EQ(FrameSnapshot::capture(source_frame, source_vi), source_before);
 }
 
-TEST(ConvertToPlanarGeneric, ExtractsYv24LumaAsY8Subframe) {
+TEST(ConvertToY, ExtractsYv24LumaAsY8Subframe) {
   AviSynthEnvironment environment;
   const auto source_vi =
       make_video_info(VideoInfoSpec{kSourceWidth, kSourceHeight, VideoInfo::CS_YV24, 1, 25, 1});
@@ -1523,18 +1523,16 @@ TEST(ConvertToPlanarGeneric, ExtractsYv24LumaAsY8Subframe) {
   auto* source_clip_impl = new StaticFrameClip(source_vi, source_frame);
   const PClip source(source_clip_impl);
 
-  const AVSValue point_resampler("point");
-  const AVSValue no_parameter;
-  ConvertToPlanarGeneric filter(source, VideoInfo::CS_Y8, false, AVS_CHROMA_UNUSED, point_resampler,
-                                no_parameter, no_parameter, no_parameter, AVS_CHROMA_UNUSED,
-                                environment.get());
+  // The public grayscale route is ConvertToY, not ConvertToPlanarGeneric,
+  // whose constructor requires a destination with chroma planes.
+  const PClip filter = environment.get()->Invoke("ConvertToY8", AVSValue(source)).AsClip();
 
-  ASSERT_EQ(filter.GetVideoInfo().pixel_type, VideoInfo::CS_Y8);
-  ASSERT_EQ(filter.GetVideoInfo().width, kSourceWidth);
-  ASSERT_EQ(filter.GetVideoInfo().height, kSourceHeight);
-  EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
+  ASSERT_EQ(filter->GetVideoInfo().pixel_type, VideoInfo::CS_Y8);
+  ASSERT_EQ(filter->GetVideoInfo().width, kSourceWidth);
+  ASSERT_EQ(filter->GetVideoInfo().height, kSourceHeight);
+  EXPECT_EQ(filter->SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
 
-  const PVideoFrame output = filter.GetFrame(0, environment.get());
+  const PVideoFrame output = filter->GetFrame(0, environment.get());
   ASSERT_EQ(output->GetRowSize(PLANAR_Y), kSourceWidth);
   ASSERT_EQ(output->GetHeight(PLANAR_Y), kSourceHeight);
   for (int y = 0; y < kSourceHeight; ++y) {
@@ -2134,9 +2132,19 @@ TEST(ConvertToPlanarGeneric, UpsamplesInterlacedYv12TopLeftChromaToYv24) {
   ASSERT_EQ(output->GetHeight(PLANAR_U), kInterlacedYv12Height);
   ASSERT_EQ(output->GetHeight(PLANAR_V), kInterlacedYv12Height);
 
-  // Resize each field independently: source rows 0/2 feed the top field and
-  // source rows 1/3 feed the bottom field before the fields are interleaved.
-  constexpr int source_chroma_rows[kInterlacedYv12Height] = {0, 1, 0, 1, 2, 3, 2, 3};
+  // Point uses source-cell selection from the crop start (no center shift).
+  // Top-left chroma has field-local vertical positions 0 (top) and 1/2
+  // (bottom), versus 0 for the 4:4:4 destination. With source subsampling 2,
+  // crop starts are 0 and -1/4. Each output field row advances by 1/2 source
+  // row. The bottom phase must not be replaced by unshifted row duplication.
+  int source_chroma_rows[kInterlacedYv12Height];
+  for (int y = 0; y < kInterlacedYv12Height; ++y) {
+    const int field = y % 2;
+    const double position = (y / 2) * 0.5 - field * 0.25;
+    const int field_source = std::clamp(static_cast<int>(std::floor(position)),
+                                       0, kInterlacedYv12Height / 4 - 1);
+    source_chroma_rows[y] = 2 * field_source + field;
+  }
   for (int y = 0; y < kInterlacedYv12Height; ++y) {
     const auto* source_y =
         source_frame->GetReadPtr(PLANAR_Y) + y * source_frame->GetPitch(PLANAR_Y);
@@ -2163,6 +2171,19 @@ TEST(ConvertToPlanarGeneric, UpsamplesInterlacedYv12TopLeftChromaToYv24) {
   EXPECT_EQ(source_clip_impl->frame_requests(), expected_requests);
   EXPECT_NE(source_frame->CheckMemory(), 1);
   EXPECT_NE(output->CheckMemory(), 1);
+  const AVSValue public_args[] = {source, true, "point", "top_left"};
+  const char* public_names[] = {nullptr, "interlaced", "chromaresample", "ChromaInPlacement"};
+  const PClip public_filter = environment.get()->Invoke(
+      "ConvertToYV24", AVSValue(public_args, 4), public_names).AsClip();
+  const PVideoFrame public_output = public_filter->GetFrame(0, environment.get());
+  for (int plane : {PLANAR_Y, PLANAR_U, PLANAR_V}) {
+    for (int y = 0; y < output->GetHeight(plane); ++y) {
+      const auto* expected_row = output->GetReadPtr(plane) + y * output->GetPitch(plane);
+      const auto* public_row = public_output->GetReadPtr(plane) + y * public_output->GetPitch(plane);
+      for (int x = 0; x < output->GetRowSize(plane); ++x)
+        EXPECT_EQ(public_row[x], expected_row[x]);
+    }
+  }
   EXPECT_EQ(FrameSnapshot::capture(source_frame, source_vi), source_before);
 }
 

@@ -27,6 +27,12 @@
 
 namespace {
 
+// Original fixed-point resampling contract, independent of private kernels.
+constexpr int FPScale8bits = 14;
+constexpr int FPScale16bits = 13;
+constexpr int FPScale = 1 << FPScale8bits;
+constexpr int FPScale16 = 1 << FPScale16bits;
+
 using avsut::test::AviSynthEnvironment;
 using avsut::test::fill_plane_full_pitch;
 using avsut::test::FrameSnapshot;
@@ -370,11 +376,11 @@ TEST(FilteredResizeFilter, PointResizeHorizontalUsesNearestSourceCoordinates) {
   const auto source_before = FrameSnapshot::capture(source, vi);
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
-  PointFilter point_filter;
+  const vc_filter_spec point_filter{VC_POINT, {}};
 
-  FilteredResizeH filter(clip, 0.0, static_cast<double>(source_width), target_width, &point_filter,
+  PClip filter = FilteredResize::CreateResizeH(clip, 0.0, static_cast<double>(source_width), target_width, true, point_filter,
                          false, -1, environment.get());
-  const PVideoFrame output = filter.GetFrame(0, environment.get());
+  const PVideoFrame output = filter->GetFrame(0, environment.get());
 
   ASSERT_EQ(output->GetRowSize(PLANAR_Y), target_width);
   for (const int plane : {PLANAR_Y, PLANAR_U, PLANAR_V}) {
@@ -404,11 +410,11 @@ TEST(FilteredResizeFilter, PointResizeVerticalUsesNearestSourceCoordinates) {
   const auto source_before = FrameSnapshot::capture(source, vi);
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
-  PointFilter point_filter;
+  const vc_filter_spec point_filter{VC_POINT, {}};
 
-  FilteredResizeV filter(clip, 0.0, static_cast<double>(source_height), target_height,
-                         &point_filter, false, -1, environment.get());
-  const PVideoFrame output = filter.GetFrame(0, environment.get());
+  PClip filter = FilteredResize::CreateResizeV(clip, 0.0, static_cast<double>(source_height), target_height,
+                         true, point_filter, false, -1, environment.get());
+  const PVideoFrame output = filter->GetFrame(0, environment.get());
 
   ASSERT_EQ(output->GetHeight(), target_height);
   for (const int plane : {PLANAR_Y, PLANAR_U, PLANAR_V}) {
@@ -536,19 +542,19 @@ void run_planar_triangle_case(const PlanarResizeCase& test_case) {
   const auto source_before = FrameSnapshot::capture(source, vi);
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
-  TriangleFilter triangle_filter;
+  const vc_filter_spec triangle_filter{VC_TRIANGLE, {}};
 
   PVideoFrame output;
   if (horizontal) {
-    FilteredResizeH filter(clip, 0.0, static_cast<double>(source_width), target_width,
-                           &triangle_filter, true, test_case.placement, environment.get());
-    EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
-    output = filter.GetFrame(0, environment.get());
+    PClip filter = FilteredResize::CreateResizeH(clip, 0.0, static_cast<double>(source_width), target_width,
+                           true, triangle_filter, true, test_case.placement, environment.get());
+    EXPECT_EQ(filter->SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
+    output = filter->GetFrame(0, environment.get());
   } else {
-    FilteredResizeV filter(clip, 0.0, static_cast<double>(source_height), target_height,
-                           &triangle_filter, true, test_case.placement, environment.get());
-    EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
-    output = filter.GetFrame(0, environment.get());
+    PClip filter = FilteredResize::CreateResizeV(clip, 0.0, static_cast<double>(source_height), target_height,
+                           true, triangle_filter, true, test_case.placement, environment.get());
+    EXPECT_EQ(filter->SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
+    output = filter->GetFrame(0, environment.get());
   }
 
   for (const int plane : video_frame_planes(vi)) {
@@ -654,31 +660,31 @@ void run_extra_resize_case(const ExtraResizeCase& test_case) {
   const PClip clip(source_clip);
 
   PVideoFrame output;
-  std::unique_ptr<ResamplingFunction> filter_function;
+  vc_filter_spec filter_function{};
   switch (test_case.kernel) {
     case ExtraResizeKernel::MitchellNetravali:
-      filter_function = std::make_unique<MitchellNetravaliFilter>();
+      filter_function = vc_filter_spec{VC_BICUBIC, {1.0 / 3, 1.0 / 3}};
       break;
     case ExtraResizeKernel::Lanczos3:
-      filter_function = std::make_unique<LanczosFilter>(3);
+      filter_function = vc_filter_spec{VC_LANCZOS, {3}};
       break;
     case ExtraResizeKernel::Spline36:
-      filter_function = std::make_unique<Spline36Filter>();
+      filter_function = vc_filter_spec{VC_SPLINE36, {}};
       break;
     case ExtraResizeKernel::Sinc4:
-      filter_function = std::make_unique<SincFilter>(4);
+      filter_function = vc_filter_spec{VC_SINC, {4}};
       break;
   }
   if (horizontal) {
-    FilteredResizeH filter(clip, 0.0, static_cast<double>(source_width), target_width,
-                           filter_function.get(), true, AVS_CHROMA_UNUSED, environment.get());
-    EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
-    output = filter.GetFrame(0, environment.get());
+    PClip filter = FilteredResize::CreateResizeH(clip, 0.0, static_cast<double>(source_width), target_width,
+                           true, filter_function, true, AVS_CHROMA_UNUSED, environment.get());
+    EXPECT_EQ(filter->SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
+    output = filter->GetFrame(0, environment.get());
   } else {
-    FilteredResizeV filter(clip, 0.0, static_cast<double>(source_height), target_height,
-                           filter_function.get(), true, AVS_CHROMA_UNUSED, environment.get());
-    EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
-    output = filter.GetFrame(0, environment.get());
+    PClip filter = FilteredResize::CreateResizeV(clip, 0.0, static_cast<double>(source_height), target_height,
+                           true, filter_function, true, AVS_CHROMA_UNUSED, environment.get());
+    EXPECT_EQ(filter->SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
+    output = filter->GetFrame(0, environment.get());
   }
 
   for (const int plane : {PLANAR_Y, PLANAR_U, PLANAR_V}) {
@@ -758,19 +764,19 @@ TEST_P(Spline36Rgb16ResizeTest, AppliesSpline36ReferenceToSixteenBitPlanarRgb) {
   const auto source_before = FrameSnapshot::capture(source, vi);
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
-  Spline36Filter filter_function;
+  const vc_filter_spec filter_function{VC_SPLINE36, {}};
 
   PVideoFrame output;
   if (horizontal) {
-    FilteredResizeH filter(clip, 0.0, static_cast<double>(source_width), target_width,
-                           &filter_function, true, AVS_CHROMA_UNUSED, environment.get());
-    EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
-    output = filter.GetFrame(0, environment.get());
+    PClip filter = FilteredResize::CreateResizeH(clip, 0.0, static_cast<double>(source_width), target_width,
+                           true, filter_function, true, AVS_CHROMA_UNUSED, environment.get());
+    EXPECT_EQ(filter->SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
+    output = filter->GetFrame(0, environment.get());
   } else {
-    FilteredResizeV filter(clip, 0.0, static_cast<double>(source_height), target_height,
-                           &filter_function, true, AVS_CHROMA_UNUSED, environment.get());
-    EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
-    output = filter.GetFrame(0, environment.get());
+    PClip filter = FilteredResize::CreateResizeV(clip, 0.0, static_cast<double>(source_height), target_height,
+                           true, filter_function, true, AVS_CHROMA_UNUSED, environment.get());
+    EXPECT_EQ(filter->SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
+    output = filter->GetFrame(0, environment.get());
   }
 
   for (const int plane : video_frame_planes(vi)) {
@@ -871,19 +877,19 @@ void run_packed_triangle_case(const PackedResizeCase& test_case) {
   const auto source_before = FrameSnapshot::capture(source, vi);
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
-  TriangleFilter triangle_filter;
+  const vc_filter_spec triangle_filter{VC_TRIANGLE, {}};
 
   PVideoFrame output;
   if (horizontal) {
-    FilteredResizeH filter(clip, 0.0, static_cast<double>(source_width), target_width,
-                           &triangle_filter, true, AVS_CHROMA_UNUSED, environment.get());
-    EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
-    output = filter.GetFrame(0, environment.get());
+    PClip filter = FilteredResize::CreateResizeH(clip, 0.0, static_cast<double>(source_width), target_width,
+                           true, triangle_filter, true, AVS_CHROMA_UNUSED, environment.get());
+    EXPECT_EQ(filter->SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
+    output = filter->GetFrame(0, environment.get());
   } else {
-    FilteredResizeV filter(clip, 0.0, static_cast<double>(source_height), target_height,
-                           &triangle_filter, true, AVS_CHROMA_UNUSED, environment.get());
-    EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
-    output = filter.GetFrame(0, environment.get());
+    PClip filter = FilteredResize::CreateResizeV(clip, 0.0, static_cast<double>(source_height), target_height,
+                           true, triangle_filter, true, AVS_CHROMA_UNUSED, environment.get());
+    EXPECT_EQ(filter->SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
+    output = filter->GetFrame(0, environment.get());
   }
 
   const int source_axis = horizontal ? source_width : source_height;
@@ -956,17 +962,17 @@ TEST_P(ResizeFramePropertiesTest, PreservesChromaRangeAndFieldProperties) {
   const auto source_before = FrameSnapshot::capture(source, vi);
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
-  PointFilter point_filter;
+  const vc_filter_spec point_filter{VC_POINT, {}};
 
   PVideoFrame output;
   if (horizontal) {
-    FilteredResizeH filter(clip, 0.0, static_cast<double>(source_width), 6, &point_filter, true,
+    PClip filter = FilteredResize::CreateResizeH(clip, 0.0, static_cast<double>(source_width), 6, true, point_filter, true,
                            AVS_CHROMA_CENTER, environment.get());
-    output = filter.GetFrame(0, environment.get());
+    output = filter->GetFrame(0, environment.get());
   } else {
-    FilteredResizeV filter(clip, 0.0, static_cast<double>(source_height), 4, &point_filter, true,
+    PClip filter = FilteredResize::CreateResizeV(clip, 0.0, static_cast<double>(source_height), 4, true, point_filter, true,
                            AVS_CHROMA_CENTER, environment.get());
-    output = filter.GetFrame(0, environment.get());
+    output = filter->GetFrame(0, environment.get());
   }
 
   for (const auto& property : std::array<std::pair<const char*, int>, 3>{
@@ -996,10 +1002,10 @@ TEST(FilteredResizeFilter, RejectsOddYv12HorizontalTargetWidth) {
   const auto source_before = FrameSnapshot::capture(source, vi);
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
-  TriangleFilter triangle_filter;
+  const vc_filter_spec triangle_filter{VC_TRIANGLE, {}};
 
   EXPECT_THROW(
-      FilteredResizeH(clip, 0.0, static_cast<double>(width), 7, &triangle_filter, true,
+      FilteredResize::CreateResizeH(clip, 0.0, static_cast<double>(width), 7, true, triangle_filter, true,
                       AVS_CHROMA_CENTER, environment.get()),
       AvisynthError);
   EXPECT_TRUE(source_clip->frame_requests().empty());
@@ -1016,10 +1022,10 @@ TEST(FilteredResizeFilter, RejectsOddYv12VerticalTargetHeight) {
   const auto source_before = FrameSnapshot::capture(source, vi);
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
-  TriangleFilter triangle_filter;
+  const vc_filter_spec triangle_filter{VC_TRIANGLE, {}};
 
   EXPECT_THROW(
-      FilteredResizeV(clip, 0.0, static_cast<double>(height), 5, &triangle_filter, true,
+      FilteredResize::CreateResizeV(clip, 0.0, static_cast<double>(height), 5, true, triangle_filter, true,
                       AVS_CHROMA_CENTER, environment.get()),
       AvisynthError);
   EXPECT_TRUE(source_clip->frame_requests().empty());

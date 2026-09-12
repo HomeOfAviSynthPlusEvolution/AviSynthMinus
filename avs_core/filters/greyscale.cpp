@@ -34,9 +34,8 @@
 
 
 #include "greyscale.h"
-#ifdef INTEL_INTRINSICS
-#include "intel/greyscale_sse.h"
-#endif
+#include "video_convert/layout.h"
+#include "avs_simd/target_policy.h"
 #include "../core/internal.h"
 #include <avs/alignment.h>
 #include <avs/minmax.h>
@@ -64,7 +63,7 @@ extern const AVSFunction Greyscale_filters[] = {
 };
 
 Greyscale::Greyscale(PClip _child, const char* matrix_name, IScriptEnvironment* env)
- : GenericVideoFilter(_child), coeff_int16_overflow(false)
+ : GenericVideoFilter(_child)
 {
   if (matrix_name && !vi.IsRGB())
     env->ThrowError("GreyScale: invalid \"matrix\" parameter (RGB data only)");
@@ -72,138 +71,34 @@ Greyscale::Greyscale(PClip _child, const char* matrix_name, IScriptEnvironment* 
   // originally there was no PC range here
   pixelsize = vi.ComponentSize();
   bits_per_pixel = vi.BitsPerComponent();
+  if (vi.IsYUY2()) {
+    layout = vc_get_layout_functions(avs_simd::ChooseTarget(env->GetCPUFlagsEx(), vc_layout_supported_targets()));
+    if (!layout)
+      env->ThrowError("Greyscale: Could not select VideoConvert layout kernels.");
+  }
 
-  // In all cases, Luma range is not changed(0-255 in -> 0-255 out; 16-235 in -> 16-235 out)
+  // Preserve the input range unless the matrix argument selects another range.
 
   if (vi.IsRGB()) {
     auto frame0 = _child->GetFrame(0, env);
     const AVSMap* props = env->getFramePropsRO(frame0);
     // input _ColorRange frame property can appear for RGB source (studio range limited rgb)
-    matrix_parse_merge_with_props(true /*in rgb*/, true /*out rgb, same range*/, matrix_name, props, theMatrix, theColorRange, theOutColorRange, env);
+    matrix_parse_merge_with_props(true /*in rgb*/, true /*out rgb*/, matrix_name, props, theMatrix, theColorRange, theOutColorRange, env);
     /*if (theColorRange == ColorRange_e::AVS_RANGE_FULL && theMatrix != Matrix_e::AVS_MATRIX_AVERAGE)
       env->ThrowError("GreyScale: only limited range matrix definition or \"Average\" is allowed.");
     */
 
-    const int shift = 15; // internally 15 bits precision, still no overflow in calculations
+    const int shift = 15; // fixed-point coefficient precision
 
     // input _ColorRange frame property can appear for RGB source (studio range limited rgb)
-    if (!do_BuildMatrix_Rgb2Yuv(theMatrix, theColorRange, theOutColorRange, shift, bits_per_pixel, /*ref*/greyMatrix))
+    double kr, kb;
+    if (!GetKrKb(theMatrix, kr, kb))
       env->ThrowError("GreyScale: Unknown matrix.");
-
-    if (bits_per_pixel <= 16) {
-      // all y coeffs must be [-1.0;1.0) to fit into signed 16 bit when upscaled by 2^15,
-      // in order to use int16 arithmetic for the conversion.
-      // The only suspicious case is AVS_MATRIX_RGB which returns G for Y in greyscale (RGB is otherwise the IDENTITY matrix)
-      // Greyscale SSE2 SIMD must work with valid coefficients
-      const int max_coeff = (1 << shift) - 1; // 32767 in 15 bit fixed point, maximum positive
-      const int min_coeff = -(1 << shift);    // -32768
-      if (greyMatrix.y_r > max_coeff || greyMatrix.y_r < min_coeff ||
-        greyMatrix.y_g > max_coeff || greyMatrix.y_g < min_coeff ||
-        greyMatrix.y_b > max_coeff || greyMatrix.y_b < min_coeff)
-      {
-        coeff_int16_overflow = true;
-      }
-    }
+    matrix_plan = std::make_unique<avs_video_convert::MatrixPlan>(kr, kb, bits_per_pixel, shift,
+      theColorRange == AVS_RANGE_FULL, theOutColorRange == AVS_RANGE_FULL, true, env, true);
   }
-  // greyscale does not change color space, rgb remains rgb
-  // Leave matrix and range frame properties as is.
+  // RGB matrix identity is preserved; RGB output range follows the numeric plan.
 }
-
-template<typename pixel_t, int pixel_step>
-static void greyscale_packed_rgb_c(BYTE *srcp8, int src_pitch, int width, int height, ConversionMatrix& m) {
-  const bool has_offset_rgb = 0 != m.offset_rgb;
-
-  pixel_t *srcp = reinterpret_cast<pixel_t *>(srcp8);
-  src_pitch /= sizeof(pixel_t);
-
-  // .15 bit frac integer arithmetic
-  const int rounder_and_luma_offset = (1 << 14) + (m.offset_y << 15);
-  // greyscale RGB is putting pack the calculated pixels to rgb
-  // Limited range input remains limited range output (-offset_rgb is the same as offset_y)
-
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      int b = srcp[x * pixel_step + 0];
-      int g = srcp[x * pixel_step + 1];
-      int r = srcp[x * pixel_step + 2];
-      if (has_offset_rgb) {
-        b = b + m.offset_rgb;
-        g = g + m.offset_rgb;
-        r = r + m.offset_rgb;
-      }
-      srcp[x * pixel_step + 0] = srcp[x * pixel_step + 1] = srcp[x * pixel_step + 2] =
-        (m.y_b * b + m.y_g * g + m.y_r * r + rounder_and_luma_offset) >> 15;
-    }
-    srcp += src_pitch;
-  }
-}
-
-template<typename pixel_t>
-static void greyscale_planar_rgb_c(BYTE *srcp_r8, BYTE *srcp_g8, BYTE *srcp_b8, int src_pitch, int width, int height, ConversionMatrix& m) {
-  const bool has_offset_rgb = 0 != m.offset_rgb;
-
-  pixel_t *srcp_r = reinterpret_cast<pixel_t *>(srcp_r8);
-  pixel_t *srcp_g = reinterpret_cast<pixel_t *>(srcp_g8);
-  pixel_t *srcp_b = reinterpret_cast<pixel_t *>(srcp_b8);
-  src_pitch /= sizeof(pixel_t);
-
-  // .15 bit frac integer arithmetic
-  const int rounder_and_luma_offset = (1 << 14) + (m.offset_y << 15);
-  // greyscale RGB is putting pack the calculated pixels to rgb
-  // Limited range input remains limited range output (-offset_rgb is the same as offset_y)
-
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      int b = srcp_b[x];
-      int g = srcp_g[x];
-      int r = srcp_r[x];
-      if (has_offset_rgb) {
-        b = b + m.offset_rgb;
-        g = g + m.offset_rgb;
-        r = r + m.offset_rgb;
-      }
-
-      srcp_b[x] = srcp_g[x] = srcp_r[x] =
-        (m.y_b * b + m.y_g * g + m.y_r * r + rounder_and_luma_offset) >> 15;
-    }
-    srcp_r += src_pitch;
-    srcp_g += src_pitch;
-    srcp_b += src_pitch;
-  }
-}
-
-static void greyscale_planar_rgb_float_c(BYTE *srcp_r8, BYTE *srcp_g8, BYTE *srcp_b8, int src_pitch, int width, int height, ConversionMatrix& m) {
-  const bool has_offset_rgb = 0 != m.offset_rgb_f;
-
-  float *srcp_r = reinterpret_cast<float *>(srcp_r8);
-  float *srcp_g = reinterpret_cast<float *>(srcp_g8);
-  float *srcp_b = reinterpret_cast<float *>(srcp_b8);
-  src_pitch /= sizeof(float);
-
-  const float luma_offset = m.offset_y_f;
-  // greyscale RGB is putting pack the calculated pixels to rgb
-  // Limited range input remains limited range output (-offset_rgb is the same as offset_y)
-
-
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      float b = srcp_b[x];
-      float g = srcp_g[x];
-      float r = srcp_r[x];
-      if (has_offset_rgb) {
-        b = b + m.offset_rgb_f;
-        g = g + m.offset_rgb_f;
-        r = r + m.offset_rgb_f;
-      }
-      srcp_b[x] = srcp_g[x] = srcp_r[x] =
-        m.y_b_f * b + m.y_g_f * g + m.y_r_f * r + luma_offset;
-    }
-    srcp_r += src_pitch;
-    srcp_g += src_pitch;
-    srcp_b += src_pitch;
-  }
-}
-
 
 PVideoFrame Greyscale::GetFrame(int n, IScriptEnvironment* env)
 {
@@ -217,8 +112,7 @@ PVideoFrame Greyscale::GetFrame(int n, IScriptEnvironment* env)
   int height = vi.height;
   int width = vi.width;
 
-  // greyscale does not change color space, rgb remains rgb
-  // Leave matrix and range frame properties as is.
+  // RGB matrix identity is preserved; RGB output range follows the numeric plan.
 
   if (vi.IsPlanar() && (vi.IsYUV() || vi.IsYUVA())) {
     // planar YUV, set UV plane to neutral
@@ -244,89 +138,13 @@ PVideoFrame Greyscale::GetFrame(int n, IScriptEnvironment* env)
   }
 
   if (vi.IsYUY2()) {
-#ifdef INTEL_INTRINSICS
-    if ((env->GetCPUFlags() & CPUF_SSE2) && width > 4) {
-      greyscale_yuy2_sse2(srcp, width, height, pitch);
-    } else
-#ifdef X86_32
-      if ((env->GetCPUFlags() & CPUF_MMX) && width > 2) {
-        greyscale_yuy2_mmx(srcp, width, height, pitch);
-      } else
-#endif
-#endif
-      {
-        for (int y = 0; y<height; ++y)
-        {
-          for (int x = 0; x<width; x++)
-            srcp[x*2+1] = 128;
-          srcp += pitch;
-        }
-      }
-
-      return frame;
+    if (layout->neutralize_yuy2_chroma({srcp, pitch}, {width, height, 0, height}) != VC_OK)
+      env->ThrowError("Greyscale: VideoConvert chroma neutralization failed.");
+    return frame;
   }
-#ifdef INTEL_INTRINSICS
-  if(vi.IsRGB64()) {
-    if (env->GetCPUFlags() & CPUF_SSE4_1) {
-      greyscale_rgb64_sse41(srcp, width, height, pitch, greyMatrix);
-      return frame;
-    }
-  }
-
-  if (vi.IsRGB32()) {
-    if (env->GetCPUFlags() & CPUF_SSE2) {
-      if (!coeff_int16_overflow) {
-        greyscale_rgb32_sse2(srcp, width, height, pitch, greyMatrix);
-        return frame;
-      }
-    }
-#ifdef X86_32
-    else if (env->GetCPUFlags() & CPUF_MMX) {
-      if (!coeff_int16_overflow) {
-        greyscale_rgb32_mmx(srcp, width, height, pitch, greyMatrix);
-        return frame;
-      }
-    }
-#endif
-  }
-#endif
-
-  if (vi.IsRGB())
-  {  // RGB C.
-    if (vi.IsPlanarRGB() || vi.IsPlanarRGBA())
-    {
-      BYTE* srcp_g = frame->GetWritePtr(PLANAR_G);
-      BYTE* srcp_b = frame->GetWritePtr(PLANAR_B);
-      BYTE* srcp_r = frame->GetWritePtr(PLANAR_R);
-
-      const int src_pitch = frame->GetPitch(); // same for all planes
-
-      if (pixelsize == 1)
-        greyscale_planar_rgb_c<uint8_t>(srcp_r, srcp_g, srcp_b, src_pitch, vi.width, vi.height, greyMatrix);
-      else if (pixelsize == 2)
-        greyscale_planar_rgb_c<uint16_t>(srcp_r, srcp_g, srcp_b, src_pitch, vi.width, vi.height, greyMatrix);
-      else
-        greyscale_planar_rgb_float_c(srcp_r, srcp_g, srcp_b, src_pitch, vi.width, vi.height, greyMatrix);
-
-      return frame;
-    }
-    // packed RGB
-
-    const int rgb_inc = vi.IsRGB32() || vi.IsRGB64() ? 4 : 3;
-
-    if (pixelsize == 1) { // rgb24/32
-      if (rgb_inc == 3)
-        greyscale_packed_rgb_c<uint8_t, 3>(srcp, pitch, vi.width, vi.height, greyMatrix);
-      else
-        greyscale_packed_rgb_c<uint8_t, 4>(srcp, pitch, vi.width, vi.height, greyMatrix);
-    }
-    else { // rgb48/64
-      if (rgb_inc == 3)
-        greyscale_packed_rgb_c<uint16_t, 3>(srcp, pitch, vi.width, vi.height, greyMatrix);
-      else
-        greyscale_packed_rgb_c<uint16_t, 4>(srcp, pitch, vi.width, vi.height, greyMatrix);
-    }
-
+  if (vi.IsRGB()) {
+    matrix_plan->ApplyGreyscale(frame, vi, env);
+    update_ColorRange(env->getFramePropsRW(frame), theOutColorRange, env);
   }
   return frame;
 }

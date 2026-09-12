@@ -307,7 +307,7 @@ Turn::Turn(PClip c, int direction, IScriptEnvironment* env) : GenericVideoFilter
 
 void Turn::SetUVSource(int mod_h, int mod_v, IScriptEnvironment* env)
 {
-    MitchellNetravaliFilter filter(1.0 / 3, 1.0 / 3);
+    const vc_filter_spec filter{VC_BICUBIC, {1.0 / 3, 1.0 / 3}};
     AVSValue subs[4] = { 0.0, 0.0, 0.0, 0.0 };
 
     bool isRGB = vi.IsRGB(); // can be planar
@@ -326,8 +326,8 @@ void Turn::SetUVSource(int mod_h, int mod_v, IScriptEnvironment* env)
     const int forced_chroma_placement = -1; // n/a
     // chroma planes are extracted, behave like Y when resized, no chroma is involved
 
-    u_or_b_source = FilteredResize::CreateResize(u_or_b_source, uv_width, uv_height, subs, force, &filter, preserve_center, placement_name, forced_chroma_placement, env);
-    v_or_r_source = FilteredResize::CreateResize(v_or_r_source, uv_width, uv_height, subs, force, &filter, preserve_center, placement_name, forced_chroma_placement, env);
+    u_or_b_source = FilteredResize::CreateResize(u_or_b_source, uv_width, uv_height, subs, force, filter, preserve_center, placement_name, forced_chroma_placement, env);
+    v_or_r_source = FilteredResize::CreateResize(v_or_r_source, uv_width, uv_height, subs, force, filter, preserve_center, placement_name, forced_chroma_placement, env);
 
     splanes[1] = 0;
     splanes[2] = 0;

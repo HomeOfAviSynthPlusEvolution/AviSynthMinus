@@ -4,3 +4,6 @@
 [submodule "third_party/audio_convert"]
 	path = third_party/audio_convert
 	url = https://github.com/HomeOfAviSynthPlusEvolution/AviSynthConvertAudio.git
+[submodule "third_party/video_convert"]
+	path = third_party/video_convert
+	url = https://github.com/HomeOfAviSynthPlusEvolution/AviSynthConvertVideo.git

@@ -28,7 +28,8 @@ TEST(ConvertMatrixGain, LimitedRgbToFullYRetainsRangeExpansion) {
           ConversionMatrix matrix{};
           ASSERT_TRUE(do_BuildMatrix_Rgb2Yuv(id, full ? AVS_RANGE_FULL : AVS_RANGE_LIMITED,
                                             AVS_RANGE_FULL, shift, depth, matrix));
-          const double expected_gain = full ? 1.0 : 255.0 / 219.0;
+          // Integer nominal limited range scales by powers of two; full range ends at 2^depth-1.
+          const double expected_gain = full ? 1.0 : double((1 << depth) - 1) / (219 << (depth - 8));
           // Three independently rounded coefficients contribute at most 1.5 units.
           EXPECT_NEAR(matrix.y_b + matrix.y_g + matrix.y_r,
                       expected_gain * (1 << shift), 1.5);

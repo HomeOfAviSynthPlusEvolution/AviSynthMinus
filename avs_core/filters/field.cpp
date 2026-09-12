@@ -34,11 +34,7 @@
 
 
 #include "field.h"
-#ifdef INTEL_INTRINSICS
-#include "intel/resample_sse.h"
-#else
 #include "resample.h"
-#endif
 #include <avs/minmax.h>
 #include "../core/internal.h"
 #include "../convert/convert_helper.h"
@@ -1044,11 +1040,11 @@ static AVSValue __cdecl Create_Bob(AVSValue args, void*, IScriptEnvironment* env
   const double b = args[1].AsDblDef(1./3.);
   const double c = args[2].AsDblDef(1./3.);
   const int new_height = args[3].AsInt(vi.height*2);
-  MitchellNetravaliFilter filter(b, c);
-  return new Fieldwise(new FilteredResizeV(clip, -0.25, vi.height,
-                                           new_height, &filter, preserve_center, chroma_placement, env),
-                       new FilteredResizeV(clip, +0.25, vi.height,
-                                           new_height, &filter, preserve_center, chroma_placement, env));
+  const vc_filter_spec filter{VC_BICUBIC, {b, c}};
+  return new Fieldwise(FilteredResize::CreateResizeV(clip, -0.25, vi.height,
+                                           new_height, true, filter, preserve_center, chroma_placement, env),
+                       FilteredResize::CreateResizeV(clip, +0.25, vi.height,
+                                           new_height, true, filter, preserve_center, chroma_placement, env));
 }
 
 

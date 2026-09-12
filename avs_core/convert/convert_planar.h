@@ -40,6 +40,7 @@
 #include <avisynth.h>
 #include <stdint.h>
 #include "convert.h"
+#include "avs_video_convert/matrix.h"
 #include "../filters/resample.h"
 
 // useful functions
@@ -49,7 +50,9 @@ void fill_chroma(uint8_t * dstp_u, uint8_t * dstp_v, int height, int row_size, i
 template <typename pixel_t>
 void fill_plane(uint8_t * dstp, int height, int row_size, int pitch, pixel_t val);
 
-ResamplingFunction* getResampler(const char* resampler, AVSValue param1, AVSValue param2, AVSValue param3, bool throw_on_error, IScriptEnvironment* env);
+vc_filter_spec getResampler(const char* resampler, AVSValue param1, AVSValue param2, AVSValue param3, bool throw_on_error, IScriptEnvironment* env);
+
+struct vc_layout_functions;
 
 class ConvertToY : public GenericVideoFilter
 {
@@ -64,6 +67,7 @@ public:
 
   static AVSValue __cdecl Create(AVSValue args, void*, IScriptEnvironment* env);
 private:
+  const vc_layout_functions* layout = nullptr;
   bool blit_luma_only;
   bool yuy2_input;
   bool packed_rgb_input;
@@ -73,7 +77,7 @@ private:
   int theMatrix;
   int theColorRange;
   int theOutColorRange;
-  ConversionMatrix matrix;
+  std::unique_ptr<avs_video_convert::MatrixPlan> matrix_plan;
 };
 
 
@@ -92,16 +96,19 @@ private:
   int theMatrix;
   int theColorRange;
   int theOutColorRange;
-  ConversionMatrix matrix;
   int pixel_step;
   bool hasAlpha;
   bool isPlanarRGBfamily;
+  std::unique_ptr<avs_video_convert::MatrixPlan> matrix_plan;
 };
+
+struct vc_layout_functions;
 
 class ConvertYUY2ToYV16 : public GenericVideoFilter
 {
 public:
   ConvertYUY2ToYV16(PClip src, IScriptEnvironment* env);
+  const vc_layout_functions* layout;
   PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
 
   int __stdcall SetCacheHints(int cachehints, int frame_range) override {
@@ -129,14 +136,15 @@ private:
   // separate out set for rgb target
   int theOutMatrix;
   int theOutColorRange;
-  ConversionMatrix matrix;
   int pixel_step;
+  std::unique_ptr<avs_video_convert::MatrixPlan> matrix_plan;
 };
 
 class ConvertYV16ToYUY2 : public GenericVideoFilter
 {
 public:
   ConvertYV16ToYUY2(PClip src, IScriptEnvironment* env);
+  const vc_layout_functions* layout;
   PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
 
   int __stdcall SetCacheHints(int cachehints, int frame_range) override {
@@ -162,6 +170,8 @@ public:
     return cachehints == CACHE_GET_MTMODE ? MT_NICE_FILTER : 0;
   }
 
+  static AVSValue __cdecl CreateConvertToYUY2(AVSValue args, void*, IScriptEnvironment* env);
+  static AVSValue __cdecl CreateConvertBackToYUY2(AVSValue args, void*, IScriptEnvironment* env);
   static AVSValue __cdecl CreateYV411(AVSValue args, void* user_data, IScriptEnvironment* env);
   static AVSValue __cdecl CreateYUV420(AVSValue args, void* user_data, IScriptEnvironment* env);
   static AVSValue __cdecl CreateYUV422(AVSValue args, void* user_data, IScriptEnvironment* env);

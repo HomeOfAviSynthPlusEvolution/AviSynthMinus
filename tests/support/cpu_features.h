@@ -64,8 +64,9 @@ struct CpuFeatures {
   }
 
   static CpuFeatures detect() {
-#if (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(__i386__))
-    // GCC and Clang include OS support for the vector register state here.
+#if !defined(_MSC_VER) && (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(__i386__))
+    // GCC and GNU-mode Clang include OS support for vector state here.
+    // clang-cl uses the MSVC branch below, without a libgcc CPU runtime.
     __builtin_cpu_init();
     return {static_cast<bool>(__builtin_cpu_supports("sse2")),
             static_cast<bool>(__builtin_cpu_supports("ssse3")),

@@ -38,7 +38,6 @@
 #include <avs/minmax.h>
 #include "../core/bitblt.h"
 #include <stdint.h>
-#include "resample_functions.h"
 #include "../convert/convert_planar.h"
 #include "combine.h"
 #include <vector>
@@ -721,8 +720,8 @@ static PClip AddBorderPostProcess(PClip child,
     param2 = _param2.AsDblDef(2.718281828); // b
     param3 = _param3.AsDblDef(0); // 0
   }
-  ResamplingFunction* filter = getResampler(resampler_name, param1, param2, param3, false, env);
-  if (filter == nullptr)
+  const vc_filter_spec filter = getResampler(resampler_name, param1, param2, param3, false, env);
+  if (filter.kind < 0)
     env->ThrowError("AddBorders: unknown resampler name: %s", resampler_name);
 
   const bool grey = vi.IsY();
@@ -739,7 +738,10 @@ static PClip AddBorderPostProcess(PClip child,
   // but if one of the margins are smaller, e.g. 5, the the 2*10 is achieved as 5+15 pixel wide (high) parts
   // We always filter a larger area, but only copy the 2*radius (r) pixels from it.
   // a radius plus the filter support size overrides
-  int filtering_width = max(MIN_FILTERING_EXTENT, r + (int)std::ceil(filter->support()));
+  double filter_support = 0;
+  if (vc_resample_filter_support(&filter, &filter_support) != VC_OK)
+    env->ThrowError("AddBorders: Invalid resampler parameters.");
+  int filtering_width = max(MIN_FILTERING_EXTENT, r + (int)std::ceil(filter_support));
 
   // adjust the filtering width for the worst case, considering the chroma subsampling
   filtering_width = (filtering_width + (1 << shift) - 1) & ~((1 << shift) - 1);
@@ -1009,7 +1011,7 @@ static PClip AddBorderPostProcess(PClip child,
 
   PClip clip = new MultiOverlay(child_array, position_array, env);
 
-  delete filter;
+
 
   return clip;
 }

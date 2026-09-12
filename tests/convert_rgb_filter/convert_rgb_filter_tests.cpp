@@ -16,6 +16,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <string>
 #include <vector>
@@ -62,6 +63,28 @@ using avsut::test::make_video_info;
 using avsut::test::StaticFrameClip;
 using avsut::test::VideoInfoSpec;
 using avsut::test::write_frame_plane;
+
+void expect_public_layout(PClip source, const PVideoFrame& expected, const VideoInfo& vi, IScriptEnvironment* env) {
+  const char* name = vi.IsRGB24() ? "ConvertToRGB24" : vi.IsRGB32() ? "ConvertToRGB32" :
+    vi.IsRGB48() ? "ConvertToRGB48" : vi.IsRGB64() ? "ConvertToRGB64" :
+    vi.IsPlanarRGBA() ? "ConvertToPlanarRGBA" : "ConvertToPlanarRGB";
+  const PClip converted = env->Invoke(name, AVSValue(source)).AsClip();
+  const auto output = converted->GetFrame(0, env);
+  ASSERT_EQ(converted->GetVideoInfo().pixel_type, vi.pixel_type);
+  const int planes[] = {vi.IsPlanar() ? PLANAR_G : DEFAULT_PLANE, PLANAR_B, PLANAR_R, PLANAR_A};
+  const int count = vi.IsPlanar() ? (vi.IsPlanarRGBA() ? 4 : 3) : 1;
+  for (int i = 0; i < count; ++i) {
+    const int plane = planes[i];
+    ASSERT_EQ(output->GetRowSize(plane), expected->GetRowSize(plane));
+    ASSERT_EQ(output->GetHeight(plane), expected->GetHeight(plane));
+    for (int y = 0; y < output->GetHeight(plane); ++y)
+      EXPECT_EQ(std::memcmp(output->GetReadPtr(plane) + y * output->GetPitch(plane),
+                           expected->GetReadPtr(plane) + y * expected->GetPitch(plane),
+                           output->GetRowSize(plane)), 0);
+  }
+  EXPECT_NE(output->CheckMemory(), 1);
+  EXPECT_EQ(env->propGetInt(env->getFramePropsRO(output), "LayoutMarker", 0, nullptr), 321);
+}
 
 template <typename Pixel>
 void fill_packed_rgb_source(PVideoFrame& frame, int components) {
@@ -182,19 +205,21 @@ void expect_planar_to_packed(const PVideoFrame& source, const PVideoFrame& outpu
 }
 
 template <typename Pixel>
-void run_rgb_to_rgba_case(int source_pixel_type) {
-  constexpr int width = 5;
+void run_rgb_to_rgba_case(int source_pixel_type, int width = 5, bool force_c = false) {
   constexpr int height = 3;
   const auto source_vi = make_video_info(
       VideoInfoSpec{width, height, source_pixel_type, 1, 25, 1});
   AviSynthEnvironment environment;
   PVideoFrame source = environment.get()->NewVideoFrame(source_vi);
+  environment.get()->propSetInt(environment.get()->getFramePropsRW(source), "LayoutMarker", 321, 0);
+  if (force_c)
+    environment.get()->Invoke("SetMaxCPU", AVSValue("none"));
   fill_packed_rgb_source<Pixel>(source, 3);
   const auto source_before = FrameSnapshot::capture(source, source_vi);
   auto* source_impl = new StaticFrameClip(source_vi, source);
   const PClip clip(source_impl);
 
-  RGBtoRGBA filter(clip);
+  RGBtoRGBA filter(clip, environment.get());
   EXPECT_EQ(filter.GetVideoInfo().pixel_type,
             sizeof(Pixel) == 1 ? VideoInfo::CS_BGR32 : VideoInfo::CS_BGR64);
   EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
@@ -203,22 +228,25 @@ void run_rgb_to_rgba_case(int source_pixel_type) {
   EXPECT_NE(output->CheckMemory(), 1);
   EXPECT_EQ(source_impl->frame_requests(), std::vector<int>{0});
   EXPECT_EQ(FrameSnapshot::capture(source, source_vi), source_before);
+  expect_public_layout(clip, output, filter.GetVideoInfo(), environment.get());
 }
 
 template <typename Pixel>
-void run_rgba_to_rgb_case(int source_pixel_type) {
-  constexpr int width = 5;
+void run_rgba_to_rgb_case(int source_pixel_type, int width = 5, bool force_c = false) {
   constexpr int height = 3;
   const auto source_vi = make_video_info(
       VideoInfoSpec{width, height, source_pixel_type, 1, 25, 1});
   AviSynthEnvironment environment;
   PVideoFrame source = environment.get()->NewVideoFrame(source_vi);
+  environment.get()->propSetInt(environment.get()->getFramePropsRW(source), "LayoutMarker", 321, 0);
+  if (force_c)
+    environment.get()->Invoke("SetMaxCPU", AVSValue("none"));
   fill_packed_rgb_source<Pixel>(source, 4);
   const auto source_before = FrameSnapshot::capture(source, source_vi);
   auto* source_impl = new StaticFrameClip(source_vi, source);
   const PClip clip(source_impl);
 
-  RGBAtoRGB filter(clip);
+  RGBAtoRGB filter(clip, environment.get());
   EXPECT_EQ(filter.GetVideoInfo().pixel_type,
             sizeof(Pixel) == 1 ? VideoInfo::CS_BGR24 : VideoInfo::CS_BGR48);
   EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
@@ -227,23 +255,26 @@ void run_rgba_to_rgb_case(int source_pixel_type) {
   EXPECT_NE(output->CheckMemory(), 1);
   EXPECT_EQ(source_impl->frame_requests(), std::vector<int>{0});
   EXPECT_EQ(FrameSnapshot::capture(source, source_vi), source_before);
+  expect_public_layout(clip, output, filter.GetVideoInfo(), environment.get());
 }
 
 template <typename Pixel>
 void run_packed_to_planar_case(int source_pixel_type, bool source_has_alpha,
-                               bool target_has_alpha, int target_pixel_type) {
-  constexpr int width = 5;
+                               bool target_has_alpha, int target_pixel_type, int width = 5, bool force_c = false) {
   constexpr int height = 3;
   const auto source_vi = make_video_info(
       VideoInfoSpec{width, height, source_pixel_type, 1, 25, 1});
   AviSynthEnvironment environment;
   PVideoFrame source = environment.get()->NewVideoFrame(source_vi);
+  environment.get()->propSetInt(environment.get()->getFramePropsRW(source), "LayoutMarker", 321, 0);
+  if (force_c)
+    environment.get()->Invoke("SetMaxCPU", AVSValue("none"));
   fill_packed_rgb_source<Pixel>(source, source_has_alpha ? 4 : 3);
   const auto source_before = FrameSnapshot::capture(source, source_vi);
   auto* source_impl = new StaticFrameClip(source_vi, source);
   const PClip clip(source_impl);
 
-  PackedRGBtoPlanarRGB filter(clip, source_has_alpha, target_has_alpha);
+  PackedRGBtoPlanarRGB filter(clip, source_has_alpha, target_has_alpha, environment.get());
   EXPECT_EQ(filter.GetVideoInfo().pixel_type, target_pixel_type);
   EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
   const PVideoFrame output = filter.GetFrame(0, environment.get());
@@ -252,22 +283,26 @@ void run_packed_to_planar_case(int source_pixel_type, bool source_has_alpha,
   EXPECT_NE(output->CheckMemory(), 1);
   EXPECT_EQ(source_impl->frame_requests(), std::vector<int>{0});
   EXPECT_EQ(FrameSnapshot::capture(source, source_vi), source_before);
+  expect_public_layout(clip, output, filter.GetVideoInfo(), environment.get());
 }
 
 template <typename Pixel>
 void run_planar_to_packed_case(int source_pixel_type, bool source_has_alpha,
-                               bool target_has_alpha, int target_pixel_type, int width = 5) {
+                               bool target_has_alpha, int target_pixel_type, int width = 5, bool force_c = false) {
   constexpr int height = 3;
   const auto source_vi = make_video_info(
       VideoInfoSpec{width, height, source_pixel_type, 1, 25, 1});
   AviSynthEnvironment environment;
   PVideoFrame source = environment.get()->NewVideoFrame(source_vi);
+  environment.get()->propSetInt(environment.get()->getFramePropsRW(source), "LayoutMarker", 321, 0);
+  if (force_c)
+    environment.get()->Invoke("SetMaxCPU", AVSValue("none"));
   fill_planar_rgb_source<Pixel>(source, source_has_alpha);
   const auto source_before = FrameSnapshot::capture(source, source_vi);
   auto* source_impl = new StaticFrameClip(source_vi, source);
   const PClip clip(source_impl);
 
-  PlanarRGBtoPackedRGB filter(clip, target_has_alpha);
+  PlanarRGBtoPackedRGB filter(clip, target_has_alpha, environment.get());
   EXPECT_EQ(filter.GetVideoInfo().pixel_type, target_pixel_type);
   EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
   const PVideoFrame output = filter.GetFrame(0, environment.get());
@@ -275,6 +310,25 @@ void run_planar_to_packed_case(int source_pixel_type, bool source_has_alpha,
   EXPECT_NE(output->CheckMemory(), 1);
   EXPECT_EQ(source_impl->frame_requests(), std::vector<int>{0});
   EXPECT_EQ(FrameSnapshot::capture(source, source_vi), source_before);
+  expect_public_layout(clip, output, filter.GetVideoInfo(), environment.get());
+}
+
+TEST(ConvertRgbFilter, UnpackAndAlphaCAndNativeCoverShortRowsAndTails) {
+  for (bool force_c : {false, true})
+    for (int width : {1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 17, 33, 65}) {
+      SCOPED_TRACE(::testing::Message() << "width=" << width << " C=" << force_c);
+      run_rgb_to_rgba_case<uint8_t>(VideoInfo::CS_BGR24, width, force_c);
+      run_rgb_to_rgba_case<uint16_t>(VideoInfo::CS_BGR48, width, force_c);
+      run_rgba_to_rgb_case<uint8_t>(VideoInfo::CS_BGR32, width, force_c);
+      run_rgba_to_rgb_case<uint16_t>(VideoInfo::CS_BGR64, width, force_c);
+      for (bool sa : {false, true})
+        for (bool da : {false, true}) {
+          run_packed_to_planar_case<uint8_t>(sa ? VideoInfo::CS_BGR32 : VideoInfo::CS_BGR24,
+            sa, da, da ? VideoInfo::CS_RGBAP : VideoInfo::CS_RGBP, width, force_c);
+          run_packed_to_planar_case<uint16_t>(sa ? VideoInfo::CS_BGR64 : VideoInfo::CS_BGR48,
+            sa, da, da ? VideoInfo::CS_RGBAP16 : VideoInfo::CS_RGBP16, width, force_c);
+        }
+    }
 }
 
 TEST(ConvertRgbFilter, AddsOpaqueAlphaToBgr24) {
@@ -303,6 +357,20 @@ TEST(ConvertRgbFilter, ConvertsBgr32ToRgbpWithoutAlpha) {
 
 TEST(ConvertRgbFilter, ConvertsBgr64ToRgbap16WithSourceAlpha) {
   run_packed_to_planar_case<std::uint16_t>(VideoInfo::CS_BGR64, true, true, VideoInfo::CS_RGBAP16);
+}
+
+TEST(ConvertRgbFilter, PlanarPackingCAndNativeCoverShortRowsAndTails) {
+  for (bool force_c : {false, true})
+    for (int width : {1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 17, 33})
+      for (bool source_alpha : {false, true})
+        for (bool target_alpha : {false, true}) {
+          SCOPED_TRACE(::testing::Message() << "width=" << width << " C=" << force_c
+            << " source_alpha=" << source_alpha << " target_alpha=" << target_alpha);
+          run_planar_to_packed_case<std::uint8_t>(source_alpha ? VideoInfo::CS_RGBAP : VideoInfo::CS_RGBP,
+            source_alpha, target_alpha, target_alpha ? VideoInfo::CS_BGR32 : VideoInfo::CS_BGR24, width, force_c);
+          run_planar_to_packed_case<std::uint16_t>(source_alpha ? VideoInfo::CS_RGBAP16 : VideoInfo::CS_RGBP16,
+            source_alpha, target_alpha, target_alpha ? VideoInfo::CS_BGR64 : VideoInfo::CS_BGR48, width, force_c);
+        }
 }
 
 TEST(ConvertRgbFilter, ConvertsRgbpToBgr32WithOpaqueAlpha) {

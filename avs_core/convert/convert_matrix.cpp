@@ -106,7 +106,7 @@ static void BuildMatrix_Rgb2Yuv_core(double Kr, double Kb, int int_arith_shift, 
   const double Kg = 1. - Kr - Kb;
 
   if (bits_per_pixel <= 16) {
-    const auto Srgb = (((1 << bits_per_pixel) - 1) * (full_scale_s ? 1.0 : 219.0 / 255.0));
+    const auto Srgb = (full_scale_s ? double((1 << bits_per_pixel) - 1) : double(219 << (bits_per_pixel - 8)));
     const double Suv_d = (cmax - cmin) / 2.0;
     matrix.y_b = (int)(Sy * Kb * mulfac / Srgb + 0.5); //B
     matrix.y_g = (int)(Sy * Kg * mulfac / Srgb + 0.5); //G
@@ -121,23 +121,18 @@ static void BuildMatrix_Rgb2Yuv_core(double Kr, double Kb, int int_arith_shift, 
     matrix.offset_y = Oy;
     matrix.offset_rgb = -Orgb; // yes, minus, because addition is used
 
-    // FIXME: do we need it to expand for the other u and v constants?
-    // anti overflow e.g. for 15 bits the sum must not exceed 32768
-    // Unity gain correction is valid only for full-range RGB to full-range Y.
-    if (full_scale_s && full_scale_d && matrix.y_g + matrix.y_r + matrix.y_b != mulfac_int)
-      matrix.y_g = mulfac_int - (matrix.y_r + matrix.y_b);
+    // Preserve the rounded total luma gain, including limited RGB expansion.
+    // For a full-range source this is unity; a limited source needs Sy/Srgb.
+    if (matrix.offset_y == 0) {
+      const int luma_sum = (int)(Sy * mulfac / Srgb + 0.5);
+      matrix.y_g = luma_sum - (matrix.y_r + matrix.y_b);
+    }
 
-    // special precalculations for direct RGB to YUY2
-    double dku = Suv_d / (Srgb * (1.0 - Kb)) * mulfac;
-    double dkv = Suv_d / (Srgb * (1.0 - Kr)) * mulfac;
-    matrix.ku = (int)(dku + 0.5);
-    matrix.kv = (int)(dkv + 0.5);
-    matrix.ku_luma = -(int)(dku * Srgb / Sy + 0.5);
-    matrix.kv_luma = -(int)(dkv * Srgb / Sy + 0.5);
   }
 
   // for 16 bits, float is used, no unsigned 16 bit arithmetic
-  double Srgb_f = (bits_per_pixel == 32 ? 1.0 : ((1 << bits_per_pixel) - 1)) * (full_scale_s ? 1.0 : 219.0 / 255.0);
+  double Srgb_f = (bits_per_pixel == 32) ? (full_scale_s ? 1.0 : 219.0 / 255.0)
+    : (full_scale_s ? double((1 << bits_per_pixel) - 1) : double(219 << (bits_per_pixel - 8)));
   matrix.y_b_f = (float)(Sy_f * Kb / Srgb_f); //B
   matrix.y_g_f = (float)(Sy_f * Kg / Srgb_f); //G
   matrix.y_r_f = (float)(Sy_f * Kr / Srgb_f); //R
@@ -215,7 +210,7 @@ static void BuildMatrix_Yuv2Rgb_core(double Kr, double Kb, int int_arith_shift, 
   const double Kg = 1. - Kr - Kb;
 
   if (bits_per_pixel <= 16) {
-    const auto Srgb = (((1 << bits_per_pixel) - 1) * (full_scale_d ? 1.0 : 219.0/255.0));
+    const auto Srgb = (full_scale_d ? double((1 << bits_per_pixel) - 1) : double(219 << (bits_per_pixel - 8)));
     const double Suv_d = (cmax - cmin) / 2.0;
 
     matrix.y_b = (int)(Srgb * 1.000 * mulfac / Sy + 0.5); //Y
@@ -234,7 +229,8 @@ static void BuildMatrix_Yuv2Rgb_core(double Kr, double Kb, int int_arith_shift, 
     matrix.offset_rgb = Orgb;
   }
 
-  double Srgb_f = (bits_per_pixel == 32 ? 1.0 : ((1 << bits_per_pixel) - 1)) * (full_scale_d ? 1.0 : 219.0 / 255.0);
+  double Srgb_f = (bits_per_pixel == 32) ? (full_scale_d ? 1.0 : 219.0 / 255.0)
+    : (full_scale_d ? double((1 << bits_per_pixel) - 1) : double(219 << (bits_per_pixel - 8)));
   matrix.y_b_f = (float)(Srgb_f * 1.000 / Sy_f); //Y
   matrix.u_b_f = (float)(Srgb_f * (1 - Kb) / Suv_f); //U
   matrix.v_b_f = (float)(Srgb_f * 0.000 / Suv_f); //V
@@ -248,6 +244,23 @@ static void BuildMatrix_Yuv2Rgb_core(double Kr, double Kb, int int_arith_shift, 
   matrix.offset_rgb_f = Orgb_f;
 }
 
+bool GetKrKb(int matrix, double& kr, double& kb)
+{
+  switch (matrix) {
+  case Matrix_e::AVS_MATRIX_BT470_BG:
+  case Matrix_e::AVS_MATRIX_ST170_M: kr = 0.299; kb = 0.114; break;
+  case Matrix_e::AVS_MATRIX_BT709: kr = 0.2126; kb = 0.0722; break;
+  case Matrix_e::AVS_MATRIX_AVERAGE: kr = 1.0 / 3; kb = 1.0 / 3; break;
+  case Matrix_e::AVS_MATRIX_BT2020_CL:
+  case Matrix_e::AVS_MATRIX_BT2020_NCL: kr = 0.2627; kb = 0.0593; break;
+  case Matrix_e::AVS_MATRIX_BT470_M: kr = 0.3; kb = 0.11; break;
+  case Matrix_e::AVS_MATRIX_ST240_M: kr = 0.212; kb = 0.087; break;
+  case Matrix_e::AVS_MATRIX_RGB: kr = 0; kb = 0; break;
+  default: return false;
+  }
+  return true;
+}
+
 bool do_BuildMatrix_Rgb2Yuv(int _Matrix, int _ColorRange, int _ColorRange_Out, int int_arith_shift, int bits_per_pixel, ConversionMatrix& matrix)
 {
   if (_ColorRange != ColorRange_e::AVS_RANGE_FULL && _ColorRange != ColorRange_e::AVS_RANGE_LIMITED)
@@ -258,48 +271,10 @@ bool do_BuildMatrix_Rgb2Yuv(int _Matrix, int _ColorRange, int _ColorRange_Out, i
   const bool is_full_s = _ColorRange == ColorRange_e::AVS_RANGE_FULL;
   const bool is_full_d = _ColorRange_Out == ColorRange_e::AVS_RANGE_FULL;
 
-  if (_Matrix == Matrix_e::AVS_MATRIX_BT470_BG || _Matrix == Matrix_e::AVS_MATRIX_ST170_M) { // 601
-    /*
-    Y'= 0.299*R' + 0.587*G' + 0.114*B'
-    Cb=-0.169*R' - 0.331*G' + 0.500*B'
-    Cr= 0.500*R' - 0.419*G' - 0.081*B'
-    */
-    BuildMatrix_Rgb2Yuv_core(0.299,  /* 0.587  */ 0.114, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_BT709) {
-    /*
-    Y'= 0.2126*R' + 0.7152*G' + 0.0722*B'
-    Cb=-0.1145*R' - 0.3855*G' + 0.5000*B'
-    Cr= 0.5000*R' - 0.4542*G' - 0.0458*B'
-    */
-    BuildMatrix_Rgb2Yuv_core(0.2126, /* 0.7152 */ 0.0722, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_AVERAGE) { // non-standard!
-    BuildMatrix_Rgb2Yuv_core(1.0 / 3, /* 1.0/3 */ 1.0 / 3, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_BT2020_CL || _Matrix == Matrix_e::AVS_MATRIX_BT2020_NCL) {
-    BuildMatrix_Rgb2Yuv_core(0.2627, /* 0.6780 */ 0.0593, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_BT470_M) {
-    BuildMatrix_Rgb2Yuv_core(0.3, /* 0.59 */ 0.11, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_ST240_M) {
-    BuildMatrix_Rgb2Yuv_core(0.212, /* 0.701 */ 0.087, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_RGB) {
-    BuildMatrix_Rgb2Yuv_core(0.0, /*  */ 0.0, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_ICTCP) {
-    // not supported REC_2100_LMS
+  double kr, kb;
+  if (!GetKrKb(_Matrix, kr, kb))
     return false;
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_YCGCO) {
-    // not supported
-    return false;
-  }
-  else {
-    return false;
-  }
+  BuildMatrix_Rgb2Yuv_core(kr, kb, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
   return true;
 }
 
@@ -313,37 +288,9 @@ bool do_BuildMatrix_Yuv2Rgb(int _Matrix, int _ColorRange, int _ColorRange_Out, i
   const bool is_full_s = _ColorRange == ColorRange_e::AVS_RANGE_FULL;
   const bool is_full_d = _ColorRange_Out == ColorRange_e::AVS_RANGE_FULL;
 
-  if (_Matrix == Matrix_e::AVS_MATRIX_BT470_BG || _Matrix == Matrix_e::AVS_MATRIX_ST170_M) { // 601
-    BuildMatrix_Yuv2Rgb_core(0.299,  /* 0.587  */ 0.114, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_BT709) {
-    BuildMatrix_Yuv2Rgb_core(0.2126, /* 0.7152 */ 0.0722, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_AVERAGE) { // non-standard!
-    BuildMatrix_Yuv2Rgb_core(1.0 / 3, /* 1.0/3 */ 1.0 / 3, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_BT2020_CL || _Matrix == Matrix_e::AVS_MATRIX_BT2020_NCL) {
-    BuildMatrix_Yuv2Rgb_core(0.2627, /* 0.6780 */ 0.0593, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_BT470_M) {
-    BuildMatrix_Yuv2Rgb_core(0.3, /* 0.59 */ 0.11, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_ST240_M) {
-    BuildMatrix_Yuv2Rgb_core(0.212, /* 0.701 */ 0.087, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_RGB) {
-    BuildMatrix_Yuv2Rgb_core(0.0, /*  */ 0.0, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_ICTCP) {
-    // not supported REC_2100_LMS
+  double kr, kb;
+  if (!GetKrKb(_Matrix, kr, kb))
     return false;
-  }
-  else if (_Matrix == Matrix_e::AVS_MATRIX_YCGCO) {
-    // not supported
-    return false;
-  }
-  else {
-    return false;
-  }
+  BuildMatrix_Yuv2Rgb_core(kr, kb, int_arith_shift, is_full_s, is_full_d, bits_per_pixel, matrix);
   return true;
 }

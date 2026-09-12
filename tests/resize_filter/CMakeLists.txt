@@ -1,4 +1,4 @@
-add_executable(resize_filter_tests resize_filter_tests.cpp)
+add_executable(resize_filter_tests resize_filter_tests.cpp resize_module_tests.cpp)
 target_include_directories(resize_filter_tests PRIVATE
   ${PROJECT_SOURCE_DIR}/tests
   ${PROJECT_SOURCE_DIR}/avs_core/include

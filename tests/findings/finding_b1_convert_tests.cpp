@@ -8,86 +8,21 @@
 #endif
 #include "convert/convert_bits.h"
 #include "convert/convert_helper.h"
-#include "convert/intel/convert_bits_avx2.h"
-#include "convert/intel/convert_bits_sse.h"
 #ifdef AVSUT_FINDING_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_FINDING_UNDEF_AVS_UNUSED
 #endif
 
 #include "support/avisynth_environment.h"
-#include "support/cpu_features.h"
-#include "support/guarded_video_buffer.h"
 #include "support/video_filter_test_support.h"
 
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <limits>
 
 namespace avsut::test {
 namespace {
-
-float next_float_steps(float value, int direction, int steps) {
-  const float destination = direction < 0 ? -std::numeric_limits<float>::infinity()
-                                          : std::numeric_limits<float>::infinity();
-  for (int step = 0; step < steps; ++step) {
-    value = std::nextafter(value, destination);
-  }
-  return value;
-}
-
-TEST(ConvertBitsFmaRounding, KeepsSse41AndAvx2FmaThresholdResultsExact) {
-  const auto features = CpuFeatures::detect();
-  if (!features.supports(IsaRequirement::Sse41)) {
-    GTEST_SKIP() << "host does not support sse4.1";
-  }
-  if (!features.supports(IsaRequirement::Avx2Fma)) {
-    GTEST_SKIP() << "host does not support avx2 and fma3";
-  }
-
-  constexpr std::size_t width = 16;
-  GuardedVideoBuffer<float> source(width, 1, width * sizeof(float), 64);
-  GuardedVideoBuffer<std::uint16_t> sse_output(width, 1, width * sizeof(std::uint16_t), 64);
-  GuardedVideoBuffer<std::uint16_t> avx2_output(width, 1, width * sizeof(std::uint16_t), 64);
-
-  constexpr std::array<int, 5> offsets{-2, -1, 0, 1, 2};
-  for (int threshold = 1; threshold < 1023; ++threshold) {
-    const float boundary = static_cast<float>(threshold - 0.5F) / 1023.0F;
-    for (const int offset : offsets) {
-      const float candidate = offset == 0
-                                  ? boundary
-                                  : next_float_steps(boundary, offset < 0 ? -1 : 1,
-                                                     std::abs(offset));
-      std::fill(source.view().row(0), source.view().row(0) + width, candidate);
-      std::fill(sse_output.view().row(0), sse_output.view().row(0) + width, 0);
-      std::fill(avx2_output.view().row(0), avx2_output.view().row(0) + width, 0);
-
-      convert_32_to_uintN_sse41<std::uint16_t, false, true, true>(
-          reinterpret_cast<const BYTE*>(source.view().data()),
-          reinterpret_cast<BYTE*>(sse_output.view().data()), static_cast<int>(width * sizeof(float)),
-          1, static_cast<int>(width * sizeof(float)),
-          static_cast<int>(width * sizeof(std::uint16_t)), 32, 10, 10);
-      convert_32_to_uintN_avx2<std::uint16_t, false, true, true>(
-          reinterpret_cast<const BYTE*>(source.view().data()),
-          reinterpret_cast<BYTE*>(avx2_output.view().data()), static_cast<int>(width * sizeof(float)),
-          1, static_cast<int>(width * sizeof(float)),
-          static_cast<int>(width * sizeof(std::uint16_t)), 32, 10, 10);
-
-      for (std::size_t x = 0; x < width; ++x) {
-        ASSERT_EQ(sse_output.view().row(0)[x], avx2_output.view().row(0)[x])
-            << "B1 float-to-10 threshold=" << threshold << " offset_ulps=" << offset
-            << " input=" << candidate << " column=" << x;
-      }
-    }
-  }
-
-  EXPECT_TRUE(source.memory_intact()) << "B1 float threshold scan modified source guards";
-  EXPECT_TRUE(sse_output.memory_intact()) << "B1 float threshold scan modified sse guards";
-  EXPECT_TRUE(avx2_output.memory_intact()) << "B1 float threshold scan modified avx2 guards";
-}
 
 void set_color_range(PVideoFrame& frame, IScriptEnvironment* environment, int range) {
   AVSMap* properties = environment->getFramePropsRW(frame);
