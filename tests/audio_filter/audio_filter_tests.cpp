@@ -6,7 +6,7 @@
 #endif
 #include "core/internal.h"
 #include "core/audio.h"
-#include "convert/convert_audio.h"
+#include "audio_convert/factory.h"
 #include "filters/edit.h"
 #include "filters/fps.h"
 #ifdef AVSUT_AUDIO_FILTER_UNDEF_AVS_UNUSED
@@ -84,6 +84,26 @@ void expect_audio_buffers_equal(const GuardedAudioBuffer& expected,
   }
 }
 
+TEST(ConvertAudioFilter, ValidatesChannelValueCountBeforeReadingSource) {
+  AviSynthEnvironment env;
+  const auto vi = make_audio_video_info(AudioInfoSpec{48000, SAMPLE_INT16, 1, 2});
+  auto* source_clip = new AudioSequenceClip(vi, make_audio_bytes<std::int16_t>({0, 0}));
+  PClip source(source_clip);
+  // Use the factory directly: script invocation adds the AVS cache wrapper,
+  // which handles out-of-clip requests before they reach this adapter.
+  PClip converted = avs_audio_convert::EnsureAudioFormat(source, 0, SAMPLE_FLOAT);
+  EXPECT_NO_THROW(converted->GetAudio(nullptr, 0, 0, env.get()));
+  EXPECT_NO_THROW(converted->GetAudio(nullptr, 0, -1, env.get()));
+  const int64_t count = int64_t{std::numeric_limits<int>::max()} / 2 + 1;
+  try {
+    converted->GetAudio(nullptr, 0, count, env.get());
+    FAIL() << "Oversized interleaved request was accepted";
+  } catch (const AvisynthError& error) {
+    EXPECT_STREQ(error.msg, "ConvertAudio: audio count is too large.");
+  }
+  expect_audio_requests(*source_clip, {});
+}
+
 TEST(ConvertAudioFilter, ConvertsSigned16ToFloatForRequestedInterleavedWindow) {
   AviSynthEnvironment environment;
   const auto vi = make_audio_video_info(AudioInfoSpec{48000, SAMPLE_INT16, 4, 2});
@@ -92,16 +112,17 @@ TEST(ConvertAudioFilter, ConvertsSigned16ToFloatForRequestedInterleavedWindow) {
   PClip source(source_clip);
   const auto source_before = source_clip->audio();
 
-  ConvertAudio filter(source, SAMPLE_FLOAT);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(2), 64, 64, kAudioAlignmentOffset);
-  filter.GetAudio(output.data(), 1, 2, environment.get());
+  PClip filter = avs_audio_convert::EnsureAudioFormat(source, 0, SAMPLE_FLOAT);
+  ASSERT_TRUE(filter);
+  GuardedAudioBuffer output(filter->GetVideoInfo().BytesFromAudioSamples(2), 64, 64, kAudioAlignmentOffset);
+  filter->GetAudio(output.data(), 1, 2, environment.get());
 
   expect_float_audio(output, {-1.0F, 16384.0F / 32768.0F, -16384.0F / 32768.0F, 1.0F / 32768.0F});
-  EXPECT_EQ(filter.GetVideoInfo().SampleType(), SAMPLE_FLOAT);
-  EXPECT_EQ(filter.GetVideoInfo().AudioChannels(), 2);
+  EXPECT_EQ(filter->GetVideoInfo().SampleType(), SAMPLE_FLOAT);
+  EXPECT_EQ(filter->GetVideoInfo().AudioChannels(), 2);
   expect_audio_requests(*source_clip, {{1, 2}});
   expect_audio_source_unchanged(*source_clip, source_before);
-  EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), 0);
+  EXPECT_EQ(filter->SetCacheHints(CACHE_GET_MTMODE, 0), 0);
   EXPECT_TRUE(output.memory_intact());
 }
 
@@ -113,12 +134,13 @@ TEST(ConvertAudioFilter, ConvertsFloatToSigned16WithEndpointClamping) {
   PClip source(source_clip);
   const auto source_before = source_clip->audio();
 
-  ConvertAudio filter(source, SAMPLE_INT16);
-  GuardedAudioBuffer output(filter.GetVideoInfo().BytesFromAudioSamples(5), 64, 64, kAudioAlignmentOffset);
-  filter.GetAudio(output.data(), 0, 5, environment.get());
+  PClip filter = avs_audio_convert::EnsureAudioFormat(source, 0, SAMPLE_INT16);
+  ASSERT_TRUE(filter);
+  GuardedAudioBuffer output(filter->GetVideoInfo().BytesFromAudioSamples(5), 64, 64, kAudioAlignmentOffset);
+  filter->GetAudio(output.data(), 0, 5, environment.get());
 
   expect_exact_audio<std::int16_t>(output, {-32768, -32768, -16384, 16384, 32767});
-  EXPECT_EQ(filter.GetVideoInfo().SampleType(), SAMPLE_INT16);
+  EXPECT_EQ(filter->GetVideoInfo().SampleType(), SAMPLE_INT16);
   expect_audio_requests(*source_clip, {{0, 5}});
   expect_audio_source_unchanged(*source_clip, source_before);
   EXPECT_TRUE(output.memory_intact());

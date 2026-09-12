@@ -1,3 +1,6 @@
 [submodule "filesystem"]
 	path = filesystem
 	url = https://github.com/gulrak/filesystem
+[submodule "third_party/audio_convert"]
+	path = third_party/audio_convert
+	url = https://github.com/HomeOfAviSynthPlusEvolution/AviSynthConvertAudio.git

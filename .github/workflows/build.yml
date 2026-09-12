@@ -45,6 +45,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          submodules: recursive
 
       - name: Configure (POSIX)
         if: matrix.family == 'linux' || matrix.family == 'macos'

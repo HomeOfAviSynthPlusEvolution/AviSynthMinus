@@ -6,7 +6,6 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_FINDING_UNDEF_AVS_UNUSED
 #endif
-#include "convert/convert_audio.h"
 #include "convert/convert_bits.h"
 #include "convert/convert_helper.h"
 #include "convert/intel/convert_bits_avx2.h"
@@ -26,141 +25,10 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <limits>
-#include <ostream>
-#include <string>
-#include <vector>
 
 namespace avsut::test {
 namespace {
-
-using AudioConvertFunction = void (*)(void*, void*, int);
-
-struct AudioNonFiniteCase {
-  std::string name;
-  std::size_t bytes_per_sample;
-  AudioConvertFunction scalar;
-  AudioConvertFunction sse;
-  AudioConvertFunction avx2;
-};
-
-void PrintTo(const AudioNonFiniteCase& test_case, std::ostream* stream) {
-  *stream << test_case.name;
-}
-
-std::vector<AudioNonFiniteCase> audio_non_finite_cases() {
-  return {
-      {"ToUInt8_Count17_PatternQuietNanVectorAndTail", sizeof(std::uint8_t), convertFLTTo8,
-       convertFLTTo8_SSE2, convertFLTTo8_AVX2},
-      {"ToInt16_Count17_PatternQuietNanVectorAndTail", sizeof(std::int16_t), convertFLTTo16,
-       convertFLTTo16_SSE2, convertFLTTo16_AVX2},
-      {"ToInt32_Count17_PatternQuietNanVectorAndTail", sizeof(std::int32_t), convertFLTTo32,
-       convertFLTTo32_SSE41, convertFLTTo32_AVX2},
-  };
-}
-
-std::array<float, 17> non_finite_audio_input() {
-  const float nan = std::numeric_limits<float>::quiet_NaN();
-  return {nan,    -1.25F, -0.75F, nan,   -0.5F, -0.125F, 0.0F, nan,  0.125F,
-          0.5F,   0.75F,  0.99F,  nan,   1.0F,  1.25F,  -0.0F, nan};
-}
-
-bool same_float_bits(const std::array<float, 17>& lhs, const std::array<float, 17>& rhs) {
-  return std::memcmp(lhs.data(), rhs.data(), lhs.size() * sizeof(float)) == 0;
-}
-
-std::vector<std::uint8_t> run_audio_conversion(AudioConvertFunction function,
-                                                std::array<float, 17>& source,
-                                                std::size_t bytes_per_sample) {
-  std::vector<std::uint8_t> output(source.size() * bytes_per_sample, 0);
-  function(source.data(), output.data(), static_cast<int>(source.size()));
-  return output;
-}
-
-void expect_equal_audio_bytes(const std::vector<std::uint8_t>& expected,
-                              const std::vector<std::uint8_t>& actual,
-                              const AudioNonFiniteCase& test_case, const char* variant) {
-  ASSERT_EQ(expected.size(), actual.size());
-  for (std::size_t byte_index = 0; byte_index < expected.size(); ++byte_index) {
-    EXPECT_EQ(expected[byte_index], actual[byte_index])
-        << "B1 float-to-" << test_case.name << " variant=" << variant
-        << " byte_index=" << byte_index << " bytes_per_sample=" << test_case.bytes_per_sample;
-  }
-}
-
-class ConvertAudioNonFinite : public ::testing::TestWithParam<AudioNonFiniteCase> {};
-
-TEST_P(ConvertAudioNonFinite, MapsQuietNanConsistentlyAcrossAvailableImplementations) {
-  const auto& test_case = GetParam();
-  const auto features = CpuFeatures::detect();
-  if (!features.supports(IsaRequirement::Sse2)) {
-    GTEST_SKIP() << "host does not support sse2";
-  }
-
-  auto source = non_finite_audio_input();
-  const auto source_before = source;
-  const auto scalar = run_audio_conversion(test_case.scalar, source, test_case.bytes_per_sample);
-  EXPECT_TRUE(same_float_bits(source, source_before))
-      << "B1 float-to-" << test_case.name << " scalar modified input";
-
-  source = source_before;
-  const auto sse = run_audio_conversion(test_case.sse, source, test_case.bytes_per_sample);
-  EXPECT_TRUE(same_float_bits(source, source_before))
-      << "B1 float-to-" << test_case.name << " sse modified input";
-  expect_equal_audio_bytes(scalar, sse, test_case, "sse");
-
-  if (features.supports(IsaRequirement::Avx2)) {
-    source = source_before;
-    const auto avx2 = run_audio_conversion(test_case.avx2, source, test_case.bytes_per_sample);
-    EXPECT_TRUE(same_float_bits(source, source_before))
-        << "B1 float-to-" << test_case.name << " avx2 modified input";
-    expect_equal_audio_bytes(scalar, avx2, test_case, "avx2");
-  }
-}
-
-INSTANTIATE_TEST_SUITE_P(B1, ConvertAudioNonFinite, ::testing::ValuesIn(audio_non_finite_cases()),
-                         [](const ::testing::TestParamInfo<AudioNonFiniteCase>& info) {
-                           return info.param.name;
-                         });
-
-TEST_P(ConvertAudioNonFinite, SilencesNanAndSaturatesInfinityAcrossVectorBoundaries) {
-  const auto& test_case = GetParam();
-  const auto features = CpuFeatures::detect();
-  std::vector<AudioConvertFunction> implementations{test_case.scalar};
-  if (features.supports(test_case.bytes_per_sample == 4 ? IsaRequirement::Sse41 : IsaRequirement::Sse2))
-    implementations.push_back(test_case.sse);
-  if (features.supports(IsaRequirement::Avx2))
-    implementations.push_back(test_case.avx2);
-
-  for (const int count : {1, 3, 4, 7, 8, 15, 16, 17, 31, 32, 33}) {
-    SCOPED_TRACE(count);
-    std::vector<float> source(count);
-    std::vector<std::uint8_t> expected(count * test_case.bytes_per_sample);
-    for (int i = 0; i < count; ++i) {
-      source[i] = i % 3 == 0 ? std::numeric_limits<float>::quiet_NaN() :
-                  i % 3 == 1 ? std::numeric_limits<float>::infinity() :
-                               -std::numeric_limits<float>::infinity();
-      if (test_case.bytes_per_sample == 1) {
-        expected[i] = i % 3 == 0 ? 128 : i % 3 == 1 ? 255 : 0;
-      } else if (test_case.bytes_per_sample == 2) {
-        const std::int16_t value = i % 3 == 0 ? 0 : i % 3 == 1 ? 32767 : -32768;
-        std::memcpy(expected.data() + i * sizeof(value), &value, sizeof(value));
-      } else {
-        const std::int32_t value = i % 3 == 0 ? 0 : i % 3 == 1 ?
-            std::numeric_limits<std::int32_t>::max() : std::numeric_limits<std::int32_t>::min();
-        std::memcpy(expected.data() + i * sizeof(value), &value, sizeof(value));
-      }
-    }
-    for (const auto implementation : implementations) {
-      std::vector<std::uint8_t> output(expected.size() + 32, 0xa5);
-      implementation(source.data(), output.data() + 16, count);
-      EXPECT_TRUE(std::equal(expected.begin(), expected.end(), output.begin() + 16));
-      EXPECT_TRUE(std::all_of(output.begin(), output.begin() + 16, [](auto v) { return v == 0xa5; }));
-      EXPECT_TRUE(std::all_of(output.end() - 16, output.end(), [](auto v) { return v == 0xa5; }));
-    }
-  }
-}
 
 float next_float_steps(float value, int direction, int steps) {
   const float destination = direction < 0 ? -std::numeric_limits<float>::infinity()

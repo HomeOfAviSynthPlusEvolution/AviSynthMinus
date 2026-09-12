@@ -34,6 +34,7 @@ jobs:
         with:
           ref: refs/tags/${{ inputs.tag }}
           fetch-depth: 0
+          submodules: recursive
 
       - name: Pin commit and verify embedded version
         id: release
@@ -118,6 +119,7 @@ jobs:
         with:
           ref: ${{ needs.validate-tag.outputs.commit }}
           fetch-depth: 0
+          submodules: recursive
 
       - name: Verify release tag still identifies the pinned source
         shell: bash
@@ -224,6 +226,7 @@ jobs:
         with:
           ref: ${{ needs.validate-tag.outputs.commit }}
           fetch-depth: 0
+          submodules: recursive
 
       - name: Verify release tag still identifies the pinned source
         shell: bash

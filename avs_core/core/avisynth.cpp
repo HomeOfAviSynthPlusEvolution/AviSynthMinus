@@ -3088,7 +3088,9 @@ void ScriptEnvironment::SetMaxCPU(const char* features)
       if (cpulevel <= CL_NONE)
         cpu_flags &= ~(CPUF_MMX);
 #else
-      // nothing to do, only "none" exists
+      // No feature levels are exposed on this architecture. Explicit none
+      // must still disable native dispatch in independent kernel modules.
+      cpu_flags = 0;
 #endif
     }
     else {
