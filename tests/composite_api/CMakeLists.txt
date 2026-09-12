@@ -1,0 +1,5 @@
+add_executable(composite_api_tests composite_api_tests.cpp)
+target_compile_features(composite_api_tests PRIVATE cxx_std_17)
+target_link_libraries(composite_api_tests PRIVATE GTest::gtest_main AvsCoreExternal)
+include(GoogleTest)
+gtest_discover_tests(composite_api_tests TEST_PREFIX "composite_api.")

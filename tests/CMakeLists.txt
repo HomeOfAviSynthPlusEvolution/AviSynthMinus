@@ -78,3 +78,5 @@ add_subdirectory(tweak_filter)
 add_subdirectory(rgbadjust_filter)
 add_subdirectory(expr_filter)
 add_subdirectory(findings)
+
+add_subdirectory(composite_api)

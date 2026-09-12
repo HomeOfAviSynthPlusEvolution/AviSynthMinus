@@ -766,23 +766,7 @@ void Overlay::SetOfModeByName(const char* name, IScriptEnvironment* env) {
 
 OverlayFunction* Overlay::SelectFunction()
 {
-  switch (of_mode) {
-  case OF_Blend: 
-  case OF_Blend_Compat:
-    return new OL_BlendImage();
-  case OF_Add: return new OL_AddImage();
-  case OF_Subtract: return new OL_AddImage(); // common with Add    //return new OL_SubtractImage();
-  case OF_Multiply: return new OL_MultiplyImage();
-  case OF_Chroma: return new OL_BlendImage(); // Common with BlendImage. plane range differs of_mode checked inside
-  case OF_Luma: return new OL_BlendImage(); // Common with BlendImage. plane range differs of_mode checked inside
-  case OF_Lighten: return new OL_DarkenImage(); // common with Darken
-  case OF_Darken: return new OL_DarkenImage();
-  case OF_SoftLight: return new OL_SoftLightImage();
-  case OF_HardLight: return new OL_SoftLightImage(); // Common with SoftLight
-  case OF_Difference: return new OL_DifferenceImage();
-  case OF_Exclusion: return new OL_ExclusionImage();
-  default: return nullptr; // cannot be
-  }
+  return CreateCompositeOverlay();
 }
 
 void Overlay::ClipFrames(ImageOverlayInternal* input, ImageOverlayInternal* overlay, int x, int y) {

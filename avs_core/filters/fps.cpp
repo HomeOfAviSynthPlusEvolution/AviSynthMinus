@@ -33,6 +33,7 @@
 // import and export plugins, or graphical user interfaces.
 
 
+#include "avs_composite/adapter.h"
 #include "fps.h"
 
 #ifdef AVS_WINDOWS
@@ -688,16 +689,9 @@ PVideoFrame __stdcall ConvertFPS::GetFrame(int n, IScriptEnvironment* env)
       int          row_size = a->GetRowSize(plane);
       int          height = a->GetHeight(plane);
 
-      int weight_i;
-      int invweight_i;
       float weight = (float)frac_f; // between 0 and 1.0
 
-#ifdef INTEL_INTRINSICS
-      MergeFuncPtr weighted_merge_planar = getMergeFunc(bits_per_pixel, env->GetCPUFlags(), a_data, b_data, weight, /*out*/weight_i, /*out*/invweight_i);
-#else
-      MergeFuncPtr weighted_merge_planar = getMergeFunc(bits_per_pixel, a_data, b_data, weight, /*out*/weight_i, /*out*/invweight_i);
-#endif
-      weighted_merge_planar(a_data, b_data, a_pitch, b_pitch, row_size, height, weight, weight_i, invweight_i);
+      avs_composite::MergePlane(a_data, b_data, a_pitch, b_pitch, row_size, height, bits_per_pixel, weight, env);
     }
 
     return a;

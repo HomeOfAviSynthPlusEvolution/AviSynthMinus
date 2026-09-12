@@ -259,10 +259,9 @@ std::vector<PVideoFrame> make_rgbp16_arithmetic_frames(AviSynthEnvironment& envi
 }
 
 int reference_yuv_arithmetic_value(int base, int overlay, bool add, float opacity) {
-  // Integer Overlay uses a 0..256 opacity weight and rounds down.
-  const bool full_opacity = opacity == 1.0F;
-  const int opacity_i = full_opacity ? 256 : static_cast<int>(opacity * 256.0F + 0.5F);
-  const int weighted_y = full_opacity ? overlay : (overlay * opacity_i) / 256;
+  // Composite uses normalized integer opacity and nearest rounding.
+  const int opacity_i = static_cast<int>(opacity * 255.0F + 0.5F);
+  const int weighted_y = (overlay * opacity_i + 127) / 255;
   return add ? base + weighted_y : base - weighted_y;
 }
 
@@ -271,12 +270,9 @@ int reference_yuv_chroma(int base, int overlay, bool add, float opacity, int y_v
   constexpr int kPixelRange = 256;
   constexpr int kOver32 = 32;
   constexpr int kShift = 5;
-  const bool full_opacity = opacity == 1.0F;
-  const int opacity_i = full_opacity ? 256 : static_cast<int>(opacity * 256.0F + 0.5F);
+  const int opacity_i = static_cast<int>(opacity * 255.0F + 0.5F);
   const int d_chroma = overlay - kHalfPixel;
-  const int t_chroma =
-      full_opacity ? d_chroma
-                   : static_cast<int>(std::floor(d_chroma * opacity_i / 256.0));
+  const int t_chroma = (d_chroma < 0 ? -1 : 1) * ((std::abs(d_chroma) * opacity_i + 127) / 255);
   int value = add ? base + t_chroma : base - t_chroma;
   if (add && y_value > 255) {
     const int multiplier = std::max(0, kPixelRange + kOver32 - y_value);
@@ -1000,11 +996,11 @@ void reference_special_pixel(OverlaySpecialOperation operation, float opacity,
       v_value = std::abs(static_cast<int>(base_v) - static_cast<int>(ov_v)) + half;
       break;
     case OverlaySpecialOperation::Exclusion: {
-      // The mode itself also uses a 256 divisor, even at full opacity.
+      // Composite normalizes the exclusion target by the maximum code.
       const int ov = ov_y;
-      y_value = (((base_y ^ xor_mask) * ov) + ((ov ^ xor_mask) * base_y)) / 256;
-      u_value = (((base_u ^ xor_mask) * ov) + ((ov ^ xor_mask) * base_u)) / 256;
-      v_value = (((base_v ^ xor_mask) * ov) + ((ov ^ xor_mask) * base_v)) / 256;
+      y_value = (((base_y ^ xor_mask) * ov) + ((ov ^ xor_mask) * base_y)) / 255;
+      u_value = (((base_u ^ xor_mask) * ov) + ((ov ^ xor_mask) * base_u)) / 255;
+      v_value = (((base_v ^ xor_mask) * ov) + ((ov ^ xor_mask) * base_v)) / 255;
       break;
     }
     case OverlaySpecialOperation::SoftLight:
@@ -1020,11 +1016,11 @@ void reference_special_pixel(OverlaySpecialOperation operation, float opacity,
   }
 
   if (opacity != 1.0F) {
-    // Round down, including negative intermediates before luma compensation.
-    const int weight = static_cast<int>(opacity * 256.0F + 0.5F);
-    y_value = static_cast<int>(std::floor((y_value * weight + (256 - weight) * base_y) / 256.0));
-    u_value = static_cast<int>(std::floor((u_value * weight + (256 - weight) * base_u) / 256.0));
-    v_value = static_cast<int>(std::floor((v_value * weight + (256 - weight) * base_v) / 256.0));
+    // Round to nearest before luma overshoot compensation, using code-scale opacity.
+    const int weight = static_cast<int>(opacity * 255.0F + 0.5F);
+    y_value = static_cast<int>(std::floor((y_value * weight + (255 - weight) * base_y) / 255.0 + .5));
+    u_value = static_cast<int>(std::floor((u_value * weight + (255 - weight) * base_u) / 255.0 + .5));
+    v_value = static_cast<int>(std::floor((v_value * weight + (255 - weight) * base_v) / 255.0 + .5));
   }
 
   apply_y_uv_compensation(y_value, u_value, v_value);

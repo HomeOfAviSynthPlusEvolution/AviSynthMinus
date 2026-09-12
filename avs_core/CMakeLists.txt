@@ -138,7 +138,8 @@ target_link_libraries("AvsCore" ${SYSLIB} AvsSimd)
 
 add_subdirectory("${CMAKE_SOURCE_DIR}/modules/audio_convert" "${CMAKE_CURRENT_BINARY_DIR}/modules/audio_convert")
 add_subdirectory("${CMAKE_SOURCE_DIR}/modules/video_convert" "${CMAKE_CURRENT_BINARY_DIR}/modules/video_convert")
-target_link_libraries(AvsCore AvsAudioConvert AvsVideoConvert AviSynth::ConvertVideo)
+add_subdirectory("${CMAKE_SOURCE_DIR}/modules/composite" "${CMAKE_CURRENT_BINARY_DIR}/modules/composite")
+target_link_libraries(AvsCore AvsAudioConvert AvsVideoConvert AviSynth::ConvertVideo AvsComposite)
 
 if(ENABLE_CUDA)
   if(${CMAKE_VERSION} VERSION_LESS "3.19.5")
