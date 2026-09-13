@@ -59,7 +59,13 @@ source snapshots, frame properties, packed/planar layouts, high bit depths, scal
 and native dispatch, clipped alpha sampling and extreme offsets. Standalone tests
 add C ABI, concurrency, guard pages and per-target equivalence checks. Older
 low-level Overlay SIMD tests remain as reference coverage; those kernels are no
-longer used by Overlay's production dispatch.
+longer used by Overlay's production dispatch. Library-only builds exclude those
+legacy blend/multiply translation units; test builds retain them for reference
+coverage. Overlay's 444 format conversion remains part of host adaptation.
+
+Additional registered-filter tests exercise Prefetch with clipped YUVA Layer,
+nonsequential frame requests, frame properties and immutable sources, plus
+interleaved C/native masked Overlay calls checked against an independent formula.
 
 ## Dependency
 

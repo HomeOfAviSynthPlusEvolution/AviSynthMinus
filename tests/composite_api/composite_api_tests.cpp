@@ -62,6 +62,20 @@ Source Make(IScriptEnvironment* env, int type, int seed, int width = 36, int hei
   env->propSetInt(env->getFramePropsRW(frame), "CompositeMarker", seed, 0);
   return {vi, frame, PClip(new FrameSequenceClip(vi, {frame, frame, frame})), FrameSnapshot::capture(frame, vi)};
 }
+// Immutable source for scheduler tests: unlike FrameSequenceClip, it does not
+// append requests to an unsynchronized observation vector.
+class FrozenSource final : public IClip {
+ public:
+  FrozenSource(VideoInfo vi, PVideoFrame frame) : vi_(vi), frame_(frame) { vi_.num_frames = 32; }
+  PVideoFrame __stdcall GetFrame(int, IScriptEnvironment*) override { return frame_; }
+  bool __stdcall GetParity(int) override { return false; }
+  void __stdcall GetAudio(void*, int64_t, int64_t, IScriptEnvironment*) override {}
+  int __stdcall SetCacheHints(int hint, int) override { return hint == CACHE_GET_MTMODE ? MT_NICE_FILTER : 0; }
+  const VideoInfo& __stdcall GetVideoInfo() override { return vi_; }
+ private:
+  VideoInfo vi_;
+  PVideoFrame frame_;
+};
 void Unchanged(const Source& source) { EXPECT_EQ(FrameSnapshot::capture(source.frame, source.vi), source.snapshot); }
 PClip LayerClip(IScriptEnvironment* env, const Source& base, const Source& source, const char* op,
                 double opacity, bool chroma = true, int x = 0, int y = 0, const char* placement = "MPEG1") {
@@ -267,5 +281,61 @@ TEST(CompositeOverlay, BlendUsesContinuousMasksAndPreservesAlpha) {
       Unchanged(base); Unchanged(source); Unchanged(mask); EXPECT_NE(output->CheckMemory(), 1);
     }
 }
+TEST(CompositeIntegration, PrefetchPreservesClippedLayerPixelsPropertiesAndSources) {
+  for (bool scalar : {true, false}) {
+    AviSynthEnvironment environment; auto* env = environment.get();
+    if (scalar) env->Invoke("SetMaxCPU", "none");
+    auto base = Make(env, VideoInfo::CS_YUVA420P16, 17, 130, 74);
+    auto source = Make(env, VideoInfo::CS_YUVA420P16, 113, 130, 74);
+    base.clip = new FrozenSource(base.vi, base.frame);
+    source.clip = new FrozenSource(source.vi, source.frame);
+    const auto layer = LayerClip(env, base, source, "Mul", .37, true, -3, 1);
+    const auto expected = layer->GetFrame(0, env);
+    const AVSValue args[] = {layer, 3};
+    const auto parallel = env->Invoke("Prefetch", AVSValue(args, 2)).AsClip();
+    for (int n : {0, 1, 7, 2, 19, 31}) {
+      const auto output = parallel->GetFrame(n, env);
+      for (int c = 0; c < 4; ++c)
+        for (int y = 0; y < Height(base.vi, c); ++y)
+          for (int x = 0; x < Width(base.vi, c); ++x)
+            ASSERT_EQ(Read(output, base.vi, c, x, y), Read(expected, base.vi, c, x, y));
+      EXPECT_EQ(env->propGetInt(env->getFramePropsRO(output), "CompositeMarker", 0, nullptr), 17);
+      EXPECT_NE(output->CheckMemory(), 1);
+    }
+    Unchanged(base); Unchanged(source);
+  }
+}
+
+TEST(CompositeIntegration, InterleavedCpuPoliciesKeepMaskedOverlayWithinContract) {
+  AviSynthEnvironment scalar_environment, native_environment;
+  auto* scalar = scalar_environment.get(); auto* native = native_environment.get();
+  scalar->Invoke("SetMaxCPU", "none");
+  const auto a = Make(scalar, VideoInfo::CS_YUVA444P16, 17);
+  const auto b = Make(scalar, VideoInfo::CS_YUVA444P16, 113);
+  const auto mask = Make(scalar, VideoInfo::CS_Y16, 71);
+  const AVSValue args[] = {a.clip, b.clip, mask.clip, .17, "Blend"};
+  const char* names[] = {nullptr, nullptr, "mask", "opacity", "mode"};
+  const auto c = scalar->Invoke("Overlay", AVSValue(args, 5), names).AsClip();
+  const auto simd = native->Invoke("Overlay", AVSValue(args, 5), names).AsClip();
+  for (int n : {2, 0, 1}) {
+    const auto first = c->GetFrame(n, scalar);
+    const auto middle = simd->GetFrame(n, native);
+    const auto last = c->GetFrame(n, scalar);
+    for (int ch = 0; ch < 4; ++ch)
+      for (int y = 0; y < a.vi.height; ++y)
+        for (int x = 0; x < a.vi.width; ++x) {
+          const double av = Read(a.frame, a.vi, ch, x, y);
+          const double bv = Read(b.frame, b.vi, ch, x, y);
+          const double w = double(float(.17)) * Read(mask.frame, mask.vi, 0, x, y) / Maximum(a.vi);
+          const double expected = ch == 3 ? av : Rounded(av + (bv - av) * w, a.vi);
+          ASSERT_EQ(Read(first, a.vi, ch, x, y), expected);
+          ASSERT_EQ(Read(last, a.vi, ch, x, y), expected);
+          ASSERT_NEAR(Read(middle, a.vi, ch, x, y), expected, ch == 3 || w == 0 ? 0 : 1);
+        }
+    EXPECT_EQ(native->propGetInt(native->getFramePropsRO(middle), "CompositeMarker", 0, nullptr), 17);
+  }
+  Unchanged(a); Unchanged(b); Unchanged(mask);
+}
+
 } // namespace
 } // namespace avsut::test
