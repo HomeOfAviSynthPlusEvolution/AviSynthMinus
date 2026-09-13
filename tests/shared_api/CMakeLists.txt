@@ -15,7 +15,8 @@ FetchContent_MakeAvailable(googletest)
 add_executable(shared_api_tests linkage.cpp
   ../audio_filter/convert_audio_api_tests.cpp
   ../convert_bits_api/convert_bits_api_tests.cpp
-  ../composite_api/composite_api_tests.cpp)
+  ../composite_api/composite_api_tests.cpp
+  ../resize_filter/resize_api_tests.cpp)
 target_compile_features(shared_api_tests PRIVATE cxx_std_17)
 target_compile_definitions(shared_api_tests PRIVATE DEPTH_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/video_convert/tests/fixtures/depth/upstream-c.txt")
 target_include_directories(shared_api_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/.." "${AVS_INCLUDE_DIR}")

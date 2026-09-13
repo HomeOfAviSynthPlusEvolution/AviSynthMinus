@@ -60,6 +60,13 @@ former full-frame layout wrapper chain, using the original centered default grid
 and both H/V orders. Generic conversion scripts are not a substitute for that
 reference: they can deliberately change chroma placement.
 
+Installed shared-core coverage also checks PointResize crop/shrink/enlarge and
+BilinearResize enlargement against independent coordinate/interpolation formulas
+across 12 grayscale, planar 4:4:4 and packed RGB formats under C/native dispatch.
+The tests preserve the historical PointResize boundary grid and packed RGB
+bottom-up vertical sampling phase, and check alpha, properties, timing and source
+immutability. The same cases run in the static host Resize suite.
+
 ## Planar matrix conversion
 
 The AVS filter retains script parsing, frame allocation, alpha and metadata.

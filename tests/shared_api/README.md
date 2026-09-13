@@ -4,7 +4,11 @@ This standalone CMake project exercises Audio, Video and Composite through an
 installed shared core and its public headers. It reuses host filter regression
 cases, initializes the public AVS linkage table, and does not link `AvsCore` or
 any independent kernel library directly. The depth fixture comes from the pinned
-Video submodule.
+Video submodule. Resize cases use independent PointResize coordinates and
+BilinearResize interpolation expectations across 12 grayscale, planar 4:4:4 and
+packed RGB formats. They cover crop/shrink/enlarge, alpha, frame properties,
+timing, source immutability and C/native dispatch; subsampled chroma and other
+resize kernels remain covered by the static host suites.
 
 After building and installing a shared core, run from the repository root:
 
