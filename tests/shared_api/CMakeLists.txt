@@ -12,11 +12,16 @@ set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_Declare(googletest GIT_REPOSITORY https://github.com/google/googletest.git GIT_TAG v1.17.0 GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(googletest)
-add_executable(shared_api_tests linkage.cpp
+add_executable(shared_api_tests linkage.cpp linkage_tests.cpp
   ../audio_filter/convert_audio_api_tests.cpp
   ../convert_bits_api/convert_bits_api_tests.cpp
   ../composite_api/composite_api_tests.cpp
   ../resize_filter/resize_api_tests.cpp)
+add_library(shared_linkage_probe MODULE linkage_probe.cpp)
+target_include_directories(shared_linkage_probe PRIVATE "${AVS_INCLUDE_DIR}")
+target_compile_features(shared_linkage_probe PRIVATE cxx_std_17)
+add_dependencies(shared_api_tests shared_linkage_probe)
+target_compile_definitions(shared_api_tests PRIVATE SHARED_LINKAGE_PLUGIN="$<TARGET_FILE:shared_linkage_probe>")
 target_compile_features(shared_api_tests PRIVATE cxx_std_17)
 target_compile_definitions(shared_api_tests PRIVATE DEPTH_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/video_convert/tests/fixtures/depth/upstream-c.txt")
 target_include_directories(shared_api_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/.." "${AVS_INCLUDE_DIR}")

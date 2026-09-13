@@ -10,6 +10,11 @@ packed RGB formats. They cover crop/shrink/enlarge, alpha, frame properties,
 timing, source immutability and C/native dispatch; subsampled chroma and other
 resize kernels remain covered by the static host suites.
 
+Linkage regressions also check that a client with an uninitialized `AVS_linkage`
+receives the core table and can load a legacy Init3 plugin. On Linux, the core
+binds internal function references locally so SDK forwarding methods exported
+by a client cannot replace core implementations or linkage-table entries.
+
 After building and installing a shared core, run from the repository root:
 
 ```sh
