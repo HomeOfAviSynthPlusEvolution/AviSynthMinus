@@ -250,6 +250,9 @@ Expr language/RPN elements
   internal 32-bit float can hold only a 24 bit integer number (approximately).
 * Math constant: ``pi``
 * Functions: ``min, max, sqrt, abs, exp, log, pow ^`` (synonyms: ``pow`` and ``^``)
+
+  In AviSynthMinus 0.3.0, ``sqrt`` clamps negative inputs to zero in the C
+  evaluators and constant folding, matching the existing SIMD behavior.
 * Function: ``neg`` simple negates stack top
 * Function: ``sgn`` simple signum function -1 if x<0; 0 when x==0; 1 if x>0
 * Function: ``clip`` three operand function for clipping. Example: ``x 16 240
@@ -552,6 +555,9 @@ Changelog
 +-----------------+----------------------------------------------------------+
 | Version         | Changes                                                  |
 +=================+==========================================================+
+| 0.3.0           | AviSynthMinus: clamp negative sqrt input to zero in C    |
+|                 | evaluation and constant folding, matching SIMD.          |
++-----------------+----------------------------------------------------------+
 | 3.7.4           || Enhancement: vectorizable C implementation helps nonJIT |
 |                 || New parameter: optVectorC                               |
 |                 || Implement ``tan`` for JitASM                            |

@@ -188,6 +188,20 @@ TEST(ExprFormatOverride, PreservesRgbaPlaneOrderForCopiedYuvaOutput) {
   expect_source_unchanged(source, "B10 copied RGBA to YUVA");
 }
 
+TEST(ExprSqrt, ConstantNegativeInputMatchesRuntimeClamp) {
+  AviSynthEnvironment environment;
+  const StaticVideoSource source = make_y32_negative_source(environment);
+  const std::vector<PClip> children{source.clip};
+  const std::vector<std::string> expressions{"-1 sqrt"};
+  Exprfilter filter(children, expressions, nullptr, false, false, false, false,
+                    "none", 0, 0, environment.get());
+  const PVideoFrame output = filter.GetFrame(0, environment.get());
+  const auto* row = reinterpret_cast<const float*>(output->GetReadPtr(PLANAR_Y));
+  for (int x = 0; x < source.video_info.width; ++x)
+    EXPECT_EQ(row[x], 0.0F) << "constant sqrt column=" << x;
+  expect_source_unchanged(source, "constant negative sqrt");
+}
+
 TEST(ExprSqrt, ClampsNegativeFloatInputAcrossScalarAndSse2) {
   AviSynthEnvironment environment;
   if ((environment.get()->GetCPUFlags() & CPUF_SSE2) == 0) {

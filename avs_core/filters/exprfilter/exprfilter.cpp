@@ -4608,7 +4608,7 @@ public:
   // Vectorized sqrt
   void sqrt() {
     for (int i = 0; i < VectorSize; ++i)
-      stacktop[i] = std::sqrt(stacktop[i]);
+      stacktop[i] = std::sqrt(std::max(0.0f, stacktop[i]));
   }
 
   // Vectorized abs
@@ -5226,7 +5226,7 @@ void Exprfilter::processFrame(int plane, int w, int h, int pixels_per_iter, floa
             stacktop = std::trunc(stacktop);
             break;
           case opSqrt:
-            stacktop = std::sqrt(stacktop);
+            stacktop = std::sqrt(std::max(0.0f, stacktop));
             break;
           case opAbs:
             stacktop = std::abs(stacktop);
@@ -6517,7 +6517,7 @@ static size_t parseExpression(const std::string &expr, std::vector<ExprOp> &ops,
 static float calculateOneOperand(uint32_t op, float a) {
     switch (op) {
         case opSqrt:
-            return std::sqrt(a);
+            return std::sqrt(std::max(0.0f, a));
         case opAbs:
             return std::abs(a);
         case opSgn:
