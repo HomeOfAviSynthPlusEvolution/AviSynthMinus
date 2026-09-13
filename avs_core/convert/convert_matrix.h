@@ -37,27 +37,8 @@
 
 #include "../core/internal.h"
 
-struct ConversionMatrix {
-  int y_r, y_g, y_b;
-  // for grayscale conversion these may not needed
-  int u_r, u_g, u_b;
-  int v_r, v_g, v_b;
-
-  // used in YUY2 RGB->YUY2 asm
-
-  float y_r_f, y_g_f, y_b_f;
-  float u_r_f, u_g_f, u_b_f;
-  float v_r_f, v_g_f, v_b_f;
-
-  int offset_y;
-  float offset_y_f;
-  int offset_rgb;
-  float offset_rgb_f;
-};
-
+// Host matrix-id mapping; numeric coefficient plans belong to VideoConvert.
 bool GetKrKb(int matrix, double& kr, double& kb);
-bool do_BuildMatrix_Rgb2Yuv(int _Matrix, int _ColorRange, int _ColorRange_Out, int int_arith_shift, int bits_per_pixel, ConversionMatrix& matrix);
-bool do_BuildMatrix_Yuv2Rgb(int _Matrix, int _ColorRange, int _ColorRange_Out, int int_arith_shift, int bits_per_pixel, ConversionMatrix& matrix);
 
 /*****************************************************
  *******   Colorspace Single-Byte Conversions   ******

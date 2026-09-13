@@ -1,5 +1,4 @@
 #include "convert/convert_helper.h"
-#include "convert/convert_matrix.h"
 #include "support/avisynth_environment.h"
 #include "support/video_filter_test_support.h"
 #include <gtest/gtest.h>
@@ -7,28 +6,6 @@
 #include <cstring>
 namespace avsut::test {
 namespace {
-TEST(ConvertMatrixGain, NominalLimitedRgbSpanMapsToFullLuma) {
-  for (int depth : {8, 10, 12, 14, 16})
-    for (int precision : {13, 14, 15})
-      for (int id : {AVS_MATRIX_BT709, AVS_MATRIX_BT470_BG, AVS_MATRIX_BT2020_NCL}) {
-        SCOPED_TRACE(::testing::Message() << "depth=" << depth << " precision=" << precision << " matrix=" << id);
-        ConversionMatrix m{};
-        ASSERT_TRUE(do_BuildMatrix_Rgb2Yuv(id, AVS_RANGE_LIMITED, AVS_RANGE_FULL, precision, depth, m));
-        const double span = 219 << (depth - 8), maximum = (1 << depth) - 1, scale = 1 << precision;
-        EXPECT_NEAR(span * (m.y_b + m.y_g + m.y_r) / scale, maximum, span / (2 * scale) + 1e-8);
-        EXPECT_NEAR(span * (double(m.y_b_f) + m.y_g_f + m.y_r_f), maximum, maximum * 2e-7);
-        EXPECT_EQ(m.offset_rgb, -(16 << (depth - 8)));
-      }
-}
-TEST(ConvertMatrixGain, LimitedRgbDestinationUsesNominalIntegerSpan) {
-  for (int depth : {8, 10, 12, 14, 16}) {
-    ConversionMatrix m{};
-    ASSERT_TRUE(do_BuildMatrix_Yuv2Rgb(AVS_MATRIX_BT709, AVS_RANGE_FULL, AVS_RANGE_LIMITED, 13, depth, m));
-    const double maximum = (1 << depth) - 1, span = 219 << (depth - 8);
-    EXPECT_NEAR(maximum * m.y_b / 8192., span, maximum / 16384.);
-    EXPECT_NEAR(maximum * m.y_b_f, span, span * 2e-7);
-  }
-}
 TEST(ConvertMatrixGain, PublicLimitedRgbEndpoints) {
   for (bool scalar : {true, false})
     for (const int format :

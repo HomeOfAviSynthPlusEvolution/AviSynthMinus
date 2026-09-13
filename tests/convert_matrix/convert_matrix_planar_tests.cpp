@@ -1,5 +1,5 @@
 #include "convert/convert_helper.h"
-#include "convert/convert_matrix.h"
+#include "legacy_matrix_reference.h"
 #include "support/avisynth_environment.h"
 #include "support/video_filter_test_support.h"
 #include <gtest/gtest.h>
@@ -87,11 +87,11 @@ TEST_P(PlanarMatrix, PublicPixelsAlphaAndProperties) {
         EXPECT_EQ(env->propGetInt(props, "MatrixTestMarker", 0, nullptr), 173);
         if (!forward)
           EXPECT_EQ(env->propNumElements(props, "_ChromaLocation"), -1);
-        ConversionMatrix m{};
+        legacy_matrix_reference::ConversionMatrix m{};
         const int precision = forward ? 15 : 13;
         ASSERT_TRUE(
-            forward ? do_BuildMatrix_Rgb2Yuv(ids[matrix_index], source_range, destination_range, precision, depth, m)
-                    : do_BuildMatrix_Yuv2Rgb(ids[matrix_index], source_range, destination_range, precision, depth, m));
+            forward ? legacy_matrix_reference::do_BuildMatrix_Rgb2Yuv(ids[matrix_index], source_range, destination_range, precision, depth, m)
+                    : legacy_matrix_reference::do_BuildMatrix_Yuv2Rgb(ids[matrix_index], source_range, destination_range, precision, depth, m));
         const int weights[3][3] = {{m.y_b, forward ? m.y_g : m.u_b, forward ? m.y_r : m.v_b},
                                    {forward ? m.u_b : m.y_g, m.u_g, forward ? m.u_r : m.v_g},
                                    {forward ? m.v_b : m.y_r, forward ? m.v_g : m.u_r, m.v_r}};

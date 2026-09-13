@@ -161,3 +161,15 @@ kernel/full-filter performance gaps are recorded in the submodule's depth docs.
 ## Integration behavior
 
 Float YUV-to-RGB preserves values outside [0, 1] on C and SIMD targets, retaining the host scalar contract and making target selection numerically consistent. The standalone default remains clipped; the adapter explicitly requests `VC_YUV_TO_RGB_UNCLIPPED`. Integer limited-range endpoints use the nominal 16/235 codes scaled by bit depth; full range ends at `(1 << depth) - 1`.
+
+## Retired host matrix builders
+
+The old ConversionMatrix coefficient structure and RGB-to-YUV/YUV-to-RGB builders
+have been removed: production paths use VideoConvert plans. Their exclusive
+legacy coefficient tests are removed as well; public matrix arithmetic, range,
+alpha and property tests remain. Public pixel tests retain a frozen, test-only
+coefficient oracle in legacy_matrix_reference.h; it is never built into AvsCore.
+The host retains GetKrKb for script matrix IDs
+and RGB2YUV_Rec601 for filters that convert a single color value. The empty
+convert/intel source glob is removed because that directory has no remaining
+tracked implementation files.
