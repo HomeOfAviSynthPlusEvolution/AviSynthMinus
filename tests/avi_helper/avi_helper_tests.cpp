@@ -1046,19 +1046,27 @@ INSTANTIATE_TEST_SUITE_P(Packed422, Px10ConversionKernels,
 std::vector<ToY416Case> to_y416_cases() {
   const auto c_false = Variant<ToY416Function>{"c", ToY416_c<false>, IsaRequirement::Scalar};
   const auto c_true = Variant<ToY416Function>{"c", ToY416_c<true>, IsaRequirement::Scalar};
-  const auto sse_false = Variant<ToY416Function>{"sse2", ToY416_sse2<false>, IsaRequirement::Sse2};
-  const auto sse_true = Variant<ToY416Function>{"sse2", ToY416_sse2<true>, IsaRequirement::Sse2};
-  return {make_to_y416_case(false, c_false, "c835b250e5c3f569"),
-          make_to_y416_case(false, sse_false, "c835b250e5c3f569"),
-          make_to_y416_case(true, c_true, "ad8e099a3bd0d8cf"),
-          make_to_y416_case(true, sse_true, "ad8e099a3bd0d8cf")};
+  std::vector<ToY416Case> cases = {
+      make_to_y416_case(false, c_false, "c835b250e5c3f569"),
+      make_to_y416_case(true, c_true, "ad8e099a3bd0d8cf")};
+#if AVS_TEST_INTEL_SIMD
+  cases.push_back(make_to_y416_case(false,
+      {"sse2", ToY416_sse2<false>, IsaRequirement::Sse2}, "c835b250e5c3f569"));
+  cases.push_back(make_to_y416_case(true,
+      {"sse2", ToY416_sse2<true>, IsaRequirement::Sse2}, "ad8e099a3bd0d8cf"));
+#endif
+  return cases;
 }
 
 std::vector<BgraToArgbBeCase> bgra_to_argb_be_cases() {
   const auto hash = "f0a88e7431f4f42d";
-  return {make_bgra_to_argb_be_case({"c", bgra_to_argbBE_c, IsaRequirement::Scalar}, hash),
-          make_bgra_to_argb_be_case({"sse2", bgra_to_argbBE_sse2, IsaRequirement::Sse2}, hash),
-          make_bgra_to_argb_be_case({"ssse3", bgra_to_argbBE_ssse3, IsaRequirement::Ssse3}, hash)};
+  std::vector<BgraToArgbBeCase> cases = {
+      make_bgra_to_argb_be_case({"c", bgra_to_argbBE_c, IsaRequirement::Scalar}, hash)};
+#if AVS_TEST_INTEL_SIMD
+  cases.push_back(make_bgra_to_argb_be_case({"sse2", bgra_to_argbBE_sse2, IsaRequirement::Sse2}, hash));
+  cases.push_back(make_bgra_to_argb_be_case({"ssse3", bgra_to_argbBE_ssse3, IsaRequirement::Ssse3}, hash));
+#endif
+  return cases;
 }
 
 class ToY416Kernels : public ::testing::TestWithParam<ToY416Case> {};

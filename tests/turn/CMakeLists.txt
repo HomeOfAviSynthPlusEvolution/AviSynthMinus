@@ -17,3 +17,5 @@ target_link_libraries(turn_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(turn_tests TEST_PREFIX "turn.")
+
+target_compile_definitions(turn_tests PRIVATE AVS_TEST_INTEL_SIMD=$<BOOL:${ENABLE_INTEL_SIMD}>)

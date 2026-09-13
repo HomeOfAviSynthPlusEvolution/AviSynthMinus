@@ -1,3 +1,8 @@
+# Direct x86 kernel tests require the matching AvsCore implementations.
+if(NOT ENABLE_INTEL_SIMD)
+  return()
+endif()
+
 add_executable(text_overlay_tests
   text_overlay_compare_tests.cpp
 )

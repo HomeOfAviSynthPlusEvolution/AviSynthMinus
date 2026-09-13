@@ -1,3 +1,8 @@
+# Direct x86 kernel tests require the matching AvsCore implementations.
+if(NOT ENABLE_INTEL_SIMD)
+  return()
+endif()
+
 add_executable(resize_tests resize_tests.cpp)
 target_include_directories(resize_tests PRIVATE
   ${PROJECT_SOURCE_DIR}/tests

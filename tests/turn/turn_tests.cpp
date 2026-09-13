@@ -37,14 +37,14 @@ void add_plane_cases(std::vector<TurnCase>& cases, const char* format, std::size
 std::vector<TurnCase> plane_cases() {
   std::vector<TurnCase> cases;
   add_plane_cases(cases, "Plane8", 1, 33, 17, 40, 32, 0xC0FFEEU, "9d4f11c702db4abb",
-                  "6bd054de3d79c781", turn_left_plane_8_c, turn_left_plane_8_sse2,
-                  turn_right_plane_8_c, turn_right_plane_8_sse2);
+                  "6bd054de3d79c781", turn_left_plane_8_c, AVS_TEST_TURN_SIMD(turn_left_plane_8_sse2),
+                  turn_right_plane_8_c, AVS_TEST_TURN_SIMD(turn_right_plane_8_sse2));
   add_plane_cases(cases, "Plane16", 2, 17, 19, 40, 48, 0x1600BEEFU, "db4e5f13c5b07ed5",
-                  "27f43f7d2e758b85", turn_left_plane_16_c, turn_left_plane_16_sse2,
-                  turn_right_plane_16_c, turn_right_plane_16_sse2);
+                  "27f43f7d2e758b85", turn_left_plane_16_c, AVS_TEST_TURN_SIMD(turn_left_plane_16_sse2),
+                  turn_right_plane_16_c, AVS_TEST_TURN_SIMD(turn_right_plane_16_sse2));
   add_plane_cases(cases, "Plane32", 4, 9, 11, 48, 64, 0x3200BEEFU, "8f8457e88990cdf5",
-                  "fbc817cd498ed5b1", turn_left_plane_32_c, turn_left_plane_32_sse2,
-                  turn_right_plane_32_c, turn_right_plane_32_sse2);
+                  "fbc817cd498ed5b1", turn_left_plane_32_c, AVS_TEST_TURN_SIMD(turn_left_plane_32_sse2),
+                  turn_right_plane_32_c, AVS_TEST_TURN_SIMD(turn_right_plane_32_sse2));
   return cases;
 }
 

@@ -15,3 +15,5 @@ target_link_libraries(avi_helper_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(avi_helper_tests TEST_PREFIX "avi_helper.")
+
+target_compile_definitions(avi_helper_tests PRIVATE AVS_TEST_INTEL_SIMD=$<BOOL:${ENABLE_INTEL_SIMD}>)

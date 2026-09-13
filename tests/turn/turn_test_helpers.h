@@ -1,5 +1,12 @@
 #pragma once
 
+// Omit references to kernels absent from SIMD-disabled/ARM core builds.
+#if AVS_TEST_INTEL_SIMD
+#define AVS_TEST_TURN_SIMD(function) function
+#else
+#define AVS_TEST_TURN_SIMD(function) nullptr
+#endif
+
 #include "filters/turn.h"
 
 #include "support/cpu_features.h"

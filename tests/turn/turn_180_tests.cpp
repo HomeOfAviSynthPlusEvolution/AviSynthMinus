@@ -17,9 +17,11 @@ void add_180_cases(std::vector<TurnCase>& cases, const char* format, std::size_t
   cases.push_back(make_turn_case(
       format, TurnDirection::Half, width_pixels, height_pixels, bytes_per_pixel, pitch, pitch, seed,
       scalar, Variant<TurnFuncPtr>{"c", scalar, IsaRequirement::Scalar}, expected_hash));
-  cases.push_back(make_turn_case(
-      format, TurnDirection::Half, width_pixels, height_pixels, bytes_per_pixel, pitch, pitch, seed,
-      scalar, Variant<TurnFuncPtr>{"sse2", sse2, IsaRequirement::Sse2}, expected_hash));
+  if (sse2 != nullptr) {
+    cases.push_back(make_turn_case(
+        format, TurnDirection::Half, width_pixels, height_pixels, bytes_per_pixel, pitch, pitch, seed,
+        scalar, Variant<TurnFuncPtr>{"sse2", sse2, IsaRequirement::Sse2}, expected_hash));
+  }
   if (ssse3 != nullptr) {
     cases.push_back(make_turn_case(
         format, TurnDirection::Half, width_pixels, height_pixels, bytes_per_pixel, pitch, pitch,
@@ -30,15 +32,15 @@ void add_180_cases(std::vector<TurnCase>& cases, const char* format, std::size_t
 std::vector<TurnCase> turn_180_cases() {
   std::vector<TurnCase> cases;
   add_180_cases(cases, "Plane8", 1, 33, 9, 40, 0x1800BEEFU, "27fe2002b6d13934",
-                turn_180_plane_c<std::uint8_t>, turn_180_plane_sse2<std::uint8_t>,
-                turn_180_plane_ssse3<std::uint8_t>);
+                turn_180_plane_c<std::uint8_t>, AVS_TEST_TURN_SIMD(turn_180_plane_sse2<std::uint8_t>),
+                AVS_TEST_TURN_SIMD(turn_180_plane_ssse3<std::uint8_t>));
   add_180_cases(cases, "Plane16", 2, 17, 7, 40, 0x1800C0DEU, "e1d7bc0fe504321c",
-                turn_180_plane_c<std::uint16_t>, turn_180_plane_sse2<std::uint16_t>,
-                turn_180_plane_ssse3<std::uint16_t>);
+                turn_180_plane_c<std::uint16_t>, AVS_TEST_TURN_SIMD(turn_180_plane_sse2<std::uint16_t>),
+                AVS_TEST_TURN_SIMD(turn_180_plane_ssse3<std::uint16_t>));
   add_180_cases(cases, "Plane32", 4, 9, 7, 48, 0x180032BEU, "1505fea3d7e012a6",
-                turn_180_plane_c<std::uint32_t>, turn_180_plane_sse2<std::uint32_t>, nullptr);
+                turn_180_plane_c<std::uint32_t>, AVS_TEST_TURN_SIMD(turn_180_plane_sse2<std::uint32_t>), nullptr);
   add_180_cases(cases, "Plane64", 8, 5, 7, 48, 0x180064BEU, "fc2d297705cb1972",
-                turn_180_plane_c<std::uint64_t>, turn_180_plane_sse2<std::uint64_t>, nullptr);
+                turn_180_plane_c<std::uint64_t>, AVS_TEST_TURN_SIMD(turn_180_plane_sse2<std::uint64_t>), nullptr);
   return cases;
 }
 
