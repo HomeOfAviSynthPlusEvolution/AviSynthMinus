@@ -41,6 +41,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "version.h"
+#include <cmath>
 #include <memory>
 #include <string>
 #ifdef AVS_POSIX
@@ -216,7 +217,7 @@ public:
   { return (unsigned(a-b+threshold) <= threshold*2); }
 
 [[maybe_unused]] static AVS_FORCEINLINE bool IsCloseFloat(float a, float b, float threshold)
-{ return (a-b+threshold <= threshold*2); }
+{ return std::fabs(a - b) <= threshold; }
 
 #ifdef INTEL_INTRINSICS
 // useful SIMD helpers

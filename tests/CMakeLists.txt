@@ -46,6 +46,7 @@ add_subdirectory(greyscale)
 add_subdirectory(focus)
 # add_subdirectory(layer) -- tests 3.7.6-dev new Layer placement and AVX2 features
 # add_subdirectory(layer_filter) -- tests 3.7.6-dev new Layer placement features
+add_subdirectory(colorkeymask_filter)
 # add_subdirectory(merge) -- tests 3.7.6-dev unified merge kernel API
 add_subdirectory(turn)
 add_subdirectory(resize)
