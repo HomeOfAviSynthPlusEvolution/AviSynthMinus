@@ -505,6 +505,9 @@ TEST(CxLegacySdk, DualBinaryStillWorksThroughOldMsvcEntry) {
     AviSynthEnvironment environment;
     using Init = const char *(__stdcall *)(IScriptEnvironment *, const AVS_Linkage *);
     auto init = reinterpret_cast<Init>(GetProcAddress(module, "AvisynthPluginInit3"));
+    // Match the legacy loader's fallback for MSVC x86 stdcall exports.
+    if (!init)
+      init = reinterpret_cast<Init>(GetProcAddress(module, "_AvisynthPluginInit3@8"));
     ASSERT_NE(init, nullptr);
     init(environment.get(), environment.get()->GetAVSLinkage());
     EXPECT_FALSE(environment.get()->FunctionExists("CXSdkOnly"));
