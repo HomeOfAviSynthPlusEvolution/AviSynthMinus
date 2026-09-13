@@ -40,7 +40,6 @@
 #include <avisynth.h>
 #include <avs/minmax.h>
 #include "imghelpers.h"
-#include "blend_common.h"
 
 enum {
   OF_Blend = 0,

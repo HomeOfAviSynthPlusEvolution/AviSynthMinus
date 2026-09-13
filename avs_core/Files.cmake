@@ -94,14 +94,3 @@ IF( MSVC_IDE )
     # Ninja, unfortunately, seems to have some issues with using rc.exe
     LIST(APPEND AvsCore_Sources "core/avisynth.rc")
 ENDIF()
-
-# Composite owns production blending. Keep legacy implementations only for the
-# low-level reference tests; 444convert still serves host format adaptation.
-if(NOT ENABLE_TESTS)
-  list(REMOVE_ITEM AvsCore_Sources
-    "filters/overlay/blend_common.cpp"
-    "filters/overlay/intel/blend_common_sse.cpp"
-    "filters/overlay/intel/blend_common_avx2.cpp"
-    "filters/overlay/intel/OF_multiply_sse.cpp"
-    "filters/overlay/intel/OF_multiply_avx2.cpp")
-endif()

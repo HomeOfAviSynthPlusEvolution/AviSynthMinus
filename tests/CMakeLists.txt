@@ -42,13 +42,11 @@ add_subdirectory(cx)
 add_subdirectory(v12)
 add_subdirectory(bitblt)
 add_subdirectory(limiter)
-add_subdirectory(overlay)
 add_subdirectory(overlay_filter)
 add_subdirectory(planeswap)
 add_subdirectory(focus)
 # add_subdirectory(layer) -- tests 3.7.6-dev new Layer placement and AVX2 features
 # add_subdirectory(layer_filter) -- tests 3.7.6-dev new Layer placement features
-# add_subdirectory(merge) -- tests 3.7.6-dev unified merge kernel API
 add_subdirectory(turn)
 add_subdirectory(resize)
 add_subdirectory(resize_filter)

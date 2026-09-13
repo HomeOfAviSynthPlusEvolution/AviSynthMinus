@@ -57,11 +57,13 @@ while packed Fast averages it. Empty overlaps use checked wide intersection math
 `tests/composite_api` tests real registered filters using independent formulas,
 source snapshots, frame properties, packed/planar layouts, high bit depths, scalar
 and native dispatch, clipped alpha sampling and extreme offsets. Standalone tests
-add C ABI, concurrency, guard pages and per-target equivalence checks. Older
-low-level Overlay SIMD tests remain as reference coverage; those kernels are no
-longer used by Overlay's production dispatch. Library-only builds exclude those
-legacy blend/multiply translation units; test builds retain them for reference
-coverage. Overlay's 444 format conversion remains part of host adaptation.
+add C ABI, concurrency, guard pages and per-target equivalence checks. The replaced host Overlay blend and SSE4.1/AVX2 Multiply kernels, headers and
+exclusive raw-kernel tests have been removed, together with the disabled legacy
+Merge kernel suite. Disabled Layer helpers no longer call the removed scalar
+baseline; their independent reference remains. Historical code and hashes remain
+in Git. Public Overlay/Merge/Layer tests and independent Composite tests cover the
+active implementation. Overlay's 444 format conversion still serves production
+host adaptation and is retained.
 
 Additional registered-filter tests exercise Prefetch with clipped YUVA Layer,
 nonsequential frame requests, frame properties and immutable sources, plus

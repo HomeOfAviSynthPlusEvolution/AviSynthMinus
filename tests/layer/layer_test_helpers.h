@@ -8,9 +8,6 @@
 #endif
 #include "filters/intel/layer_avx2.h"
 #include "filters/intel/layer_sse41.h"
-#include "filters/overlay/blend_common.h"
-#include "filters/overlay/intel/blend_common_avx2.h"
-#include "filters/overlay/intel/blend_common_sse.h"
 
 #include "support/comparators.h"
 #include "support/deterministic_data.h"
@@ -51,7 +48,6 @@ struct LayerYuvAddCase {
   std::size_t mask_pitch{};
   int opacity{};
   std::string opacity_name;
-  LayerYuvAddFuncPtr scalar_function{};
   Variant<LayerYuvAddFuncPtr> variant;
   std::string expected_hash;
   std::uint32_t seed{};
@@ -208,7 +204,6 @@ inline LayerYuvAddCase make_layer_yuv_add_case(bool is_chroma, int colorspace, i
                          layer_round_up(mask_width * bytes_per_pixel, 32),
                          opacity,
                          std::move(opacity_name),
-                         get_overlay_blend_masked_fn_c(is_chroma, mode),
                          std::move(variant),
                          std::move(expected_hash),
                          seed,
@@ -333,19 +328,6 @@ void run_layer_yuv_add_case(const LayerYuvAddCase& test_case) {
   apply_layer_reference(test_case, expected.view(), overlay.view().as_const(),
                         mask.view().as_const());
 
-  test_case.scalar_function(
-      reinterpret_cast<BYTE*>(actual.view().data()),
-      reinterpret_cast<const BYTE*>(overlay.view().data()),
-      reinterpret_cast<const BYTE*>(mask.view().data()),
-      static_cast<int>(actual.view().pitch_bytes()), static_cast<int>(overlay.view().pitch_bytes()),
-      static_cast<int>(mask.view().pitch_bytes()), static_cast<int>(test_case.width_pixels),
-      static_cast<int>(test_case.height_pixels), test_case.opacity, test_case.bits_per_pixel);
-  EXPECT_TRUE(compare_exact(expected.view().as_const(), actual.view().as_const()))
-      << test_case.name << " reference mismatch for scalar baseline";
-
-  for (std::size_t y = 0; y < destination.view().height(); ++y) {
-    std::copy_n(destination.view().row(y), destination.view().width(), actual.view().row(y));
-  }
   test_case.variant.function(
       reinterpret_cast<BYTE*>(actual.view().data()),
       reinterpret_cast<const BYTE*>(overlay.view().data()),
