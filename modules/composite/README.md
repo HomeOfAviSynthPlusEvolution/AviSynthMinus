@@ -66,6 +66,10 @@ coverage. Overlay's 444 format conversion remains part of host adaptation.
 Additional registered-filter tests exercise Prefetch with clipped YUVA Layer,
 nonsequential frame requests, frame properties and immutable sources, plus
 interleaved C/native masked Overlay calls checked against an independent formula.
+Dissolve tests cover overlap lengths 1/2/3; ConvertFPS tests cover doubled frame
+rates, intermediate blends and final-frame extension through the source cache.
+Both check pixels, alpha, frame properties, timing and source immutability across
+seven packed/planar formats under C/native dispatch.
 
 ## Dependency
 

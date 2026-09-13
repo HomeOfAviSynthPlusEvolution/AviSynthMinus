@@ -337,5 +337,76 @@ TEST(CompositeIntegration, InterleavedCpuPoliciesKeepMaskedOverlayWithinContract
   Unchanged(a); Unchanged(b); Unchanged(mask);
 }
 
+void ExpectTransition(const PVideoFrame& output, const Source& a, const Source& b,
+                      double weight, bool scalar, IScriptEnvironment* env) {
+  for (int c = 0; c < a.vi.NumComponents(); ++c)
+    for (int y = 0; y < Height(a.vi, c); ++y)
+      for (int x = 0; x < Width(a.vi, c); ++x) {
+        const double av = Read(a.frame, a.vi, c, x, y);
+        const double bv = Read(b.frame, b.vi, c, x, y);
+        const double expected = Rounded(av + (bv - av) * weight, a.vi);
+        const double tolerance = weight == 0 || weight == 1 ? 0 :
+          a.vi.BitsPerComponent() == 32 ? 2e-7 : scalar ? 0 : 1;
+        ASSERT_NEAR(Read(output, a.vi, c, x, y), expected, tolerance)
+          << c << '/' << x << '/' << y;
+      }
+  EXPECT_EQ(env->propGetInt(env->getFramePropsRO(output), "CompositeMarker", 0, nullptr),
+            env->propGetInt(env->getFramePropsRO(weight == 1 ? b.frame : a.frame),
+                            "CompositeMarker", 0, nullptr));
+  EXPECT_NE(output->CheckMemory(), 1);
+}
+
+TEST(CompositeTransition, DissolveBlendsAlphaAndPreservesTimingPropertiesAndSources) {
+  for (bool scalar : {true, false})
+    for (int type : {VideoInfo::CS_YUVA420, VideoInfo::CS_YUVA420P10,
+                     VideoInfo::CS_YUVA444P16, VideoInfo::CS_YUVA444PS,
+                     VideoInfo::CS_BGR32, VideoInfo::CS_BGR64, VideoInfo::CS_YUY2}) {
+      AviSynthEnvironment environment; auto* env = environment.get();
+      if (scalar) env->Invoke("SetMaxCPU", "none");
+      const auto a = Make(env, type, 17), b = Make(env, type, 113);
+      for (int overlap : {1, 2, 3}) {
+        const AVSValue args[] = {a.clip, b.clip, overlap};
+        const auto clip = env->Invoke("Dissolve", AVSValue(args, 3)).AsClip();
+        ASSERT_EQ(clip->GetVideoInfo().num_frames, 6 - overlap);
+        EXPECT_EQ(clip->GetVideoInfo().fps_numerator, 25u);
+        EXPECT_EQ(clip->GetVideoInfo().fps_denominator, 1u);
+        for (int n = clip->GetVideoInfo().num_frames - 1; n >= 0; --n) {
+          SCOPED_TRACE(::testing::Message() << type << '/' << scalar << '/' << overlap << '/' << n);
+          const double weight = n < 3 - overlap ? 0 : n >= 3 ? 1 :
+            double(float(double(n - (3 - overlap) + 1) / (overlap + 1)));
+          ExpectTransition(clip->GetFrame(n, env), a, b, weight, scalar, env);
+        }
+      }
+      Unchanged(a); Unchanged(b);
+    }
+}
+
+TEST(CompositeTransition, ConvertFpsBlendsAlphaAndHandlesFinalFrame) {
+  for (bool scalar : {true, false})
+    for (int type : {VideoInfo::CS_YUVA420, VideoInfo::CS_YUVA420P10,
+                     VideoInfo::CS_YUVA444P16, VideoInfo::CS_YUVA444PS,
+                     VideoInfo::CS_BGR32, VideoInfo::CS_BGR64, VideoInfo::CS_YUY2}) {
+      AviSynthEnvironment environment; auto* env = environment.get();
+      if (scalar) env->Invoke("SetMaxCPU", "none");
+      const auto a = Make(env, type, 17), b = Make(env, type, 113);
+      const PClip source = new FrameSequenceClip(a.vi, {a.frame, b.frame, a.frame});
+      // Script-created source filters have a cache that clamps endpoint requests.
+      const auto cached = env->Invoke("Cache", source).AsClip();
+      const AVSValue args[] = {cached, 50, 1};
+      const auto clip = env->Invoke("ConvertFPS", AVSValue(args, 3)).AsClip();
+      ASSERT_EQ(clip->GetVideoInfo().num_frames, 6);
+      EXPECT_EQ(clip->GetVideoInfo().fps_numerator, 50u);
+      EXPECT_EQ(clip->GetVideoInfo().fps_denominator, 1u);
+      for (int n : {5, 0, 3, 1, 4, 2}) {
+        SCOPED_TRACE(::testing::Message() << type << '/' << scalar << '/' << n);
+        const auto& first = n == 2 || n == 3 ? b : a;
+        const auto& second = n == 2 || n == 3 ? a : b;
+        ExpectTransition(clip->GetFrame(n, env), first, second,
+                         n == 1 || n == 3 ? .5 : 0, scalar, env);
+      }
+      Unchanged(a); Unchanged(b);
+    }
+}
+
 } // namespace
 } // namespace avsut::test
