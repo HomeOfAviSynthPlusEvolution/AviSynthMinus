@@ -42,7 +42,7 @@ jobs:
             artifact_path: stage/**/*.dll
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
@@ -111,9 +111,53 @@ jobs:
           if (-not $dll) { throw 'AviSynth.dll was not installed.' }
           $dll | Select-Object -ExpandProperty FullName
 
+      - name: Configure shared API tests (POSIX)
+        if: matrix.family == 'linux' || matrix.family == 'macos'
+        shell: bash
+        run: cmake -S tests/shared_api -B build/shared-api -G Ninja -DCMAKE_BUILD_TYPE=Release -DAVS_INSTALL_PREFIX="$PWD/stage"
+
+      - name: Configure shared API tests (Windows)
+        if: matrix.family == 'windows'
+        shell: pwsh
+        run: cmake -S tests/shared_api -B build/shared-api -G "Visual Studio 18 2026" -A ${{ matrix.architecture }} -T v145 -DAVS_INSTALL_PREFIX="$PWD/stage"
+
+      - name: Build shared API tests
+        run: cmake --build build/shared-api --config Release --parallel
+
+      - name: Run shared API tests
+        run: ctest --test-dir build/shared-api -C Release --output-on-failure --timeout 120
+
       - name: Upload shared library
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_path }}
           if-no-files-found: error
+
+  regression:
+    name: Regression / ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: Linux x64, runner: ubuntu-26.04, architecture: x64}
+          - {name: macOS ARM64, runner: macos-15, architecture: arm64}
+          - {name: Windows x64, runner: windows-2025-vs2026, architecture: x64}
+          - {name: Windows x86, runner: windows-2025-vs2026, architecture: Win32}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Configure (POSIX)
+        if: runner.os != 'Windows'
+        run: cmake -S . -B build/regression -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DENABLE_TESTS=ON -DENABLE_PLUGINS=OFF -DENABLE_CUDA=OFF
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build/regression -G "Visual Studio 18 2026" -A ${{ matrix.architecture }} -T v145 -DBUILD_SHARED_LIBS=OFF -DENABLE_TESTS=ON -DENABLE_PLUGINS=OFF -DENABLE_CUDA=OFF
+      - name: Build
+        run: cmake --build build/regression --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build/regression -C Release --output-on-failure --parallel 2 --timeout 180

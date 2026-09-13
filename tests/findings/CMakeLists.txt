@@ -21,7 +21,9 @@ target_include_directories(finding_tests PRIVATE
   ${PROJECT_SOURCE_DIR}/avs_core
   ${PROJECT_BINARY_DIR}/avs_core
 )
-target_compile_definitions(finding_tests PRIVATE INTEL_INTRINSICS VS_TARGET_CPU_X86)
+if(ENABLE_INTEL_SIMD)
+  target_compile_definitions(finding_tests PRIVATE INTEL_INTRINSICS VS_TARGET_CPU_X86)
+endif()
 target_link_libraries(finding_tests PRIVATE
   GTest::gtest_main
   AvsCoreExternal
