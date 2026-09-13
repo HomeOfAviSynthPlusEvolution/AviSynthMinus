@@ -18,3 +18,13 @@ target_link_libraries(convert_matrix_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(convert_matrix_tests TEST_PREFIX "convert_matrix.")
+
+# Match VideoConvert's separate multiply/add rounding in the frozen pixel oracle.
+# A fused reference can differ by one ULP even when the kernel is correct.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  if(MSVC)
+    set_source_files_properties(convert_matrix_planar_tests.cpp PROPERTIES COMPILE_OPTIONS /clang:-ffp-contract=off)
+  else()
+    set_source_files_properties(convert_matrix_planar_tests.cpp PROPERTIES COMPILE_OPTIONS -ffp-contract=off)
+  endif()
+endif()
