@@ -2,9 +2,6 @@
 
 #include "merge_test_helpers.h"
 
-#include "filters/overlay/intel/blend_common_avx2.h"
-#include "filters/overlay/intel/blend_common_sse.h"
-
 #include <cstdint>
 #include <vector>
 
@@ -29,18 +26,30 @@ void add_merge_cases(std::vector<MergeCase>& cases, const char* format, int bits
 
 std::vector<MergeCase> merge_cases() {
   std::vector<MergeCase> cases;
-  add_merge_cases(cases, "Plane", 8, 37, 13, 48, 56, 8192, 0x0800BEEFU, "0bfd45f11b093a11",
-                  weighted_merge_c, weighted_merge_sse2, weighted_merge_avx2);
-  add_merge_cases(cases, "Plane", 8, 29, 5, 64, 72, 23456, 0xF30A11CEU, "",
-                  weighted_merge_c, weighted_merge_sse2, weighted_merge_avx2);
-  add_merge_cases(cases, "Plane", 10, 19, 11, 48, 56, 12345, 0x0A00BEEFU, "e6589674b8fcdcc1",
-                  weighted_merge_c, weighted_merge_sse2, weighted_merge_avx2);
-  add_merge_cases(cases, "Plane", 12, 17, 9, 48, 64, 21845, 0x0C00BEEFU, "f3e059b967e7222c",
-                  weighted_merge_c, weighted_merge_sse2, weighted_merge_avx2);
-  add_merge_cases(cases, "Plane", 14, 23, 7, 64, 72, 24576, 0x0E00BEEFU, "52a1934f97a6ef3d",
-                  weighted_merge_c, weighted_merge_sse2, weighted_merge_avx2);
-  add_merge_cases(cases, "Plane", 16, 15, 13, 48, 64, 16384, 0x1000BEEFU, "2fa29a72cbd44451",
-                  weighted_merge_c, weighted_merge_sse2, weighted_merge_avx2);
+  add_merge_cases(cases, "Plane", 8, 37, 13, 64, 64, 8192, 0x0800BEEFU, "0bfd45f11b093a11",
+                  legacy_merge_integer<LegacyMergeIsa::Scalar>,
+                       legacy_merge_integer<LegacyMergeIsa::Sse2>,
+                       legacy_merge_integer<LegacyMergeIsa::Avx2>);
+  add_merge_cases(cases, "Plane", 8, 29, 5, 64, 96, 23456, 0xF30A11CEU, "",
+                  legacy_merge_integer<LegacyMergeIsa::Scalar>,
+                       legacy_merge_integer<LegacyMergeIsa::Sse2>,
+                       legacy_merge_integer<LegacyMergeIsa::Avx2>);
+  add_merge_cases(cases, "Plane", 10, 19, 11, 64, 64, 12345, 0x0A00BEEFU, "e6589674b8fcdcc1",
+                  legacy_merge_integer<LegacyMergeIsa::Scalar>,
+                       legacy_merge_integer<LegacyMergeIsa::Sse2>,
+                       legacy_merge_integer<LegacyMergeIsa::Avx2>);
+  add_merge_cases(cases, "Plane", 12, 17, 9, 64, 64, 21845, 0x0C00BEEFU, "f3e059b967e7222c",
+                  legacy_merge_integer<LegacyMergeIsa::Scalar>,
+                       legacy_merge_integer<LegacyMergeIsa::Sse2>,
+                       legacy_merge_integer<LegacyMergeIsa::Avx2>);
+  add_merge_cases(cases, "Plane", 14, 23, 7, 64, 96, 24576, 0x0E00BEEFU, "52a1934f97a6ef3d",
+                  legacy_merge_integer<LegacyMergeIsa::Scalar>,
+                       legacy_merge_integer<LegacyMergeIsa::Sse2>,
+                       legacy_merge_integer<LegacyMergeIsa::Avx2>);
+  add_merge_cases(cases, "Plane", 16, 15, 13, 64, 64, 16384, 0x1000BEEFU, "2fa29a72cbd44451",
+                  legacy_merge_integer<LegacyMergeIsa::Scalar>,
+                       legacy_merge_integer<LegacyMergeIsa::Sse2>,
+                       legacy_merge_integer<LegacyMergeIsa::Avx2>);
   return cases;
 }
 

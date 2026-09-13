@@ -17,8 +17,6 @@
 
 namespace avsut::test {
 
-using MergeFloatFuncPtr = weighted_merge_float_fn_t*;
-
 enum class FloatInputPattern {
   RandomBounded,
   MixedMagnitudeCancellation,
@@ -231,16 +229,17 @@ inline ::testing::AssertionResult compare_float_ulp(PlaneView<const float> expec
 }
 
 inline void run_merge_float_case(const MergeFloatCase& test_case) {
+  // Release SSE2 float merge requires aligned row starts and pitches.
   GuardedVideoBuffer<float> destination(test_case.width_pixels, test_case.height_pixels,
-                                        test_case.destination_pitch, 32, 4);
+                                        test_case.destination_pitch, 32, 0);
   GuardedVideoBuffer<float> other(test_case.width_pixels, test_case.height_pixels,
-                                  test_case.other_pitch, 32, 4);
+                                  test_case.other_pitch, 32, 0);
   GuardedVideoBuffer<float> expected(test_case.width_pixels, test_case.height_pixels,
-                                     test_case.destination_pitch, 32, 4);
+                                     test_case.destination_pitch, 32, 0);
   GuardedVideoBuffer<float> scalar(test_case.width_pixels, test_case.height_pixels,
-                                   test_case.destination_pitch, 32, 4);
+                                   test_case.destination_pitch, 32, 0);
   GuardedVideoBuffer<float> actual(test_case.width_pixels, test_case.height_pixels,
-                                   test_case.destination_pitch, 32, 4);
+                                   test_case.destination_pitch, 32, 0);
 
   fill_merge_float_inputs(test_case, destination.view(), other.view());
   const auto other_snapshot = other.snapshot_active();

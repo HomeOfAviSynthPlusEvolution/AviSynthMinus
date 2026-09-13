@@ -7,7 +7,6 @@
 #define AVSUT_LAYER_GENERIC_DEFINED_AVS_UNUSED
 #endif
 
-#include "filters/intel/layer_avx2.h"
 #include "filters/intel/layer_sse.h"
 
 #ifdef AVSUT_LAYER_GENERIC_DEFINED_AVS_UNUSED

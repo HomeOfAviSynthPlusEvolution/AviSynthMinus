@@ -1,6 +1,6 @@
 #pragma once
 
-#include "filters/overlay/blend_common.h"
+#include "legacy_merge_adapters.h"
 
 #include "support/comparators.h"
 #include "support/cpu_features.h"
@@ -23,8 +23,6 @@
 #include <utility>
 
 namespace avsut::test {
-
-using MergeFuncPtr = weighted_merge_fn_t*;
 
 struct MergeCase {
   std::string format;

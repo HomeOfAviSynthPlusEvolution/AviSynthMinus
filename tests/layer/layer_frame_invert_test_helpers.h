@@ -1,6 +1,5 @@
 #pragma once
 
-#include "filters/intel/layer_avx2.h"
 #include "filters/intel/layer_sse.h"
 
 #include "support/deterministic_data.h"
