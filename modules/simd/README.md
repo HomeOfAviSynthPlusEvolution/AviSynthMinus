@@ -1,7 +1,7 @@
-# AviSynth+ SIMD Infrastructure (`modules/simd`)
+# AviSynthMinus SIMD Infrastructure (`modules/simd`)
 
 This module provides common SIMD configuration and target selection policy for
-AviSynth+ using vendored Google Highway 1.4.0 (`third_party/highway`).
+AviSynthMinus using vendored Google Highway 1.4.0 (`third_party/highway`).
 
 ## Internal build dependencies
 
@@ -10,23 +10,30 @@ AviSynth+ using vendored Google Highway 1.4.0 (`third_party/highway`).
 copies of dependency objects in their own archives. CMake carries the required
 libraries to the final DLL or executable link.
 
-Audio conversion uses `AvsCore` -> `AvsAudioConvert` (the core adapters).
-The adapter links both `AvsSimd` (AVS CPU policy) and `AviSynth::ConvertAudio`
-(the independent static library in `third_party/audio_convert`). Both reuse
-one host-provided `hwy` target. The independent library has no AVS dependency.
-Kernel tests are built from the submodule; public-filter tests remain in AVS.
-Separate DLLs and test executables may each contain their own linked runtime.
+The core adapters connect the independent libraries to host services:
 
-Initialize or update the pinned conversion source before configuring:
+| Host adapter | Independent static target | Submodule |
+|---|---|---|
+| `AvsAudioConvert` | `AviSynth::ConvertAudio` | `third_party/audio_convert` |
+| `AvsVideoConvert` | `AviSynth::ConvertVideo` | `third_party/video_convert` |
+| `AvsComposite` | `AviSynth::Composite` | `third_party/composite` |
+
+The host owns script interfaces, frames, scheduling, and CPU restrictions through
+`AvsSimd`; the independent libraries own kernels and their C interfaces. All three
+reuse the host-provided `hwy` target created before their subdirectories are added.
+Their vendored Highway copies are not built again. Separate DLLs and executables
+may each contain their own linked runtime.
+
+Initialize or update the pinned sources before configuring:
 
 ```sh
 git submodule update --init --recursive
 ```
 
-`ENABLE_TESTS=ON` also enables the submodule's kernel and C API tests. With tests
-disabled, the conversion library builds from checked-out sources without fetching
-GoogleTest or xxHash. AVS creates `hwy` before adding the submodule, so the
-submodule's vendored Highway copy is not configured or compiled.
+`ENABLE_TESTS=ON` enables the independent libraries' tests as well as host tests.
+Kernel tests live in the submodules; public-filter tests remain in AVS. With tests
+disabled, these libraries build from checked-out sources without fetching test
+dependencies such as GoogleTest or xxHash.
 
 These archives are internal build targets, not self-contained distribution
 packages. In particular, a static `avisynth.lib` must be consumed through its

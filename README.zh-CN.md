@@ -57,6 +57,14 @@ Version()
 
 ## 构建与测试
 
+配置前请初始化固定版本的子模块；切换主项目提交后也应执行：
+
+```sh
+git submodule update --init --recursive
+```
+
+独立的 [Audio](third_party/audio_convert/README.zh-CN.md)、[Video](third_party/video_convert/README.zh-CN.md) 和 [Composite](third_party/composite/README.zh-CN.md) 模块提供计算内核，并静态链接到核心。宿主保留脚本接口、帧管理和 CPU 策略。整合后的滤镜行为与精度约定见 [Composite 适配层说明](modules/composite/README.md)。
+
 项目使用 CMake 构建，需要支持 C++17 的编译器。以下命令在仓库根目录执行，仅构建核心库，不编译仓库附带的外部插件；生成的核心库仍可正常加载兼容的插件。
 
 **Windows（Visual Studio 2026，x64）：**

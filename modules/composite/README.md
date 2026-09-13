@@ -29,6 +29,25 @@ development-line behavior change, not a promise of bit-identical legacy output:
 - Float color values remain unclipped where the library's operation permits
   excursions. Float masks use nonnegative opacity values.
 
+SIMD rounding allowances are relative to the **new C reference**, not to legacy
+AviSynth output. Eligible continuous-weight integer paths (including Merge,
+Dissolve/ConvertFPS blending and Overlay Blend) permit at most **1 LSB per call**;
+integer YUV Multiply also permits 1 LSB at interior opacity. Integer CODE-weight
+operations, including ordinary integer Layer blending, do not inherit this
+allowance. Exact weight endpoints retain the operation's documented semantics.
+
+Selected contiguous F32 masked MIX/PRODUCT and YUV Multiply paths permit
+`16 * FLT_EPSILON * max(1, S)` error, where `S` is the operation's magnitude scale.
+This is at most about `1.91e-6` for normalized nonnegative inputs. The precise
+layout, endpoint and fallback conditions are in the pinned library's
+[Numerical behavior](../../third_party/composite/NUMERICS.md). Other operations
+must not be assigned this tolerance indiscriminately.
+
+Repeated operations can accumulate rounding error. `SetMaxCPU("none")` selects
+the C reference for these kernels; it does not restore legacy formulas. Increasing
+integer working bit depth before processing reduces the normalized size of a
+one-code error. See also the [user-facing precision notes](../../distrib/docs/english/source/avisynthdoc/corefilters/merge.rst).
+
 Layer samples subsampled alpha and luminance guides from the full source image,
 including the phase of a clipped overlap. Chroma decisions run before luma writes.
 YUV alpha stays unchanged; legacy YUV Lighten/Darken continues to ignore source
@@ -47,5 +66,5 @@ longer used by Overlay's production dispatch.
 Composite is published at
 https://github.com/HomeOfAviSynthPlusEvolution/AviSynthComposite.git and pinned
 through the `third_party/composite` submodule. Initialize it with
-`git submodule update --init --recursive`. No release tag or version bump is part
-of this integration.
+`git submodule update --init --recursive`. The parent Git revision pins the
+required source version; use matching headers and sources.

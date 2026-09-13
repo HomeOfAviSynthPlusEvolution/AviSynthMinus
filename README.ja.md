@@ -57,6 +57,14 @@ AviSynth スクリプトの読み込みに対応したプレーヤー、エデ�
 
 ## ビルドとテスト
 
+構成前に固定された版のサブモジュールを初期化してください。親リポジトリのコミットを切り替えた後も実行します。
+
+```sh
+git submodule update --init --recursive
+```
+
+独立した [Audio](third_party/audio_convert/README.ja.md)、[Video](third_party/video_convert/README.ja.md)、[Composite](third_party/composite/README.ja.md) モジュールが計算カーネルを提供し、コアに静的リンクされます。スクリプトインターフェース、フレーム管理、CPU 方針はホストが担当します。統合後のフィルター動作と許容誤差は [Composite アダプター](modules/composite/README.md)を参照してください。
+
 本プロジェクトは CMake を使用し、C++17 対応のコンパイラーを必要とします。以下のコマンドはリポジトリのルートで実行してください。コアライブラリのみをビルドし、同梱の外部プラグインはコンパイルしません。生成されたコアは、互換性のあるプラグインを通常どおり読み込めます。
 
 **Windows（Visual Studio 2026、x64）：**

@@ -57,6 +57,14 @@ An `.avs` file describes audio and video processing steps and is loaded and exec
 
 ## Building and testing
 
+Initialize the pinned submodules before configuring, including after checking out a different parent revision:
+
+```sh
+git submodule update --init --recursive
+```
+
+The independent [Audio](third_party/audio_convert/README.md), [Video](third_party/video_convert/README.md), and [Composite](third_party/composite/README.md) modules supply computational kernels and are linked statically into the core. The host retains script interfaces, frame management, and CPU policy. See the [Composite adapter](modules/composite/README.md) for integrated filter behavior and numerical allowances.
+
 The project uses CMake and requires a compiler with C++17 support. Run the following commands from the repository root. They build only the core library, without compiling the bundled external plugins; the resulting core can still load compatible plugins normally.
 
 **Windows (Visual Studio 2026, x64):**

@@ -2,6 +2,13 @@
 Layer
 =====
 
+.. note::
+
+   AviSynthMinus uses Composite kernels for this filter. See
+   :ref:`composite-precision` for C-reference behavior, SIMD rounding allowances,
+   and the distinction from historical output.
+
+
 Layer (aka overlay, blend, merge) merges two clips of possibly different sizes, but with the same color format.
 
 For pixel-wise transparency information, the alpha channel of an RGBA overlay_clip is used as a mask.
@@ -128,7 +135,7 @@ Note that some modes can be similar to :doc:`Overlay <overlay>`, but the two fil
     | Similar to "opacity" in "Overlay".
 
     Valid values are 0.0 to 1.0. Default value is 1.0 if ``level`` does not exist.
-    (1.0 means full transparency)
+    (1.0 means full opacity)
 
     If ``level`` parameter is given then ``opacity`` is calculated as:
 
@@ -137,8 +144,13 @@ Note that some modes can be similar to :doc:`Overlay <overlay>`, but the two fil
 
     "opacity" parameter is bit depth independent (unlike ``level`` which was maxed with level=257 when RGB32 but level=256 for YUY2/YUV)
 
-    Note: originally level was used in formula: (alpha*level + 1) / range_size, 
-    now level is calculated from opacity as: ``level = opacity * ((1 << bits_per_pixel) + 1)``
+    In AviSynthMinus, the legacy ``level``-to-``opacity`` conversion above is
+    retained at the script interface. Ordinary integer Layer kernels then round
+    opacity onto ``0..((1 << bits_per_pixel) - 1)`` and combine it with alpha on
+    that same maximum-code scale. Products divide by the maximum code, preserving
+    full-scale endpoints. Fast mode retains its separate half-weight behavior.
+    This replaces the historical ``(alpha*level + 1) / range_size`` arithmetic;
+    it is not a claim of bit-identical output to older implementations.
 
 .. describe:: placement
 
@@ -187,6 +199,12 @@ Changelog
 +-----------------+---------------------------------------------------------------+
 | Version         | Changes                                                       |
 +=================+===============================================================+
+| 0.3.0           | AviSynthMinus: use Composite kernels. Retain legacy           |
+|                 | level-to-opacity conversion at the script interface; ordinary |
+|                 | integer kernels use maximum-code opacity/alpha weights and    |
+|                 | product scaling. Document SIMD precision separately from      |
+|                 | legacy output differences. See :ref:`composite-precision`.    |
++-----------------+---------------------------------------------------------------+
 | 3.5.0           | Layer: support RGB24 and RGB48                                |
 +-----------------+---------------------------------------------------------------+
 | 3.4.0           | | Layer: support almost all formats, not only RGB32 and YUY2  |

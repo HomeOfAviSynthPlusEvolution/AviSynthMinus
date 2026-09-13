@@ -254,6 +254,13 @@ ignore as for telecined film.
 ConvertFPS
 ----------
 
+.. note::
+
+   AviSynthMinus uses Composite for the blending path of ConvertFPS. See
+   :ref:`composite-precision` for its numerical behavior. This note does not
+   change frame-rate selection or the conversion algorithm.
+
+
 Attempts to convert the frame rate without dropping or inserting frames,
 providing a smooth conversion with results similar to those of standalone
 converter boxes. The output will have (almost) the same duration as clip, but
@@ -388,6 +395,12 @@ Changelog
 +-----------------+------------------------------------------------------------+
 | Version         | Changes                                                    |
 +=================+============================================================+
+| 0.3.0           | AviSynthMinus: use Composite for the ConvertFPS blending   |
+|                 | path with continuous weights. Document the 1 LSB allowance |
+|                 | for eligible integer SIMD paths relative to the new C      |
+|                 | reference. Frame-rate selection is unchanged. See          |
+|                 | :ref:`composite-precision`.                                |
++-----------------+------------------------------------------------------------+
 | AviSynth+ r2632 | ConvertFPS: added 10-32bits support.                       |
 +-----------------+------------------------------------------------------------+
 | AviSynth 2.5.7  || AssumeFPS, ChangeFPS, ConvertFPS: added preset option.    |

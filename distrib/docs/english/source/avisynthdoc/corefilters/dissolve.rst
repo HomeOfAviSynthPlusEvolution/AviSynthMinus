@@ -2,6 +2,13 @@
 Dissolve
 ========
 
+.. note::
+
+   AviSynthMinus uses Composite kernels for the video blending of this filter; audio blending is unchanged. See
+   :ref:`composite-precision` for C-reference behavior, SIMD rounding allowances,
+   and the distinction from historical output.
+
+
 **Dissolve** is like :doc:`AlignedSplice <splice>`, except that the clips are 
 combined with some overlap. The last *overlap* frames of the first video stream 
 are blended progressively with the first *overlap* frames of the second video
@@ -65,6 +72,16 @@ Changelog
     +-----------------+------------------------------+
     | Version         | Changes                      |
     +=================+==============================+
+    | 0.3.0           | AviSynthMinus: use Composite |
+    |                 | for video blending with      |
+    |                 | continuous weights; audio    |
+    |                 | blending is unchanged.       |
+    |                 | Document the 1 LSB allowance |
+    |                 | for eligible integer SIMD    |
+    |                 | paths relative to the new C  |
+    |                 | reference. See               |
+    |                 | :ref:`composite-precision`.  |
+    +-----------------+------------------------------+
     | AviSynth+ r2290 | Added 16 and 32-bit support. |
     +-----------------+------------------------------+
     | AviSynth 2.5.6  | Added ``fps`` parameter.     |

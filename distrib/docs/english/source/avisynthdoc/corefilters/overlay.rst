@@ -2,6 +2,13 @@
 Overlay
 =======
 
+.. note::
+
+   AviSynthMinus uses Composite kernels for this filter. See
+   :ref:`composite-precision` for C-reference behavior, SIMD rounding allowances,
+   and the distinction from historical output.
+
+
 Puts clip ``overlay`` on top of clip ``base`` using different blend ``modes``, and 
 with optional ``x``, ``y`` positioning, ``mask`` operation and ``opacity``. 
 
@@ -437,6 +444,12 @@ And the same with using ``condvarsuffix``:
 +-----------+------------------------------------------------------------------------+
 | Changelog |                                                                        |
 +===========+========================================================================+
+| 0.3.0     | AviSynthMinus: use Composite kernels for Overlay modes. Document       |
+|           | reviewed arithmetic, the 1 LSB allowance for eligible continuous       |
+|           | integer blending and interior-opacity YUV Multiply, and selected F32   |
+|           | tolerances. Historical blend_compat arithmetic remains available. See  |
+|           | :ref:`composite-precision`.                                            |
++-----------+------------------------------------------------------------------------+
 | 3.7.2     | Address issue #255: "blend": now using accurate formula using float    |
 |           | calculation.                                                           |
 +-----------+------------------------------------------------------------------------+

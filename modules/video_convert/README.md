@@ -3,21 +3,22 @@
 The independent `third_party/video_convert` submodule owns layout and resampling
 kernels and exposes C interfaces. AVS owns script defaults, CPU policy, frames,
 properties, chroma placement, and operation order. `AvsCore` links the static
-`AviSynth::ConvertVideo` target. AudioConvert and VideoConvert both reuse the
+`AviSynth::ConvertVideo` target. AudioConvert, VideoConvert, and Composite reuse the
 single host `hwy` target created by `modules/simd`.
 
 `ENABLE_TESTS` also enables the independent video tests. `ENABLE_INTEL_SIMD` does
 not disable Highway; the host maps AVS CPU flags through `AvsSimd`, with `none`
 selecting ordinary C. Other/default requests on non-x86 select native.
 
-The submodule URL is relative to the parent repository's remote, allowing sibling
-repositories in the same organization. Local migration uses the sibling checkout
-as the submodule origin until the independent repository is published. Do not push
-parent commits before the referenced submodule commits are available remotely.
+The independent repository is published at
+https://github.com/HomeOfAviSynthPlusEvolution/AviSynthConvertVideo.git, the HTTPS
+URL recorded in `.gitmodules`. The parent Git revision pins the required commit.
+Initialize or update it with `git submodule update --init --recursive`. Referenced
+submodule commits must be available remotely before publishing parent commits.
 
-Initial build integration pins `d45d9f0`. The clang-cl Release host build and 190
-selected public API/C consumer/existing Resize filter tests pass. This batch only
-adds build dependencies; the following adapter batch changes production Resize.
+The adapters described below are integrated into production filter paths. Their
+public-filter tests remain in the host repository, alongside the independent
+kernel tests enabled by `ENABLE_TESTS`.
 
 ## Resize adapter
 
