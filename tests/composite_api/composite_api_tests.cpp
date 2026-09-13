@@ -258,7 +258,11 @@ TEST(CompositeOverlay, BlendUsesContinuousMasksAndPreservesAlpha) {
           for (int x = 0; x < base.vi.width; ++x) {
             const double a = Read(base.frame, base.vi, c, x, y), b = Read(source.frame, base.vi, c, x, y);
             const double w = double(float(.43)) * Read(mask.frame, mask.vi, 0, x, y) / Maximum(base.vi);
-            EXPECT_NEAR(Read(output, base.vi, c, x, y), c == 3 ? a : Rounded(a + (b - a) * w, base.vi), depth == 32 ? 2e-7 : 0);
+            // Continuous integer SIMD blending permits one code of rounding
+            // error; scalar arithmetic, alpha, and weight endpoints stay exact.
+            const double tolerance = c == 3 || w == 0 || w == 1 ? 0 :
+              depth == 32 ? 2e-7 : scalar ? 0 : 1;
+            EXPECT_NEAR(Read(output, base.vi, c, x, y), c == 3 ? a : Rounded(a + (b - a) * w, base.vi), tolerance);
           }
       Unchanged(base); Unchanged(source); Unchanged(mask); EXPECT_NE(output->CheckMemory(), 1);
     }
