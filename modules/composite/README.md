@@ -59,9 +59,10 @@ source snapshots, frame properties, packed/planar layouts, high bit depths, scal
 and native dispatch, clipped alpha sampling and extreme offsets. Standalone tests
 add C ABI, concurrency, guard pages and per-target equivalence checks. The replaced host Overlay blend and SSE4.1/AVX2 Multiply kernels, headers and
 exclusive raw-kernel tests have been removed, together with the disabled legacy
-Merge kernel suite. Disabled Layer helpers no longer call the removed scalar
-baseline; their independent reference remains. Historical code and hashes remain
-in Git. Public Overlay/Merge/Layer tests and independent Composite tests cover the
+Merge kernel suite. The disabled Layer raw-kernel suite and its obsolete blend-formula tests have
+also been removed. Historical code and hashes remain in Git. The retained Layer
+helper-filter suite is enabled and covers Mask, ColorKeyMask, ResetMask,
+ShowChannel, MergeRGB, Invert and Subtract using current host interfaces. Public Overlay/Merge/Layer tests and independent Composite tests cover the
 active implementation. Overlay's 444 format conversion still serves production
 host adaptation and is retained.
 
