@@ -48,6 +48,7 @@
  */
 
 #include <avisynth.h>
+#include "avs_linkage.h"
 
 #ifdef AVS_WINDOWS
     #include <avs/win.h>
@@ -1319,6 +1320,11 @@ static const AVS_Linkage avs_linkage = {    // struct AVS_Linkage {
 /**********************************************************************/
 };                                          // }
 
+const AVS_Linkage* GetCoreAVSLinkage() noexcept {
+  return &avs_linkage;
+}
+
+// Preserve the exported variable for existing binary clients.
 extern __declspec(dllexport) const AVS_Linkage* const AVS_linkage = &avs_linkage;
 
 

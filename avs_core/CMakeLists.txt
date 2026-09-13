@@ -14,6 +14,13 @@ endif()
 project("AvsCore" VERSION "${PROJECT_VERSION}" LANGUAGES CXX)
 Include("Files.cmake")
 add_library("AvsCore" ${AvsCore_Sources})
+
+if(BUILD_SHARED_LIBS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  # SDK inline forwarding methods share names with their core implementations.
+  # ELF interposition must not bind core calls/table entries to client wrappers.
+  target_link_options(AvsCore PRIVATE "LINKER:-Bsymbolic-functions")
+endif()
+
 set_target_properties("AvsCore" PROPERTIES "OUTPUT_NAME" "${CoreName}")
 if (NOT WIN32)
   set_target_properties("AvsCore" PROPERTIES VERSION "${PROJECT_VERSION}" SOVERSION "${AVISYNTH_INTERFACE_VERSION}")

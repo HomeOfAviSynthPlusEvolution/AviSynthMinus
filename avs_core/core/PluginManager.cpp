@@ -1,3 +1,4 @@
+#include "avs_linkage.h"
 #include "PluginManager.h"
 #include <avisynth.h>
 #include <avs/cx/abi.h>
@@ -1168,7 +1169,6 @@ std::string PluginManager::PluginLoading() const
 // 3: other exception
 int PluginManager::TryAsAvs26(PluginFile &plugin, AVSValue *result, std::string &avsexception_message)
 {
-  extern const AVS_Linkage* const AVS_linkage; // In interface.cpp
 #ifdef AVS_POSIX
   AvisynthPluginInit3Func AvisynthPluginInit3 = (AvisynthPluginInit3Func)dlsym(plugin.Library, "AvisynthPluginInit3");
 #elif defined(GCC_WIN32)
@@ -1190,7 +1190,7 @@ int PluginManager::TryAsAvs26(PluginFile &plugin, AVSValue *result, std::string 
     PluginInLoad = &plugin;
     // a bad plugin can kill everything if it uses e.g. an old IScriptEnvironment2
     try {
-      *result = AvisynthPluginInit3(Env, AVS_linkage);
+      *result = AvisynthPluginInit3(Env, GetCoreAVSLinkage());
     }
     catch (const AvisynthError& error) {
       avsexception_message = error.msg;

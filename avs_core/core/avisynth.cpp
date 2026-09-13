@@ -32,6 +32,7 @@
 // which is not derived from or based on Avisynth, such as 3rd-party filters,
 // import and export plugins, or graphical user interfaces.
 
+#include "avs_linkage.h"
 #include <avisynth.h>
 #include "../core/internal.h"
 #include "InternalEnvironment.h"
@@ -5978,9 +5979,7 @@ extern void ApplyMessageEx(PVideoFrame* frame, const VideoInfo& vi,
   IScriptEnvironment* env);
 
 const AVS_Linkage* ScriptEnvironment::GetAVSLinkage() {
-  extern const AVS_Linkage* const AVS_linkage; // In interface.cpp
-
-  return AVS_linkage;
+  return GetCoreAVSLinkage();
 }
 
 void ScriptEnvironment::ApplyMessageEx(PVideoFrame* frame, const VideoInfo& vi, const char* message, int size, int textcolor, int halocolor, int bgcolor, bool utf8)
