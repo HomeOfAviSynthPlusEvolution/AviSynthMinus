@@ -4,7 +4,13 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_LEVELS_UNDEF_AVS_UNUSED
 #endif
+#include "color_adjust/levels.h"
+using MigratedLevels = aif::filters::color_adjust::Levels;
 #include "filters/levels.h"
+#include "color_adjust/tweak.h"
+
+#include "color_adjust/rgb_adjust.h"
+
 #ifdef AVSUT_LEVELS_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_LEVELS_UNDEF_AVS_UNUSED
@@ -54,7 +60,7 @@ TEST(Levels, MapsEightBitLumaWithClamping) {
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
 
-  Levels filter(clip, 16.0f, 1.0, 235.0f, 0.0f, 255.0f, false, false, environment.get());
+  MigratedLevels filter(clip, 16.0f, 1.0, 235.0f, 0.0f, 255.0f, false, false, environment.get());
   const PVideoFrame output = filter.GetFrame(0, environment.get());
 
   ASSERT_EQ(output->GetRowSize(PLANAR_Y), vi.width);
@@ -88,7 +94,7 @@ TEST(Levels, MapsLumaAndChromaIndependentlyForYuv444) {
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
 
-  Levels filter(clip, 16.0f, 1.0, 235.0f, 0.0f, 255.0f, true, false, environment.get());
+  MigratedLevels filter(clip, 16.0f, 1.0, 235.0f, 0.0f, 255.0f, true, false, environment.get());
   const PVideoFrame output = filter.GetFrame(0, environment.get());
 
   for (const int plane : {PLANAR_Y, PLANAR_U, PLANAR_V}) {
@@ -131,7 +137,7 @@ TEST(Levels, MapsSixteenBitYuv420WithIndependentLumaAndChromaRanges) {
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
 
-  Levels filter(clip, 8192.0f, 1.0, 57344.0f, 4096.0f, 61440.0f, false, false,
+  MigratedLevels filter(clip, 8192.0f, 1.0, 57344.0f, 4096.0f, 61440.0f, false, false,
                 environment.get());
   EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
   const PVideoFrame output = filter.GetFrame(0, environment.get());
@@ -190,7 +196,7 @@ TEST(Levels, AppliesGammaToFloatYuv444AndPreservesChromaCenter) {
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
 
-  Levels filter(clip, 0.0f, 2.0, 1.0f, 0.0f, 1.0f, false, false, environment.get());
+  MigratedLevels filter(clip, 0.0f, 2.0, 1.0f, 0.0f, 1.0f, false, false, environment.get());
   const PVideoFrame output = filter.GetFrame(0, environment.get());
 
   for (const int plane : {PLANAR_Y, PLANAR_U, PLANAR_V}) {

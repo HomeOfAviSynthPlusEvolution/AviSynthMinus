@@ -4,7 +4,8 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_CONVOLUTION_UNDEF_AVS_UNUSED
 #endif
-#include "filters/convolution.h"
+#include "convolution/general_convolution.h"
+using aif::filters::convolution::GeneralConvolution;
 #ifdef AVSUT_CONVOLUTION_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_CONVOLUTION_UNDEF_AVS_UNUSED

@@ -15,6 +15,7 @@ target_include_directories(limiter_tests PRIVATE
 target_link_libraries(limiter_tests PRIVATE
   GTest::gtest_main
   AvsCoreExternal
+  AvsInternalFilterReferences
 )
 
 include(GoogleTest)

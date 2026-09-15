@@ -6,9 +6,21 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_FINDING_B6_UNDEF_AVS_UNUSED
 #endif
-#include "filters/convolution.h"
-#include "filters/focus.h"
-#include "filters/limiter.h"
+#include "convolution/general_convolution.h"
+using aif::filters::convolution::GeneralConvolution;
+#include "focus/adjust_focus_h.h"
+using aif::filters::focus::AdjustFocusH;
+#include "focus/adjust_focus_v.h"
+using aif::filters::focus::AdjustFocusV;
+#include "focus/temporal_soften.h"
+using aif::filters::focus::TemporalSoften;
+#include "focus/spatial_soften.h"
+using aif::filters::focus::SpatialSoften;
+#include "focus/blur_sharpen.h"
+using aif::filters::focus::Create_Blur;
+using aif::filters::focus::Create_Sharpen;
+#include "limiter/limiter.h"
+using aif::filters::limiter::Limiter;
 #ifdef AVSUT_FINDING_B6_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_FINDING_B6_UNDEF_AVS_UNUSED

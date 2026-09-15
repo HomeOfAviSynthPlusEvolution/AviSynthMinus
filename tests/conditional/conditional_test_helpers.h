@@ -1,7 +1,7 @@
 #pragma once
 
 #include "filters/conditional/intel/conditional_functions_sse.h"
-#include "filters/intel/focus_sse.h"
+#include "reference/internal_filters/intel/focus_sse.h"
 
 #include "support/guarded_video_buffer.h"
 #include "support/variant_registry.h"

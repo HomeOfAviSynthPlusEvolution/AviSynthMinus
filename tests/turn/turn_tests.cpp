@@ -3,7 +3,7 @@
 #include "support/guarded_video_buffer.h"
 #include "turn_test_helpers.h"
 
-#include "filters/intel/turn_sse.h"
+#include "reference/internal_filters/intel/turn_sse.h"
 
 #include <cstdint>
 #include <vector>

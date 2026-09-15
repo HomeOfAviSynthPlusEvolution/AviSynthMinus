@@ -140,87 +140,16 @@ private:
 
 
 
-class Invert : public GenericVideoFilter
-  /**
-    * Class to invert selected RGBA channels
-  **/
-{
-public:
-  Invert(PClip _child, const char* _channels, IScriptEnvironment* env);
-  PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
-
-  int __stdcall SetCacheHints(int cachehints, int frame_range) override {
-    AVS_UNUSED(frame_range);
-    return cachehints == CACHE_GET_MTMODE ? MT_NICE_FILTER : 0;
-  }
-
-  static AVSValue __cdecl Create(AVSValue args, void*, IScriptEnvironment* env);
-private:
-  int mask;
-  bool doB, doG, doR, doA;
-  bool doY, doU, doV;
-
-  uint64_t mask64;
-  int pixelsize;
-  int bits_per_pixel; // 8,10..16
-};
-
-
-
-class ShowChannel : public GenericVideoFilter
-  /**
-    * Class to set the RGB components to the alpha mask
-  **/
-{
-public:
-  ShowChannel(PClip _child, const char* _pixel_type, int _channel, IScriptEnvironment* env);
-  PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
-
-  int __stdcall SetCacheHints(int cachehints, int frame_range) override {
-    AVS_UNUSED(frame_range);
-    return cachehints == CACHE_GET_MTMODE ? MT_NICE_FILTER : 0;
-  }
-
-  static AVSValue __cdecl Create(AVSValue args, void* channel, IScriptEnvironment* env);
-private:
-  int channel;
-  const int input_type;
-  const int pixelsize;
-  const int bits_per_pixel;
-  bool input_type_is_planar_rgb;
-  bool input_type_is_planar_rgba;
-  bool input_type_is_yuv;
-  bool input_type_is_yuva;
-  bool input_type_is_planar;
-  bool input_type_is_packed_rgb;
-  bool target_hasalpha;
-  bool source_hasalpha;
-};
 
 
 
 
-class MergeRGB : public GenericVideoFilter
-  /**
-    * Class to load the RGB components from specified clips
-  **/
-{
-public:
-  MergeRGB(PClip _child, PClip _blue, PClip _green, PClip _red, PClip _alpha,
-    const char* _pixel_type, IScriptEnvironment* env);
-  PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
 
-  int __stdcall SetCacheHints(int cachehints, int frame_range) override {
-    AVS_UNUSED(frame_range);
-    return cachehints == CACHE_GET_MTMODE ? MT_NICE_FILTER : 0;
-  }
 
-  static AVSValue __cdecl Create(AVSValue args, void* mode, IScriptEnvironment* env);
-private:
-  const PClip blue, green, red, alpha;
-  const VideoInfo& viB, & viG, & viR, & viA;
-  const char* myname;
-};
+
+
+
+
 
 
 enum

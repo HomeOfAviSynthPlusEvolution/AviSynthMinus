@@ -34,10 +34,9 @@
 // import and export plugins, or graphical user interfaces.
 
 #include "conditional_functions.h"
-#include "../focus.h" // sad
 #ifdef INTEL_INTRINSICS
 #include "intel/conditional_functions_sse.h"
-#include "../intel/focus_sse.h" // sad
+#include "intel/sad_sse2.h"
 #endif
 #include "../../core/internal.h"
 #include <avs/config.h>

@@ -14,6 +14,7 @@ target_include_directories(planeswap_tests PRIVATE
 target_link_libraries(planeswap_tests PRIVATE
   GTest::gtest_main
   AvsCoreExternal
+  AvsInternalFilterReferences
 )
 
 include(GoogleTest)

@@ -1,0 +1,4 @@
+add_executable(internal_filter_registration_tests registration_tests.cpp)
+target_link_libraries(internal_filter_registration_tests PRIVATE GTest::gtest_main AvsCoreExternal)
+include(GoogleTest)
+gtest_discover_tests(internal_filter_registration_tests TEST_PREFIX "internal_filters.")

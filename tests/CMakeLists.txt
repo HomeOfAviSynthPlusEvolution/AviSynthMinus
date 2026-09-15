@@ -29,6 +29,7 @@ add_library(AvsCoreExternal INTERFACE)
 target_link_libraries(AvsCoreExternal INTERFACE AvsCore)
 target_compile_definitions(AvsCoreExternal INTERFACE AVS_STATIC_LIB)
 target_include_directories(AvsCoreExternal INTERFACE
+  ${PROJECT_SOURCE_DIR}/third_party/internal_filters/src
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_SOURCE_DIR}/avs_core/include
   ${CMAKE_SOURCE_DIR}/avs_core
@@ -37,6 +38,7 @@ target_include_directories(AvsCoreExternal INTERFACE
 )
 
 add_subdirectory(support)
+add_subdirectory(internal_filters)
 add_subdirectory(core)
 add_subdirectory(cx)
 add_subdirectory(v12)
@@ -44,6 +46,7 @@ add_subdirectory(bitblt)
 add_subdirectory(limiter)
 add_subdirectory(overlay_filter)
 add_subdirectory(planeswap)
+add_subdirectory(reference/internal_filters)
 add_subdirectory(focus)
 add_subdirectory(layer_filter)
 add_subdirectory(turn)

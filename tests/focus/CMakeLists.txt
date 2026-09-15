@@ -17,6 +17,7 @@ target_include_directories(focus_tests PRIVATE
 target_link_libraries(focus_tests PRIVATE
   GTest::gtest_main
   AvsCoreExternal
+  AvsInternalFilterReferences
 )
 
 include(GoogleTest)

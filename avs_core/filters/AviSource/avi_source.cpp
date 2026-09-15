@@ -34,7 +34,6 @@
 
 #include <avisynth.h>
 #include "../../convert/convert.h"
-#include "../../filters/transform.h"
 #include "../../core/alignplanar.h"
 #include "../../core/strings.h"
 #include "AudioSource.h"

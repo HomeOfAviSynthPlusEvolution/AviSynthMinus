@@ -4,7 +4,15 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_PLANESWAP_UNDEF_AVS_UNUSED
 #endif
-#include "filters/planeswap.h"
+#include "planes/swap_uv.h"
+using aif::filters::planes::SwapUV;
+#include "planes/swap_uv_to_y.h"
+using aif::filters::planes::SwapUVToY;
+#include "planes/swap_y_to_uv.h"
+using aif::filters::planes::SwapYToUV;
+#include "planes/combine_planes.h"
+using aif::filters::planes::CombinePlanes;
+
 #ifdef AVSUT_PLANESWAP_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_PLANESWAP_UNDEF_AVS_UNUSED

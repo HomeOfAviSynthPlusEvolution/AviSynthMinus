@@ -168,101 +168,16 @@ public:
 };
 
 
-class SeparateColumns : public GenericVideoFilter
-  /**
-    * Class to separate columns of video
-    **/
-{
-private:
-  const int interval;
-
-public:
-  SeparateColumns(PClip _child, int _interval, IScriptEnvironment* env);
-  PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
-
-  int __stdcall SetCacheHints(int cachehints, int frame_range) override {
-    AVS_UNUSED(frame_range);
-    return cachehints == CACHE_GET_MTMODE ? MT_NICE_FILTER : 0;
-  }
-
-  inline bool __stdcall GetParity(int n) override {
-    return child->GetParity(n/interval);
-  }
-
-  static AVSValue __cdecl Create(AVSValue args, void*, IScriptEnvironment* env);
-};
 
 
-class WeaveColumns : public GenericVideoFilter
-  /**
-    * Class to weave columns of video
-    **/
-{
-private:
-  const int period;
-  const int inframes;
-
-public:
-  WeaveColumns(PClip _child, int _period, IScriptEnvironment* env);
-  PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
-
-  int __stdcall SetCacheHints(int cachehints, int frame_range) override {
-    AVS_UNUSED(frame_range);
-    return cachehints == CACHE_GET_MTMODE ? MT_NICE_FILTER : 0;
-  }
-
-  inline bool __stdcall GetParity(int n) override {
-    return child->GetParity(n*period);
-  }
-
-  static AVSValue __cdecl Create(AVSValue args, void*, IScriptEnvironment* env);
-};
 
 
-class SeparateRows : public NonCachedGenericVideoFilter
-  /**
-    * Class to separate lines of video
-    **/
-{
-private:
-  const int interval;
-
-public:
-  SeparateRows(PClip _child, int _interval, IScriptEnvironment* env);
-  PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env);
-
-  inline bool __stdcall GetParity(int n) {
-    return child->GetParity(n/interval);
-  }
-
-  static AVSValue __cdecl Create(AVSValue args, void*, IScriptEnvironment* env);
-};
 
 
-class WeaveRows : public GenericVideoFilter
-  /**
-    * Class to weave lines of video
-    **/
-{
-private:
-  const int period;
-  const int inframes;
 
-public:
-  WeaveRows(PClip _child, int _period, IScriptEnvironment* env);
-  PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
 
-  int __stdcall SetCacheHints(int cachehints, int frame_range) override {
-    AVS_UNUSED(frame_range);
-    return cachehints == CACHE_GET_MTMODE ? MT_NICE_FILTER : 0;
-  }
 
-  inline bool __stdcall GetParity(int n) override{
-    return child->GetParity(n*period);
-  }
 
-  static AVSValue __cdecl Create(AVSValue args, void*, IScriptEnvironment* env);
-};
 
 
 class SeparateFields : public NonCachedGenericVideoFilter

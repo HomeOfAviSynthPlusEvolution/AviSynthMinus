@@ -36,7 +36,6 @@
 #include "edit.h"
 #include "audio_convert/factory.h"
 #include "../core/internal.h"
-#include "merge.h"
 #include <climits>
 #include <cmath>
 

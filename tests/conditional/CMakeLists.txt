@@ -18,3 +18,5 @@ target_link_libraries(conditional_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(conditional_tests TEST_PREFIX "conditional.")
+
+target_link_libraries(conditional_tests PRIVATE AvsInternalFilterReferences)

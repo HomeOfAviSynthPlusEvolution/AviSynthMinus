@@ -7,7 +7,7 @@
 #define AVS_TEST_TURN_SIMD(function) nullptr
 #endif
 
-#include "filters/turn.h"
+#include "reference/internal_filters/turn.h"
 
 #include "support/cpu_features.h"
 #include "support/deterministic_data.h"

@@ -1,3 +1,5 @@
+#include "stack/show_five_versions.h"
+using aif::filters::stack::ShowFiveVersions;
 #include <gtest/gtest.h>
 
 #include <avisynth.h>

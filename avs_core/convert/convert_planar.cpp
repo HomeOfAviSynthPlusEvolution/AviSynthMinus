@@ -43,7 +43,8 @@
 #include "convert_planar.h"
 #include "convert_bits.h"
 #include "../filters/resample.h"
-#include "../filters/planeswap.h"
+#include "planes/swap_uv_to_y.h"
+using aif::filters::planes::SwapUVToY;
 #include "../filters/field.h"
 
 #ifdef AVS_WINDOWS

@@ -4,7 +4,12 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_MERGE_UNDEF_AVS_UNUSED
 #endif
-#include "filters/merge.h"
+#include "merge/merge_all.h"
+using aif::filters::merge::MergeAll;
+#include "merge/merge_luma.h"
+using aif::filters::merge::MergeLuma;
+#include "merge/merge_chroma.h"
+using aif::filters::merge::MergeChroma;
 #ifdef AVSUT_MERGE_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_MERGE_UNDEF_AVS_UNUSED

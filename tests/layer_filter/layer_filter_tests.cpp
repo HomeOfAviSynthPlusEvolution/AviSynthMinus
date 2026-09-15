@@ -1,3 +1,9 @@
+#include "invert/invert.h"
+using aif::filters::invert::Invert;
+#include "channel_display/show_channel.h"
+using aif::filters::channel_display::ShowChannel;
+#include "rgb_merge/merge_rgb.h"
+using aif::filters::rgb_merge::MergeRGB;
 #include <avisynth.h>
 
 #ifndef AVS_UNUSED

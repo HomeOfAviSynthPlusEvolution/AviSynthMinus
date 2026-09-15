@@ -4,7 +4,17 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_FOCUS_UNDEF_AVS_UNUSED
 #endif
-#include "filters/focus.h"
+#include "focus/adjust_focus_h.h"
+using aif::filters::focus::AdjustFocusH;
+#include "focus/adjust_focus_v.h"
+using aif::filters::focus::AdjustFocusV;
+#include "focus/temporal_soften.h"
+using aif::filters::focus::TemporalSoften;
+#include "focus/spatial_soften.h"
+using aif::filters::focus::SpatialSoften;
+#include "focus/blur_sharpen.h"
+using aif::filters::focus::Create_Blur;
+using aif::filters::focus::Create_Sharpen;
 #ifdef AVSUT_FOCUS_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_FOCUS_UNDEF_AVS_UNUSED
@@ -429,7 +439,7 @@ TEST(AdjustFocusFilter, AppliesVerticalThreeTapKernelToY8) {
   auto* source_impl = new StaticFrameClip(vi, source);
   const PClip clip(source_impl);
 
-  AdjustFocusV filter(amount, clip);
+  AdjustFocusV filter(amount, clip, environment.get());
   EXPECT_EQ(filter.GetVideoInfo().width, vi.width);
   EXPECT_EQ(filter.GetVideoInfo().height, vi.height);
   EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
@@ -493,7 +503,7 @@ TEST(AdjustFocusFilter, AppliesHorizontalThreeTapKernelToYv24) {
   auto* source_impl = new StaticFrameClip(vi, source);
   const PClip clip(source_impl);
 
-  AdjustFocusH filter(amount, clip);
+  AdjustFocusH filter(amount, clip, environment.get());
   EXPECT_EQ(filter.GetVideoInfo().pixel_type, vi.pixel_type);
   EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
 

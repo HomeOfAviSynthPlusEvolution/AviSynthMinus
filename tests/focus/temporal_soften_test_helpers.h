@@ -1,6 +1,6 @@
 #pragma once
 
-#include "filters/intel/focus_sse.h"
+#include "reference/internal_filters/intel/focus_sse.h"
 
 #include "support/comparators.h"
 #include "support/guarded_video_buffer.h"

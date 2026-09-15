@@ -4,7 +4,8 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_TURN_UNDEF_AVS_UNUSED
 #endif
-#include "filters/turn.h"
+#include "rotation/turn.h"
+using aif::filters::rotation::Turn;
 #ifdef AVSUT_TURN_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_TURN_UNDEF_AVS_UNUSED

@@ -146,6 +146,9 @@ target_link_libraries("AvsCore" ${SYSLIB} AvsSimd)
 add_subdirectory("${CMAKE_SOURCE_DIR}/modules/audio_convert" "${CMAKE_CURRENT_BINARY_DIR}/modules/audio_convert")
 add_subdirectory("${CMAKE_SOURCE_DIR}/modules/video_convert" "${CMAKE_CURRENT_BINARY_DIR}/modules/video_convert")
 add_subdirectory("${CMAKE_SOURCE_DIR}/modules/composite" "${CMAKE_CURRENT_BINARY_DIR}/modules/composite")
+add_subdirectory("${CMAKE_SOURCE_DIR}/modules/internal_filters" "${CMAKE_CURRENT_BINARY_DIR}/modules/internal_filters")
+target_link_libraries(AvsCore AvsInternalFilters)
+
 target_link_libraries(AvsCore AvsAudioConvert AvsVideoConvert AviSynth::ConvertVideo AvsComposite)
 
 if(ENABLE_CUDA)

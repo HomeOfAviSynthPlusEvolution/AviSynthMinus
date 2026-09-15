@@ -4,7 +4,8 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_LIMITER_UNDEF_AVS_UNUSED
 #endif
-#include "filters/limiter.h"
+#include "limiter/limiter.h"
+using aif::filters::limiter::Limiter;
 #ifdef AVSUT_LIMITER_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_LIMITER_UNDEF_AVS_UNUSED

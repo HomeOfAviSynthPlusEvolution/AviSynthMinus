@@ -4,7 +4,8 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_GREYSCALE_UNDEF_AVS_UNUSED
 #endif
-#include "filters/greyscale.h"
+#include "greyscale/greyscale.h"
+using aif::filters::greyscale::Greyscale;
 #ifdef AVSUT_GREYSCALE_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_GREYSCALE_UNDEF_AVS_UNUSED

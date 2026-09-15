@@ -1,6 +1,6 @@
 #pragma once
 
-#include "filters/intel/planeswap_sse.h"
+#include "reference/internal_filters/intel/planeswap_sse.h"
 
 #include "support/comparators.h"
 #include "support/deterministic_data.h"

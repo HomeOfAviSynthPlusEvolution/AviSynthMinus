@@ -32,40 +32,8 @@
 // which is not derived from or based on Avisynth, such as 3rd-party filters,
 // import and export plugins, or graphical user interfaces.
 
-#ifndef __Greyscale_H__
-#define __Greyscale_H__
-
+#pragma once
 #include <avisynth.h>
-#include "../convert/convert_planar.h"
-
-class Greyscale : public GenericVideoFilter
-/**
-  * Class to convert video to greyscale
- **/
-{
-public:
-  Greyscale(PClip _child, const char* matrix, IScriptEnvironment* env);
-  PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env) override;
-
-  static AVSValue __cdecl Create(AVSValue args, void*, IScriptEnvironment* env);
-
-  int __stdcall SetCacheHints(int cachehints, int frame_range) override {
-    AVS_UNUSED(frame_range);
-    return cachehints == CACHE_GET_MTMODE ? MT_NICE_FILTER : 0;
-  }
-
-private:
-  const vc_layout_functions* layout = nullptr;
-  std::unique_ptr<avs_video_convert::MatrixPlan> matrix_plan;
-  int theMatrix;
-  int theColorRange;
-  int theOutColorRange;
-  int pixelsize;
-  int bits_per_pixel;
-
-};
-
-
-
-
-#endif  // __Greyscale_H__
+#include <cstdint>
+template<typename pixel_t, bool packedRGB3264>
+int64_t calculate_sad_8_or_16_sse2(const BYTE*, const BYTE*, int, int, size_t, size_t);

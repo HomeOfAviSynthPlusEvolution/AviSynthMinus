@@ -1,10 +1,22 @@
+#include "stack/stack_horizontal.h"
+using aif::filters::stack::StackHorizontal;
+#include "stack/stack_vertical.h"
+using aif::filters::stack::StackVertical;
 #include <avisynth.h>
 
 #ifndef AVS_UNUSED
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_TRANSFORM_FILTER_UNDEF_AVS_UNUSED
 #endif
-#include "filters/transform.h"
+#include "rotation/flip_horizontal.h"
+using aif::filters::rotation::FlipHorizontal;
+#include "rotation/flip_vertical.h"
+using aif::filters::rotation::FlipVertical;
+#include "crop/crop.h"
+using aif::filters::crop::Crop;
+#include "crop/add_borders.h"
+using aif::filters::crop::AddBorders;
+#include "crop/letterbox.h"
 #ifdef AVSUT_TRANSFORM_FILTER_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_TRANSFORM_FILTER_UNDEF_AVS_UNUSED
@@ -237,7 +249,7 @@ TEST(FlipFilter, FlipsYv24VerticallyAcrossAllPlanes) {
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
 
-  FlipVertical filter(clip);
+  FlipVertical filter(clip, environment.get());
   const PVideoFrame output = filter.GetFrame(0, environment.get());
 
   for (const int plane : {PLANAR_Y, PLANAR_U, PLANAR_V}) {
@@ -267,7 +279,7 @@ TEST(FlipFilter, FlipsYv24HorizontallyAcrossAllPlanes) {
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
 
-  FlipHorizontal filter(clip);
+  FlipHorizontal filter(clip, environment.get());
   const PVideoFrame output = filter.GetFrame(0, environment.get());
 
   for (const int plane : {PLANAR_Y, PLANAR_U, PLANAR_V}) {
@@ -432,11 +444,11 @@ TEST_P(FlipYuv420Test, FlipsSubsampledYv12AcrossEveryPlane) {
   const PClip clip(source_clip);
   PVideoFrame output;
   if (vertical) {
-    FlipVertical filter(clip);
+    FlipVertical filter(clip, environment.get());
     EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
     output = filter.GetFrame(0, environment.get());
   } else {
-    FlipHorizontal filter(clip);
+    FlipHorizontal filter(clip, environment.get());
     EXPECT_EQ(filter.SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
     output = filter.GetFrame(0, environment.get());
   }
@@ -469,7 +481,7 @@ TEST(FlipFilter, FlipsYuva420AlphaWithTheFullResolutionPlanes) {
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
 
-  FlipVertical filter(clip);
+  FlipVertical filter(clip, environment.get());
   const PVideoFrame output = filter.GetFrame(0, environment.get());
 
   for (const int plane : {PLANAR_Y, PLANAR_U, PLANAR_V, PLANAR_A}) {
@@ -496,8 +508,8 @@ TEST(FlipFilter, DoubleHorizontalFlipRestoresYuva420ActivePlanes) {
   const auto source_before = FrameSnapshot::capture(source, vi);
   auto* source_clip_impl = new StaticFrameClip(vi, source);
   const PClip source_clip(source_clip_impl);
-  const PClip flipped(new FlipHorizontal(source_clip));
-  const PClip restored(new FlipHorizontal(flipped));
+  const PClip flipped(new FlipHorizontal(source_clip, environment.get()));
+  const PClip restored(new FlipHorizontal(flipped, environment.get()));
 
   EXPECT_EQ(restored->SetCacheHints(CACHE_GET_MTMODE, 0), MT_NICE_FILTER);
   const PVideoFrame output = restored->GetFrame(0, environment.get());
@@ -539,10 +551,10 @@ TEST_P(PackedFlipFilterTest, FlipsPackedBgrRowsAndPixels) {
   const PClip clip(source_clip);
   PVideoFrame output;
   if (test_case.vertical) {
-    FlipVertical filter(clip);
+    FlipVertical filter(clip, environment.get());
     output = filter.GetFrame(0, environment.get());
   } else {
-    FlipHorizontal filter(clip);
+    FlipHorizontal filter(clip, environment.get());
     output = filter.GetFrame(0, environment.get());
   }
   if (test_case.component_bytes == 1) {
@@ -580,7 +592,7 @@ TEST(FlipFilter, FlipsPlanarRgb16GbrPlanesHorizontally) {
   auto* source_clip = new StaticFrameClip(vi, source);
   const PClip clip(source_clip);
 
-  FlipHorizontal filter(clip);
+  FlipHorizontal filter(clip, environment.get());
   const PVideoFrame output = filter.GetFrame(0, environment.get());
 
   for (const int plane : {PLANAR_G, PLANAR_B, PLANAR_R}) {

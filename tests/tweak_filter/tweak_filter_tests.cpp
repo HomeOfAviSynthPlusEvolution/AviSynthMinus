@@ -4,7 +4,12 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_TWEAK_UNDEF_AVS_UNUSED
 #endif
-#include "filters/levels.h"
+#include "color_adjust/levels.h"
+using aif::filters::color_adjust::Levels;
+#include "color_adjust/tweak.h"
+using aif::filters::color_adjust::Tweak;
+#include "color_adjust/rgb_adjust.h"
+using aif::filters::color_adjust::RGBAdjust;
 #ifdef AVSUT_TWEAK_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_TWEAK_UNDEF_AVS_UNUSED

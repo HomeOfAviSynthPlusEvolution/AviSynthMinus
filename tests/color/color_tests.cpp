@@ -4,7 +4,8 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_COLOR_UNDEF_AVS_UNUSED
 #endif
-#include "filters/color.h"
+#include "color_adjust/color_yuv.h"
+using aif::filters::color_adjust::ColorYUV;
 #ifdef AVSUT_COLOR_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_COLOR_UNDEF_AVS_UNUSED

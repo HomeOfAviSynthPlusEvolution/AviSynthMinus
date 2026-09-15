@@ -10,3 +10,6 @@
 [submodule "third_party/composite"]
 	path = third_party/composite
 	url = https://github.com/HomeOfAviSynthPlusEvolution/AviSynthComposite.git
+[submodule "third_party/internal_filters"]
+	path = third_party/internal_filters
+	url = https://github.com/HomeOfAviSynthPlusEvolution/AviSynthInternalFilters.git

@@ -37,7 +37,7 @@
 #include <vector>
 #include <avs/alignment.h>
 #include <avs/minmax.h>
-#include "../core/internal.h"
+#include "core/internal.h"
 #include <stdint.h>
 
 // experimental simd includes for avx2 compiled files
