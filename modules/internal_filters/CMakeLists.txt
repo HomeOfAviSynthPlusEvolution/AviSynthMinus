@@ -26,4 +26,13 @@ target_link_libraries(AvsInternalFilters PUBLIC
   aif_rotation_filters
   aif_rows_columns_filters
   aif_stack_filters
+  aif_mask_filters
+  aif_layer_filters
+  aif_multi_overlay_filters
+  aif_overlay_filters
+  aif_histogram_filters
+  aif_frame_rate_filters
+  aif_field_filters
+  aif_frame_select_filters
+  aif_legacy_correction_filters
 )

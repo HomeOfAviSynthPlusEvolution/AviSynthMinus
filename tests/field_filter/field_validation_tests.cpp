@@ -8,8 +8,9 @@
 #endif
 #include "filters/combine.h"
 #include "filters/edit.h"
-#include "filters/field.h"
-#include "filters/fps.h"
+#include "frame_select/select_every.h"
+using aif::filters::frame_select::SelectEvery;
+
 #ifdef AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_LOCAL_UNDEF_AVS_UNUSED

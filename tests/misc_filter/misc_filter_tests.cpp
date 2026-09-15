@@ -6,7 +6,12 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #endif
-#include "filters/misc.h"
+#include "legacy_correction/fix_luminance.h"
+#include "legacy_correction/peculiar_blend.h"
+#include "legacy_correction/skew_rows.h"
+using aif::filters::legacy_correction::FixLuminance;
+using aif::filters::legacy_correction::PeculiarBlend;
+using aif::filters::legacy_correction::SkewRows;
 #ifdef AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_LOCAL_UNDEF_AVS_UNUSED

@@ -17,4 +17,13 @@ const AVSFunction* rgb_merge();
 const AVSFunction* rotation();
 const AVSFunction* rows_columns();
 const AVSFunction* stack();
+const AVSFunction *mask();
+const AVSFunction *layer();
+const AVSFunction *multi_overlay();
+const AVSFunction *overlay();
+const AVSFunction *histogram();
+const AVSFunction *frame_rate();
+const AVSFunction *field();
+const AVSFunction *frame_select();
+const AVSFunction *legacy_correction();
 } // namespace avs::internal_filters

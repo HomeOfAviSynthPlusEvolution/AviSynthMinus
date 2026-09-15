@@ -6,7 +6,8 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #endif
-#include "filters/histogram.h"
+#include "histogram/histogram.h"
+using aif::filters::histogram::Histogram;
 #include "core/parser/script.h"
 #ifdef AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED

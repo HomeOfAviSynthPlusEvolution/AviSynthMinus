@@ -45,7 +45,16 @@
 #include "../filters/resample.h"
 #include "planes/swap_uv_to_y.h"
 using aif::filters::planes::SwapUVToY;
-#include "../filters/field.h"
+#include "field/assume_parity.h"
+#include "field/double_weave_fields.h"
+#include "field/separate_fields.h"
+#include "frame_select/interleave.h"
+#include "frame_select/select_every.h"
+using aif::filters::field::AssumeParity;
+using aif::filters::field::DoubleWeaveFields;
+using aif::filters::field::SeparateFields;
+using aif::filters::frame_select::Interleave;
+using aif::filters::frame_select::SelectEvery;
 
 #ifdef AVS_WINDOWS
     #include <avs/win.h>
@@ -732,8 +741,12 @@ ConvertToPlanarGeneric::ConvertToPlanarGeneric(
     tbVsource[0] = FilteredResize::CreateResize(new SelectEvery(Vsource, 2, 0, env), uv_width, uv_height, tVsubSampling, force, filter, preserve_center, placement_name_notused, forced_chroma_placement, env);
     tbVsource[1] = FilteredResize::CreateResize(new SelectEvery(Vsource, 2, 1, env), uv_width, uv_height, bVsubSampling, force, filter, preserve_center, placement_name_notused, forced_chroma_placement, env);
 
-    Usource = new SelectEvery(new DoubleWeaveFields(new Interleave(std::move(tbUsource), env)), 2, 0, env);
-    Vsource = new SelectEvery(new DoubleWeaveFields(new Interleave(std::move(tbVsource), env)), 2, 0, env);
+    Usource = new SelectEvery(
+        new DoubleWeaveFields(new Interleave(std::move(tbUsource), env), env),
+        2, 0, env);
+    Vsource = new SelectEvery(
+        new DoubleWeaveFields(new Interleave(std::move(tbVsource), env), env),
+        2, 0, env);
   }
   else {
     AVSValue UsubSampling[4] = { ChrOffset(xsIn, xdInU, xsOut, xdOutU), ChrOffset(ysIn, ydInU, ysOut, ydOutU), AVSValue(), AVSValue() };

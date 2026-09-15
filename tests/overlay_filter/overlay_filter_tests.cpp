@@ -4,7 +4,8 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_OVERLAY_FILTER_UNDEF_AVS_UNUSED
 #endif
-#include "filters/overlay/overlay.h"
+#include "overlay/overlay.h"
+using aif::filters::overlay::Overlay;
 #ifdef AVSUT_OVERLAY_FILTER_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_OVERLAY_FILTER_UNDEF_AVS_UNUSED

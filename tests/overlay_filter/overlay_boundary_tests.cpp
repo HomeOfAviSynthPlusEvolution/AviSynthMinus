@@ -7,8 +7,12 @@
 #define AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #endif
 #include "core/parser/script.h"
-#include "filters/overlay/444convert.h"
-#include "filters/overlay/overlay.h"
+#include "overlay/kernel/chroma_conversion.h"
+using aif::filters::overlay::Convert444FromYV12;
+using aif::filters::overlay::Convert444FromYV16;
+using aif::filters::overlay::Convert444ToYV16;
+#include "overlay/overlay.h"
+using aif::filters::overlay::Overlay;
 #ifdef AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_LOCAL_UNDEF_AVS_UNUSED
@@ -188,15 +192,17 @@ bool run_narrow_conversion(const NarrowConversionCase& test_case) {
     fill_plane_full_pitch(destination, 0x5a, plane);
   }
 
+  // The resolver intersects this mask with compiled and supported targets.
+  const auto kernel = aif::filters::overlay::select_chroma(INT64_MAX);
   switch (test_case.operation) {
     case NarrowConversion::Yv12ToYv24:
-      Convert444FromYV12(source, destination, 1, 8, environment.get());
+      Convert444FromYV12(source, destination, 1, 8, environment.get(), kernel);
       break;
     case NarrowConversion::Yv16ToYv24:
-      Convert444FromYV16(source, destination, 1, 8, environment.get());
+      Convert444FromYV16(source, destination, 1, 8, environment.get(), kernel);
       break;
     case NarrowConversion::Yv24ToYv16:
-      Convert444ToYV16(source, destination, 1, 8, environment.get());
+      Convert444ToYV16(source, destination, 1, 8, environment.get(), kernel);
       break;
   }
 

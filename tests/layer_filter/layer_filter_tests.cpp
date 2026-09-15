@@ -10,7 +10,14 @@ using aif::filters::rgb_merge::MergeRGB;
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_LAYER_FILTER_UNDEF_AVS_UNUSED
 #endif
-#include "filters/layer.h"
+#include "layer/subtract.h"
+#include "mask/color_key_mask.h"
+#include "mask/mask.h"
+#include "mask/reset_mask.h"
+using aif::filters::layer::Subtract;
+using aif::filters::mask::ColorKeyMask;
+using aif::filters::mask::Mask;
+using aif::filters::mask::ResetMask;
 #ifdef AVSUT_LAYER_FILTER_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_LAYER_FILTER_UNDEF_AVS_UNUSED

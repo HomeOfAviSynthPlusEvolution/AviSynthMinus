@@ -1,24 +1,33 @@
 #include "internal_filters_core/registration.h"
-#include "core/function.h"
-#include "core/internal.h"
-#include <array>
-#include <utility>
 #include "blank_clip/filters.h"
 #include "channel_display/filters.h"
 #include "color_adjust/filters.h"
 #include "color_bars/filters.h"
 #include "convolution/filters.h"
+#include "core/function.h"
+#include "core/internal.h"
 #include "crop/filters.h"
+#include "field/filters.h"
 #include "focus/filters.h"
+#include "frame_rate/filters.h"
+#include "frame_select/filters.h"
 #include "greyscale/filters.h"
+#include "histogram/filters.h"
 #include "invert/filters.h"
+#include "layer/filters.h"
+#include "legacy_correction/filters.h"
 #include "limiter/filters.h"
+#include "mask/filters.h"
 #include "merge/filters.h"
+#include "multi_overlay/filters.h"
+#include "overlay/filters.h"
 #include "planes/filters.h"
 #include "rgb_merge/filters.h"
 #include "rotation/filters.h"
 #include "rows_columns/filters.h"
 #include "stack/filters.h"
+#include <array>
+#include <utility>
 
 namespace avs::internal_filters {
 namespace {
@@ -97,6 +106,43 @@ const AVSFunction* rows_columns() {
 }
 const AVSFunction* stack() {
   static const BuiltinTable table(aif::filters::stack::registrations());
+  return table.data();
+}
+const AVSFunction *mask() {
+  static const BuiltinTable table(aif::filters::mask::registrations());
+  return table.data();
+}
+const AVSFunction *layer() {
+  static const BuiltinTable table(aif::filters::layer::registrations());
+  return table.data();
+}
+const AVSFunction *multi_overlay() {
+  static const BuiltinTable table(aif::filters::multi_overlay::registrations());
+  return table.data();
+}
+const AVSFunction *overlay() {
+  static const BuiltinTable table(aif::filters::overlay::registrations());
+  return table.data();
+}
+const AVSFunction *histogram() {
+  static const BuiltinTable table(aif::filters::histogram::registrations());
+  return table.data();
+}
+const AVSFunction *frame_rate() {
+  static const BuiltinTable table(aif::filters::frame_rate::registrations());
+  return table.data();
+}
+const AVSFunction *field() {
+  static const BuiltinTable table(aif::filters::field::registrations());
+  return table.data();
+}
+const AVSFunction *frame_select() {
+  static const BuiltinTable table(aif::filters::frame_select::registrations());
+  return table.data();
+}
+const AVSFunction *legacy_correction() {
+  static const BuiltinTable table(
+      aif::filters::legacy_correction::registrations());
   return table.data();
 }
 } // namespace avs::internal_filters

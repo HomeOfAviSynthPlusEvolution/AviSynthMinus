@@ -6,7 +6,8 @@
 #endif
 #include "color_adjust/levels.h"
 using MigratedLevels = aif::filters::color_adjust::Levels;
-#include "filters/levels.h"
+#include "mask/mask_hs.h"
+using aif::filters::mask::MaskHS;
 #include "color_adjust/tweak.h"
 
 #include "color_adjust/rgb_adjust.h"

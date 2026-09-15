@@ -9,10 +9,15 @@ using aif::filters::rgb_merge::MergeRGB;
 #define AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #endif
 #include "core/parser/script.h"
-#include "filters/layer.h"
-#ifdef INTEL_INTRINSICS
-#include "filters/intel/layer_sse.h"
-#endif
+#include "layer/layer.h"
+#include "layer/subtract.h"
+#include "mask/mask.h"
+#include "mask/reset_mask.h"
+using aif::filters::layer::Layer;
+using aif::filters::layer::Subtract;
+using aif::filters::mask::Mask;
+using aif::filters::mask::ResetMask;
+#include "mask/kernel_adapter.h"
 #ifdef AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_LOCAL_UNDEF_AVS_UNUSED
@@ -250,12 +255,10 @@ INSTANTIATE_TEST_SUITE_P(BoundaryCases, LayerThresholdConstruction,
 
 class MaskRgb32NarrowRows : public ::testing::TestWithParam<int> {};
 
-#ifdef INTEL_INTRINSICS
-TEST(MaskRgb32Sse2, PreservesGuardsAndPaddingAroundVectorBoundaries) {
+TEST(MaskRgb32Kernel, PreservesGuardsAndPaddingAroundVectorBoundaries) {
   AviSynthEnvironment environment;
-  if (!(environment.get()->GetCPUFlags() & CPUF_SSE2)) {
-    GTEST_SKIP() << "SSE2 is unavailable";
-  }
+  const auto kernel =
+      aif_mask_resolve(aif::filters::mask::allowed_cpu(environment.get()));
   constexpr int kGuard = 16;
   constexpr int kSourcePitch = 48;
   constexpr int kMaskPitch = 64;
@@ -281,13 +284,13 @@ TEST(MaskRgb32Sse2, PreservesGuardsAndPaddingAroundVectorBoundaries) {
             (3736 * pixel[0] + 19234 * pixel[1] + 9798 * pixel[2] + 16384) >> 15);
       }
     }
-    mask_sse2(source.data() + kGuard, mask.data() + kGuard,
-              kSourcePitch, kMaskPitch, width, kHeight);
+    for (int y = 0; y < kHeight; ++y)
+      kernel(source.data() + kGuard + y * kSourcePitch,
+             mask.data() + kGuard + y * kMaskPitch, width, 0, 0, 0);
     EXPECT_EQ(source, expected);
     EXPECT_EQ(mask, original_mask);
   }
 }
-#endif
 
 TEST_P(MaskRgb32NarrowRows, HandlesRowsShorterThanOneVector) {
   const int width = GetParam();

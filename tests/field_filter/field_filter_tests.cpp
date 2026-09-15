@@ -4,7 +4,18 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_FIELD_FILTER_UNDEF_AVS_UNUSED
 #endif
-#include "filters/field.h"
+#include "field/assume_parity.h"
+#include "field/double_weave_fields.h"
+#include "field/double_weave_frames.h"
+#include "field/separate_fields.h"
+#include "frame_select/interleave.h"
+#include "frame_select/select_every.h"
+using aif::filters::field::AssumeParity;
+using aif::filters::field::DoubleWeaveFields;
+using aif::filters::field::DoubleWeaveFrames;
+using aif::filters::field::SeparateFields;
+using aif::filters::frame_select::Interleave;
+using aif::filters::frame_select::SelectEvery;
 #ifdef AVSUT_FIELD_FILTER_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_FIELD_FILTER_UNDEF_AVS_UNUSED
@@ -224,7 +235,7 @@ TEST(FieldFilter, OverlapsAdjacentFieldsThroughDoubleWeaveFields) {
   const PClip tff_source(new AssumeParity(source, true));
   const PClip field_clip(new SeparateFields(tff_source, environment.get()));
 
-  DoubleWeaveFields filter(field_clip);
+  DoubleWeaveFields filter(field_clip, environment.get());
   const auto& output_vi = filter.GetVideoInfo();
   EXPECT_EQ(output_vi.width, width);
   EXPECT_EQ(output_vi.height, height);
@@ -263,7 +274,7 @@ TEST(FieldFilter, DoubleWeaveFieldsServesLastAdvertisedFrame) {
   const PClip source(source_impl);
   const PClip field_clip(new SeparateFields(new AssumeParity(source, true), environment.get()));
 
-  DoubleWeaveFields filter(field_clip);
+  DoubleWeaveFields filter(field_clip, environment.get());
   PVideoFrame output;
   ASSERT_NO_THROW(output = filter.GetFrame(filter.GetVideoInfo().num_frames - 1, environment.get()))
       << "DoubleWeaveFields must serve its last advertised frame without requesting a past-end "
@@ -292,7 +303,8 @@ TEST(FieldFilter, ReconstructsFramesThroughPublicWeaveComposition) {
   const PClip source(source_impl);
   const PClip tff_source(new AssumeParity(source, true));
   const PClip field_clip(new SeparateFields(tff_source, environment.get()));
-  const PClip double_weave(new DoubleWeaveFields(field_clip));
+  const PClip double_weave(
+      new DoubleWeaveFields(field_clip, environment.get()));
 
   SelectEvery filter(double_weave, 2, 0, environment.get());
   const auto& output_vi = filter.GetVideoInfo();

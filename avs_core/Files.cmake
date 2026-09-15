@@ -33,9 +33,6 @@ FILE(GLOB AvsCore_Sources RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
   "filters/conditional/*.cpp"
   "filters/conditional/*.h"
 
-  "filters/overlay/*.c"
-  "filters/overlay/*.cpp"
-  "filters/overlay/*.h"
 
   "filters/exprfilter/*.cpp"
   "filters/exprfilter/*.h"
@@ -54,12 +51,6 @@ IF(ENABLE_INTEL_SIMD)
 
   LIST(APPEND AvsCore_Sources "${Filters_Cpu_Sources}")
 
-  FILE(GLOB Overlay_Cpu_Sources RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
-    "filters/overlay/intel/*.cpp"
-    "filters/overlay/intel/*.h")
-  LIST(REMOVE_ITEM AvsCore_Sources "filters/overlay/444convert.cpp"
-                                   "filters/overlay/444convert.h")
-  LIST(APPEND AvsCore_Sources "${Overlay_Cpu_Sources}")
 ENDIF()
 
 IF( MSVC OR MINGW )

@@ -10,8 +10,7 @@ using aif::filters::stack::ShowFiveVersions;
 #endif
 #include "filters/combine.h"
 #include "filters/edit.h"
-#include "filters/field.h"
-#include "filters/fps.h"
+
 #ifdef AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_LOCAL_UNDEF_AVS_UNUSED

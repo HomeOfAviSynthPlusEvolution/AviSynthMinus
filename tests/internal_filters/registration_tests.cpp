@@ -73,6 +73,41 @@ TEST(InternalFilters, ExportsOriginalNamesAndOverloadsExactlyOnce) {
       {"StackVertical", 1},
       {"StackHorizontal", 1},
       {"ShowFiveVersions", 1},
+      {"Mask", 1},
+      {"ColorKeyMask", 1},
+      {"ResetMask", 1},
+      {"MaskHS", 1},
+      {"Layer", 1},
+      {"Subtract", 1},
+      {"MultiOverlay", 1},
+      {"Overlay", 1},
+      {"Histogram", 1},
+      {"AssumeScaledFPS", 1},
+      {"AssumeFPS", 4},
+      {"ChangeFPS", 4},
+      {"ConvertFPS", 4},
+      {"ContinuedDenominator", 1},
+      {"ContinuedNumerator", 1},
+      {"ComplementParity", 1},
+      {"AssumeTFF", 1},
+      {"AssumeBFF", 1},
+      {"AssumeFieldBased", 1},
+      {"AssumeFrameBased", 1},
+      {"SeparateFields", 1},
+      {"Weave", 1},
+      {"DoubleWeave", 1},
+      {"Pulldown", 1},
+      {"SwapFields", 1},
+      {"Bob", 1},
+      {"SelectEvery", 1},
+      {"SelectEven", 1},
+      {"SelectOdd", 1},
+      {"Interleave", 1},
+      {"SelectRangeEvery", 1},
+      {"FixLuminance", 1},
+      {"PeculiarBlend", 1},
+      {"SkewRows", 1},
+      {"FixBrokenChromaUpsampling", 1},
   };
   for (const auto& entry : expected) {
     EXPECT_EQ(actual[entry.first], entry.second) << entry.first;
@@ -83,7 +118,7 @@ TEST(InternalFilters, ExportsOriginalNamesAndOverloadsExactlyOnce) {
 TEST(InternalFilters, InvokesEveryFamilyThroughBuiltinRegistration) {
   avsut::test::AviSynthEnvironment environment;
   auto* env = environment.get();
-  const char* expressions[] = {
+  const char *expressions[] = {
       R"avs(Blur(BlankClip(width=32,height=16,pixel_type="Y8"),0.3))avs",
       R"avs(TurnRight(BlankClip(width=32,height=16)))avs",
       R"avs(Crop(BlankClip(width=32,height=16),2,2,24,12))avs",
@@ -99,6 +134,16 @@ TEST(InternalFilters, InvokesEveryFamilyThroughBuiltinRegistration) {
       R"avs(Merge(BlankClip(width=32,height=16),BlankClip(width=32,height=16,color=$ffffff),0.25))avs",
       R"avs(Levels(BlankClip(width=32,height=16),0,1,255,16,235))avs",
       R"avs(GeneralConvolution(BlankClip(width=32,height=16,pixel_type="RGB32")))avs",
+      R"avs(Mask(BlankClip(pixel_type="RGB32"),BlankClip(pixel_type="RGB32")))avs",
+      R"avs(MaskHS(BlankClip(width=32,height=16,pixel_type="YV12")))avs",
+      R"avs(Layer(BlankClip(pixel_type="RGB32"),BlankClip(pixel_type="RGB32")))avs",
+      R"avs(MultiOverlay(BlankClip(pixel_type="RGB32"),BlankClip(pixel_type="RGB32"),0,0))avs",
+      R"avs(Overlay(BlankClip(pixel_type="YV12"),BlankClip(pixel_type="YV12")))avs",
+      R"avs(Histogram(BlankClip(pixel_type="YV12")))avs",
+      R"avs(ConvertFPS(BlankClip(pixel_type="YV12"),30))avs",
+      R"avs(Bob(AssumeTFF(BlankClip(pixel_type="YV12"))))avs",
+      R"avs(SelectEvery(BlankClip(),2,0))avs",
+      R"avs(FixBrokenChromaUpsampling(BlankClip(pixel_type="YUY2")))avs",
   };
   for (const char* expression : expressions) {
     SCOPED_TRACE(expression);
@@ -110,4 +155,21 @@ TEST(InternalFilters, InvokesEveryFamilyThroughBuiltinRegistration) {
       FAIL() << error.msg;
     }
   }
+}
+
+TEST(InternalFilters, ResetMaskPreservesItsOriginalParameterContract) {
+  avsut::test::AviSynthEnvironment environment;
+  auto *env = environment.get();
+  auto clip =
+      env->Invoke(
+             "Eval",
+             R"avs(ResetMask(BlankClip(width=4,height=2,pixel_type="RGB32"),mask=127))avs")
+          .AsClip();
+  auto frame = clip->GetFrame(0, env);
+  EXPECT_EQ(frame->GetReadPtr()[3], 127);
+  EXPECT_THROW(
+      env->Invoke(
+          "Eval",
+          R"avs(ResetMask(BlankClip(pixel_type="RGB32"),opacity=0.5))avs"),
+      AvisynthError);
 }

@@ -4,11 +4,14 @@
 #define AVS_UNUSED(x) (void)(x)
 #define AVSUT_AUDIO_FILTER_UNDEF_AVS_UNUSED
 #endif
-#include "core/internal.h"
-#include "core/audio.h"
 #include "audio_convert/factory.h"
+#include "core/audio.h"
+#include "core/internal.h"
 #include "filters/edit.h"
-#include "filters/fps.h"
+#include "frame_rate/assume_fps.h"
+#include "frame_rate/assume_scaled_fps.h"
+using aif::filters::frame_rate::AssumeFPS;
+using aif::filters::frame_rate::AssumeScaledFPS;
 #ifdef AVSUT_AUDIO_FILTER_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_AUDIO_FILTER_UNDEF_AVS_UNUSED
