@@ -34,8 +34,10 @@
 #ifndef __Audio_H__
 #define __Audio_H__
 
+#include "internal.h"
 #include <avisynth.h>
 #include <cmath>
+#include <string>
 
 // ------- Channels, only 0..17, SPEAKER_ALL not handled here
 enum AVSChannel {
@@ -291,7 +293,7 @@ class KillVideo : public GenericVideoFilter
 {
 public:
   KillVideo(PClip _clip);
-  PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment*) { AVS_UNUSED(n); return NULL; };
+  PVideoFrame __stdcall GetFrame(int, IScriptEnvironment*) { return NULL; };
   static AVSValue __cdecl Create(AVSValue args, void*, IScriptEnvironment*);
 };
 
@@ -303,7 +305,7 @@ class KillAudio : public NonCachedGenericVideoFilter
 {
 public:
   KillAudio(PClip _clip);
-  void __stdcall GetAudio(void* buf, int64_t start, int64_t count, IScriptEnvironment* env) { AVS_UNUSED(buf); AVS_UNUSED(start); AVS_UNUSED(count); AVS_UNUSED(env); };
+  void __stdcall GetAudio(void*, int64_t, int64_t, IScriptEnvironment*) {};
   static AVSValue __cdecl Create(AVSValue args, void*, IScriptEnvironment*);
 };
 
