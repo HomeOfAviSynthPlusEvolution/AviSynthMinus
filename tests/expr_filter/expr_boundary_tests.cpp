@@ -4,22 +4,22 @@
 
 #ifdef AVS_WINDOWS
 #include <avs/win.h>
-#define AVSUT_FINDING_B10_WINDOWS_CONTEXT
+#define AVSUT_EXPR_WINDOWS_CONTEXT
 #define VS_TARGET_OS_WINDOWS
 #endif
 
 #ifndef AVS_UNUSED
 #define AVS_UNUSED(x) (void)(x)
-#define AVSUT_FINDING_B10_UNDEF_AVS_UNUSED
+#define AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #endif
 #include "filters/exprfilter/exprfilter.h"
-#ifdef AVSUT_FINDING_B10_WINDOWS_CONTEXT
+#ifdef AVSUT_EXPR_WINDOWS_CONTEXT
 #undef VS_TARGET_OS_WINDOWS
-#undef AVSUT_FINDING_B10_WINDOWS_CONTEXT
+#undef AVSUT_EXPR_WINDOWS_CONTEXT
 #endif
-#ifdef AVSUT_FINDING_B10_UNDEF_AVS_UNUSED
+#ifdef AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
-#undef AVSUT_FINDING_B10_UNDEF_AVS_UNUSED
+#undef AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #endif
 
 #include "support/avisynth_environment.h"
@@ -49,16 +49,14 @@ StaticVideoSource make_y8_row_source(AviSynthEnvironment& environment) {
   PVideoFrame frame = environment.get()->NewVideoFrame(video_info);
   fill_plane_full_pitch(frame, 0xa5, PLANAR_Y);
   for (int y = 0; y < video_info.height; ++y) {
-    auto* row =
-        frame->GetWritePtr(PLANAR_Y) + static_cast<std::size_t>(y) * frame->GetPitch(PLANAR_Y);
+    auto* row = frame->GetWritePtr(PLANAR_Y) + static_cast<std::size_t>(y) * frame->GetPitch(PLANAR_Y);
     for (int x = 0; x < video_info.width; ++x) {
       row[x] = static_cast<std::uint8_t>(20 + y * 40 + x);
     }
   }
 
   auto* clip_impl = new StaticFrameClip(video_info, frame);
-  return StaticVideoSource{video_info, frame, clip_impl, PClip(clip_impl),
-                           FrameSnapshot::capture(frame, video_info)};
+  return StaticVideoSource{video_info, frame, clip_impl, PClip(clip_impl), FrameSnapshot::capture(frame, video_info)};
 }
 
 StaticVideoSource make_y32_negative_source(AviSynthEnvironment& environment) {
@@ -66,15 +64,13 @@ StaticVideoSource make_y32_negative_source(AviSynthEnvironment& environment) {
   PVideoFrame frame = environment.get()->NewVideoFrame(video_info);
   fill_plane_full_pitch(frame, 0xa5, PLANAR_Y);
   auto* row = reinterpret_cast<float*>(frame->GetWritePtr(PLANAR_Y));
-  constexpr std::array<float, 8> kSamples{-1.0F,   -0.75F,   -0.5F,     -0.25F,
-                                          -0.125F, -0.0625F, -0.03125F, -0.015625F};
+  constexpr std::array<float, 8> kSamples{-1.0F, -0.75F, -0.5F, -0.25F, -0.125F, -0.0625F, -0.03125F, -0.015625F};
   for (int x = 0; x < video_info.width; ++x) {
     row[x] = kSamples[static_cast<std::size_t>(x)];
   }
 
   auto* clip_impl = new StaticFrameClip(video_info, frame);
-  return StaticVideoSource{video_info, frame, clip_impl, PClip(clip_impl),
-                           FrameSnapshot::capture(frame, video_info)};
+  return StaticVideoSource{video_info, frame, clip_impl, PClip(clip_impl), FrameSnapshot::capture(frame, video_info)};
 }
 
 StaticVideoSource make_rgbap8_source(AviSynthEnvironment& environment) {
@@ -91,25 +87,22 @@ StaticVideoSource make_rgbap8_source(AviSynthEnvironment& environment) {
   }
 
   auto* clip_impl = new StaticFrameClip(video_info, frame);
-  return StaticVideoSource{video_info, frame, clip_impl, PClip(clip_impl),
-                           FrameSnapshot::capture(frame, video_info)};
+  return StaticVideoSource{video_info, frame, clip_impl, PClip(clip_impl), FrameSnapshot::capture(frame, video_info)};
 }
 
 std::uint8_t y8_at(const PVideoFrame& frame, int x, int y) {
   return frame->GetReadPtr(PLANAR_Y)[static_cast<std::size_t>(y) * frame->GetPitch(PLANAR_Y) + x];
 }
 
-::testing::AssertionResult plane_has_value(const PVideoFrame& frame, int plane,
-                                           std::uint8_t expected, const char* operation) {
+::testing::AssertionResult plane_has_value(const PVideoFrame& frame, int plane, std::uint8_t expected,
+                                           const char* operation) {
   for (int y = 0; y < frame->GetHeight(plane); ++y) {
-    const auto* row =
-        frame->GetReadPtr(plane) + static_cast<std::size_t>(y) * frame->GetPitch(plane);
+    const auto* row = frame->GetReadPtr(plane) + static_cast<std::size_t>(y) * frame->GetPitch(plane);
     for (int x = 0; x < frame->GetRowSize(plane); ++x) {
       if (row[x] != expected) {
         return ::testing::AssertionFailure()
                << operation << " plane=" << plane << " row=" << y << " column=" << x
-               << " expected=" << static_cast<int>(expected)
-               << " actual=" << static_cast<int>(row[x]);
+               << " expected=" << static_cast<int>(expected) << " actual=" << static_cast<int>(row[x]);
       }
     }
   }
@@ -126,10 +119,8 @@ TEST(ExprRelativePixels, MatchesScalarPreviousRowBoundaryWithVectorC) {
   const StaticVideoSource source = make_y8_row_source(environment);
   const std::vector<PClip> children{source.clip};
   const std::vector<std::string> expressions{"x[0,-1]"};
-  Exprfilter scalar(children, expressions, nullptr, false, false, false, false, "none", 0, 0,
-                    environment.get());
-  Exprfilter vector_c(children, expressions, nullptr, false, false, false, true, "none", 0, 0,
-                      environment.get());
+  Exprfilter scalar(children, expressions, nullptr, false, false, false, false, "none", 0, 0, environment.get());
+  Exprfilter vector_c(children, expressions, nullptr, false, false, false, true, "none", 0, 0, environment.get());
 
   PVideoFrame scalar_output;
   PVideoFrame vector_output;
@@ -141,15 +132,13 @@ TEST(ExprRelativePixels, MatchesScalarPreviousRowBoundaryWithVectorC) {
   for (int y = 0; y < source.video_info.height; ++y) {
     for (int x = 0; x < source.video_info.width; ++x) {
       const std::uint8_t expected = static_cast<std::uint8_t>(20 + std::max(0, y - 1) * 40 + x);
-      ASSERT_EQ(y8_at(scalar_output, x, y), expected)
-          << "B10 scalar relative pixel row=" << y << " column=" << x;
-      ASSERT_EQ(y8_at(vector_output, x, y), expected)
-          << "B10 Vector-C relative pixel row=" << y << " column=" << x;
+      ASSERT_EQ(y8_at(scalar_output, x, y), expected) << "scalar relative pixel row=" << y << " column=" << x;
+      ASSERT_EQ(y8_at(vector_output, x, y), expected) << "Vector-C relative pixel row=" << y << " column=" << x;
     }
   }
   EXPECT_NE(scalar_output->CheckMemory(), 1);
   EXPECT_NE(vector_output->CheckMemory(), 1);
-  expect_source_unchanged(source, "B10 relative pixel addressing");
+  expect_source_unchanged(source, "relative pixel addressing");
 }
 
 TEST(ExprFormatOverride, PreservesRgbaPlaneOrderForProcessedYuvaOutput) {
@@ -157,17 +146,16 @@ TEST(ExprFormatOverride, PreservesRgbaPlaneOrderForProcessedYuvaOutput) {
   const StaticVideoSource source = make_rgbap8_source(environment);
   const std::vector<PClip> children{source.clip};
   const std::vector<std::string> expressions{"x 1 +", "x 1 +", "x 1 +", "x 1 +"};
-  Exprfilter filter(children, expressions, "YUVA444P8", false, false, false, false, "none", 0, 0,
-                    environment.get());
+  Exprfilter filter(children, expressions, "YUVA444P8", false, false, false, false, "none", 0, 0, environment.get());
 
   const PVideoFrame output = filter.GetFrame(0, environment.get());
   ASSERT_NE(output, nullptr);
-  ASSERT_TRUE(plane_has_value(output, PLANAR_Y, 18, "B10 processed RGBA to YUVA"));
-  ASSERT_TRUE(plane_has_value(output, PLANAR_U, 62, "B10 processed RGBA to YUVA"));
-  ASSERT_TRUE(plane_has_value(output, PLANAR_V, 150, "B10 processed RGBA to YUVA"));
-  ASSERT_TRUE(plane_has_value(output, PLANAR_A, 232, "B10 processed RGBA to YUVA"));
+  ASSERT_TRUE(plane_has_value(output, PLANAR_Y, 18, "processed RGBA to YUVA"));
+  ASSERT_TRUE(plane_has_value(output, PLANAR_U, 62, "processed RGBA to YUVA"));
+  ASSERT_TRUE(plane_has_value(output, PLANAR_V, 150, "processed RGBA to YUVA"));
+  ASSERT_TRUE(plane_has_value(output, PLANAR_A, 232, "processed RGBA to YUVA"));
   EXPECT_NE(output->CheckMemory(), 1);
-  expect_source_unchanged(source, "B10 processed RGBA to YUVA");
+  expect_source_unchanged(source, "processed RGBA to YUVA");
 }
 
 TEST(ExprFormatOverride, PreservesRgbaPlaneOrderForCopiedYuvaOutput) {
@@ -175,17 +163,16 @@ TEST(ExprFormatOverride, PreservesRgbaPlaneOrderForCopiedYuvaOutput) {
   const StaticVideoSource source = make_rgbap8_source(environment);
   const std::vector<PClip> children{source.clip};
   const std::vector<std::string> expressions{"", "", "", ""};
-  Exprfilter filter(children, expressions, "YUVA444P8", false, false, false, false, "none", 0, 0,
-                    environment.get());
+  Exprfilter filter(children, expressions, "YUVA444P8", false, false, false, false, "none", 0, 0, environment.get());
 
   const PVideoFrame output = filter.GetFrame(0, environment.get());
   ASSERT_NE(output, nullptr);
-  ASSERT_TRUE(plane_has_value(output, PLANAR_Y, 17, "B10 copied RGBA to YUVA"));
-  ASSERT_TRUE(plane_has_value(output, PLANAR_U, 61, "B10 copied RGBA to YUVA"));
-  ASSERT_TRUE(plane_has_value(output, PLANAR_V, 149, "B10 copied RGBA to YUVA"));
-  ASSERT_TRUE(plane_has_value(output, PLANAR_A, 231, "B10 copied RGBA to YUVA"));
+  ASSERT_TRUE(plane_has_value(output, PLANAR_Y, 17, "copied RGBA to YUVA"));
+  ASSERT_TRUE(plane_has_value(output, PLANAR_U, 61, "copied RGBA to YUVA"));
+  ASSERT_TRUE(plane_has_value(output, PLANAR_V, 149, "copied RGBA to YUVA"));
+  ASSERT_TRUE(plane_has_value(output, PLANAR_A, 231, "copied RGBA to YUVA"));
   EXPECT_NE(output->CheckMemory(), 1);
-  expect_source_unchanged(source, "B10 copied RGBA to YUVA");
+  expect_source_unchanged(source, "copied RGBA to YUVA");
 }
 
 TEST(ExprSqrt, ConstantNegativeInputMatchesRuntimeClamp) {
@@ -193,8 +180,7 @@ TEST(ExprSqrt, ConstantNegativeInputMatchesRuntimeClamp) {
   const StaticVideoSource source = make_y32_negative_source(environment);
   const std::vector<PClip> children{source.clip};
   const std::vector<std::string> expressions{"-1 sqrt"};
-  Exprfilter filter(children, expressions, nullptr, false, false, false, false,
-                    "none", 0, 0, environment.get());
+  Exprfilter filter(children, expressions, nullptr, false, false, false, false, "none", 0, 0, environment.get());
   const PVideoFrame output = filter.GetFrame(0, environment.get());
   const auto* row = reinterpret_cast<const float*>(output->GetReadPtr(PLANAR_Y));
   for (int x = 0; x < source.video_info.width; ++x)
@@ -205,16 +191,14 @@ TEST(ExprSqrt, ConstantNegativeInputMatchesRuntimeClamp) {
 TEST(ExprSqrt, ClampsNegativeFloatInputAcrossScalarAndSse2) {
   AviSynthEnvironment environment;
   if ((environment.get()->GetCPUFlags() & CPUF_SSE2) == 0) {
-    GTEST_SKIP() << "B10 Expr SSE2 JIT requires CPUF_SSE2";
+    GTEST_SKIP() << "Expr SSE2 JIT requires CPUF_SSE2";
   }
 
   const StaticVideoSource source = make_y32_negative_source(environment);
   const std::vector<PClip> children{source.clip};
   const std::vector<std::string> expressions{"x sqrt"};
-  Exprfilter scalar(children, expressions, nullptr, false, false, false, false, "none", 0, 0,
-                    environment.get());
-  Exprfilter sse2(children, expressions, nullptr, false, false, true, false, "none", 0, 0,
-                  environment.get());
+  Exprfilter scalar(children, expressions, nullptr, false, false, false, false, "none", 0, 0, environment.get());
+  Exprfilter sse2(children, expressions, nullptr, false, false, true, false, "none", 0, 0, environment.get());
 
   PVideoFrame scalar_output;
   PVideoFrame sse2_output;
@@ -225,14 +209,13 @@ TEST(ExprSqrt, ClampsNegativeFloatInputAcrossScalarAndSse2) {
   const auto* scalar_row = reinterpret_cast<const float*>(scalar_output->GetReadPtr(PLANAR_Y));
   const auto* sse2_row = reinterpret_cast<const float*>(sse2_output->GetReadPtr(PLANAR_Y));
   for (int x = 0; x < source.video_info.width; ++x) {
-    ASSERT_EQ(scalar_row[x], 0.0F) << "B10 scalar sqrt column=" << x;
-    ASSERT_EQ(sse2_row[x], 0.0F)
-        << "B10 SSE2 sqrt column=" << x << " value=" << sse2_row[x];
+    ASSERT_EQ(scalar_row[x], 0.0F) << "scalar sqrt column=" << x;
+    ASSERT_EQ(sse2_row[x], 0.0F) << "SSE2 sqrt column=" << x << " value=" << sse2_row[x];
   }
   EXPECT_NE(scalar_output->CheckMemory(), 1);
   EXPECT_NE(sse2_output->CheckMemory(), 1);
-  expect_source_unchanged(source, "B10 negative sqrt");
+  expect_source_unchanged(source, "negative sqrt");
 }
 
-}  // namespace
-}  // namespace avsut::test
+} // namespace
+} // namespace avsut::test

@@ -15,3 +15,5 @@ target_link_libraries(expr_filter_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(expr_filter_tests TEST_PREFIX "expr_filter.")
+
+target_sources(expr_filter_tests PRIVATE expr_boundary_tests.cpp)

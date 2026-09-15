@@ -51,3 +51,7 @@ add_executable(global_lock_tests global_lock_tests.cpp)
 target_link_libraries(global_lock_tests PRIVATE GTest::gtest_main AvsCoreExternal)
 gtest_discover_tests(global_lock_tests TEST_PREFIX "core."
   PROPERTIES TIMEOUT 15)
+
+target_sources(core_tests PRIVATE fps_validation_tests.cpp)
+
+target_sources(core_tests PRIVATE source_validation_tests.cpp)

@@ -12,3 +12,5 @@ target_link_libraries(limiter_filter_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(limiter_filter_tests TEST_PREFIX "limiter_filter.")
+
+target_sources(limiter_filter_tests PRIVATE limiter_validation_tests.cpp)

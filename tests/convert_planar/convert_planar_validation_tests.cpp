@@ -4,13 +4,13 @@
 
 #ifndef AVS_UNUSED
 #define AVS_UNUSED(x) (void)(x)
-#define AVSUT_FINDING_UNDEF_AVS_UNUSED
+#define AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #endif
 #include "convert/convert_planar.h"
 #include "core/parser/script.h"
-#ifdef AVSUT_FINDING_UNDEF_AVS_UNUSED
+#ifdef AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
-#undef AVSUT_FINDING_UNDEF_AVS_UNUSED
+#undef AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #endif
 
 #include "support/avisynth_environment.h"
@@ -33,36 +33,31 @@ void fill_active_plane(PVideoFrame& frame, int plane, T value) {
   ASSERT_EQ(row_size % static_cast<int>(sizeof(T)), 0);
   const int width = row_size / static_cast<int>(sizeof(T));
   for (int y = 0; y < frame->GetHeight(plane); ++y) {
-    auto* row = reinterpret_cast<T*>(frame->GetWritePtr(plane) +
-                                     static_cast<std::size_t>(y) * frame->GetPitch(plane));
+    auto* row = reinterpret_cast<T*>(frame->GetWritePtr(plane) + static_cast<std::size_t>(y) * frame->GetPitch(plane));
     std::fill(row, row + width, value);
   }
 }
 
 template <typename T>
-void expect_active_plane_value(const PVideoFrame& frame, int plane, T expected,
-                               const char* operation) {
+void expect_active_plane_value(const PVideoFrame& frame, int plane, T expected, const char* operation) {
   const int row_size = frame->GetRowSize(plane);
   ASSERT_EQ(row_size % static_cast<int>(sizeof(T)), 0);
   const int width = row_size / static_cast<int>(sizeof(T));
   for (int y = 0; y < frame->GetHeight(plane); ++y) {
-    const auto* row = reinterpret_cast<const T*>(
-        frame->GetReadPtr(plane) + static_cast<std::size_t>(y) * frame->GetPitch(plane));
+    const auto* row =
+        reinterpret_cast<const T*>(frame->GetReadPtr(plane) + static_cast<std::size_t>(y) * frame->GetPitch(plane));
     for (int x = 0; x < width; ++x) {
       if constexpr (std::is_same<T, float>::value) {
-        EXPECT_FLOAT_EQ(row[x], expected)
-            << operation << " plane=" << plane << " row=" << y << " column=" << x;
+        EXPECT_FLOAT_EQ(row[x], expected) << operation << " plane=" << plane << " row=" << y << " column=" << x;
       } else {
-        EXPECT_EQ(row[x], expected)
-            << operation << " plane=" << plane << " row=" << y << " column=" << x;
+        EXPECT_EQ(row[x], expected) << operation << " plane=" << plane << " row=" << y << " column=" << x;
       }
     }
   }
 }
 
 template <typename T>
-void verify_missing_yuv_alpha_becomes_opaque(int pixel_type, T y, T u, T v, T opaque,
-                                             const char* format_name) {
+void verify_missing_yuv_alpha_becomes_opaque(int pixel_type, T y, T u, T v, T opaque, const char* format_name) {
   AviSynthEnvironment environment;
   const auto vi = make_video_info(VideoInfoSpec{5, 3, pixel_type, 1, 25, 1});
   PVideoFrame source_frame = environment.get()->NewVideoFrame(vi);
@@ -80,32 +75,28 @@ void verify_missing_yuv_alpha_becomes_opaque(int pixel_type, T y, T u, T v, T op
   ASSERT_TRUE(converted->GetVideoInfo().IsPlanarRGBA()) << format_name;
   const PVideoFrame output = converted->GetFrame(0, environment.get());
   expect_active_plane_value(output, PLANAR_A, opaque, format_name);
-  EXPECT_EQ(FrameSnapshot::capture(source_frame, vi), source_before)
-      << format_name << " modified its source";
+  EXPECT_EQ(FrameSnapshot::capture(source_frame, vi), source_before) << format_name << " modified its source";
 }
 
 TEST(ConvertYuv444ToPlanarRgba, FillsMissingUint8AlphaWithFullOpacity) {
-  verify_missing_yuv_alpha_becomes_opaque<std::uint8_t>(VideoInfo::CS_YV24, 16, 128, 128, 255,
-                                                        "B2 Yuv444ToRgbap8");
+  verify_missing_yuv_alpha_becomes_opaque<std::uint8_t>(VideoInfo::CS_YV24, 16, 128, 128, 255, "Yuv444ToRgbap8");
 }
 
 TEST(ConvertYuv444ToPlanarRgba, FillsMissingUint16AlphaWithFullOpacity) {
-  verify_missing_yuv_alpha_becomes_opaque<std::uint16_t>(
-      VideoInfo::CS_YUV444P16, 4096, 32768, 32768, std::numeric_limits<std::uint16_t>::max(),
-      "B2 Yuv444ToRgbap16");
+  verify_missing_yuv_alpha_becomes_opaque<std::uint16_t>(VideoInfo::CS_YUV444P16, 4096, 32768, 32768,
+                                                         std::numeric_limits<std::uint16_t>::max(), "Yuv444ToRgbap16");
 }
 
 TEST(ConvertYuv444ToPlanarRgba, FillsMissingFloatAlphaWithFullOpacity) {
-  verify_missing_yuv_alpha_becomes_opaque<float>(VideoInfo::CS_YUV444PS, 0.5F, 0.0F, 0.0F, 1.0F,
-                                                 "B2 Yuv444ToRgbaps");
+  verify_missing_yuv_alpha_becomes_opaque<float>(VideoInfo::CS_YUV444PS, 0.5F, 0.0F, 0.0F, 1.0F, "Yuv444ToRgbaps");
 }
 
 void fill_float_pattern(PVideoFrame& frame, int plane, const std::array<float, 6>& pattern) {
   ASSERT_EQ(frame->GetRowSize(plane), 3 * static_cast<int>(sizeof(float)));
   ASSERT_EQ(frame->GetHeight(plane), 2);
   for (int y = 0; y < 2; ++y) {
-    auto* row = reinterpret_cast<float*>(frame->GetWritePtr(plane) +
-                                         static_cast<std::size_t>(y) * frame->GetPitch(plane));
+    auto* row =
+        reinterpret_cast<float*>(frame->GetWritePtr(plane) + static_cast<std::size_t>(y) * frame->GetPitch(plane));
     for (int x = 0; x < 3; ++x) {
       row[x] = pattern[static_cast<std::size_t>(y * 3 + x)];
     }
@@ -115,11 +106,11 @@ void fill_float_pattern(PVideoFrame& frame, int plane, const std::array<float, 6
 void expect_finite_float_plane(const PVideoFrame& frame, int plane, const char* operation) {
   const int width = frame->GetRowSize(plane) / static_cast<int>(sizeof(float));
   for (int y = 0; y < frame->GetHeight(plane); ++y) {
-    const auto* row = reinterpret_cast<const float*>(
-        frame->GetReadPtr(plane) + static_cast<std::size_t>(y) * frame->GetPitch(plane));
+    const auto* row =
+        reinterpret_cast<const float*>(frame->GetReadPtr(plane) + static_cast<std::size_t>(y) * frame->GetPitch(plane));
     for (int x = 0; x < width; ++x) {
-      EXPECT_TRUE(std::isfinite(row[x])) << operation << " plane=" << plane << " row=" << y
-                                         << " column=" << x << " value=" << row[x];
+      EXPECT_TRUE(std::isfinite(row[x])) << operation << " plane=" << plane << " row=" << y << " column=" << x
+                                         << " value=" << row[x];
     }
   }
 }
@@ -146,22 +137,21 @@ TEST(FloatPlanarMatrixConversion, PreservesFiniteNeutralRgbRoundTrip) {
   const PVideoFrame yuv_frame = yuv->GetFrame(0, environment.get());
   const PVideoFrame output = round_trip->GetFrame(0, environment.get());
   for (const int plane : {PLANAR_Y, PLANAR_U, PLANAR_V}) {
-    expect_finite_float_plane(yuv_frame, plane, "B2 RGBPS to YUV444PS");
+    expect_finite_float_plane(yuv_frame, plane, "RGBPS to YUV444PS");
   }
   for (const int plane : {PLANAR_G, PLANAR_B, PLANAR_R}) {
-    expect_finite_float_plane(output, plane, "B2 YUV444PS to RGBPS");
+    expect_finite_float_plane(output, plane, "YUV444PS to RGBPS");
     const auto* rows = reinterpret_cast<const float*>(output->GetReadPtr(plane));
     const int pitch_samples = output->GetPitch(plane) / static_cast<int>(sizeof(float));
     for (int y = 0; y < 2; ++y) {
       for (int x = 0; x < 3; ++x) {
         const float expected = kGreySamples[static_cast<std::size_t>(y * 3 + x)];
         EXPECT_NEAR(rows[y * pitch_samples + x], expected, 2.0e-5F)
-            << "B2 float RGB/YUV round trip plane=" << plane << " row=" << y << " column=" << x;
+            << "float RGB/YUV round trip plane=" << plane << " row=" << y << " column=" << x;
       }
     }
   }
-  EXPECT_EQ(FrameSnapshot::capture(source_frame, vi), source_before)
-      << "B2 float matrix conversion modified its source";
+  EXPECT_EQ(FrameSnapshot::capture(source_frame, vi), source_before) << "float matrix conversion modified its source";
 }
 
 TEST(AddAlphaPlane, FillsDefaultFloatAlphaWithFullOpacity) {
@@ -181,9 +171,8 @@ TEST(AddAlphaPlane, FillsDefaultFloatAlphaWithFullOpacity) {
 
   ASSERT_TRUE(with_alpha->GetVideoInfo().IsPlanarRGBA());
   const PVideoFrame output = with_alpha->GetFrame(0, environment.get());
-  expect_active_plane_value(output, PLANAR_A, 1.0F, "B2 AddAlphaPlane RGBPS default alpha");
-  EXPECT_EQ(FrameSnapshot::capture(source_frame, vi), source_before)
-      << "B2 AddAlphaPlane modified its source";
+  expect_active_plane_value(output, PLANAR_A, 1.0F, "AddAlphaPlane RGBPS default alpha");
+  EXPECT_EQ(FrameSnapshot::capture(source_frame, vi), source_before) << "AddAlphaPlane modified its source";
 }
 
 AVSValue script_generated_nan(IScriptEnvironment* environment) {
@@ -191,8 +180,7 @@ AVSValue script_generated_nan(IScriptEnvironment* environment) {
   return Sqrt(AVSValue(&negative_one, 1), nullptr, environment);
 }
 
-PClip create_add_alpha(PClip clip, const AVSValue& mask, const AVSValue& opacity,
-                       IScriptEnvironment* environment) {
+PClip create_add_alpha(PClip clip, const AVSValue& mask, const AVSValue& opacity, IScriptEnvironment* environment) {
   const AVSValue args[3] = {clip, mask, opacity};
   return AddAlphaPlane::Create(AVSValue(args, 3), nullptr, environment).AsClip();
 }
@@ -215,9 +203,8 @@ TEST(AddAlphaPlaneFactory, RejectsScriptGeneratedNanOpacityAndMask) {
 PClip create_interlaced_yuv420(PClip clip, IScriptEnvironment* environment) {
   const AVSValue args[11] = {clip,       true,       AVSValue(), AVSValue(), AVSValue(), AVSValue(),
                              AVSValue(), AVSValue(), AVSValue(), AVSValue(), AVSValue()};
-  return ConvertToPlanarGeneric::CreateYUV420(
-             AVSValue(args, 11), reinterpret_cast<void*>(static_cast<std::intptr_t>(1)),
-             environment)
+  return ConvertToPlanarGeneric::CreateYUV420(AVSValue(args, 11),
+                                              reinterpret_cast<void*>(static_cast<std::intptr_t>(1)), environment)
       .AsClip();
 }
 
@@ -233,8 +220,8 @@ TEST(ConvertToYuv420Factory, RejectsInterlacedHeightNotMultipleOfFour) {
 
   EXPECT_THROW(create_interlaced_yuv420(source, environment.get()), AvisynthError);
   EXPECT_EQ(FrameSnapshot::capture(source_frame, vi), source_before)
-      << "B2 interlaced factory construction modified its source";
+      << "interlaced factory construction modified its source";
 }
 
-}  // namespace
-}  // namespace avsut::test
+} // namespace
+} // namespace avsut::test

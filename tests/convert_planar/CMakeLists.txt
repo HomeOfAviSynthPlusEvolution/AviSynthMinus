@@ -17,3 +17,5 @@ target_link_libraries(convert_planar_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(convert_planar_tests TEST_PREFIX "convert_planar.")
+
+target_sources(convert_planar_tests PRIVATE convert_planar_validation_tests.cpp)

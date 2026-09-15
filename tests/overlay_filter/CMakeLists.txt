@@ -12,3 +12,5 @@ target_link_libraries(overlay_filter_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(overlay_filter_tests TEST_PREFIX "overlay_filter.")
+
+target_sources(overlay_filter_tests PRIVATE overlay_boundary_tests.cpp)

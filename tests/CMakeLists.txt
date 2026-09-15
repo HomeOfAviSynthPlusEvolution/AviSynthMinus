@@ -77,6 +77,7 @@ add_subdirectory(focus_filter)
 add_subdirectory(tweak_filter)
 add_subdirectory(rgbadjust_filter)
 add_subdirectory(expr_filter)
-add_subdirectory(findings)
+add_subdirectory(misc_filter)
+add_subdirectory(debug_filter)
 
 add_subdirectory(composite_api)

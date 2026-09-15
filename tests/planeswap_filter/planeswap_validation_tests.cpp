@@ -4,7 +4,7 @@
 
 #ifndef AVS_UNUSED
 #define AVS_UNUSED(x) (void)(x)
-#define AVSUT_FINDING_B4_UNDEF_AVS_UNUSED
+#define AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #endif
 #include "planes/swap_uv.h"
 using aif::filters::planes::SwapUV;
@@ -15,9 +15,9 @@ using aif::filters::planes::SwapYToUV;
 #include "planes/combine_planes.h"
 using aif::filters::planes::CombinePlanes;
 
-#ifdef AVSUT_FINDING_B4_UNDEF_AVS_UNUSED
+#ifdef AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
-#undef AVSUT_FINDING_B4_UNDEF_AVS_UNUSED
+#undef AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #endif
 
 #include "support/avisynth_environment.h"
@@ -102,35 +102,31 @@ TEST_P(YToUvConstruction, RejectsMismatchedComponentStorage) {
   }
 
   EXPECT_THROW(
-      {
-        SwapYToUV filter(u.clip, v.clip, y ? y->clip : PClip(), alpha ? alpha->clip : PClip(),
-                         environment.get());
-      },
+      { SwapYToUV filter(u.clip, v.clip, y ? y->clip : PClip(), alpha ? alpha->clip : PClip(), environment.get()); },
       AvisynthError)
-      << "B4 component storage=" << test_case.name;
+      << "component storage=" << test_case.name;
 
   EXPECT_EQ(FrameSnapshot::capture(u.frame, u.video_info), u.snapshot)
-      << "B4 component storage=" << test_case.name << " modified U source";
+      << "component storage=" << test_case.name << " modified U source";
   EXPECT_EQ(FrameSnapshot::capture(v.frame, v.video_info), v.snapshot)
-      << "B4 component storage=" << test_case.name << " modified V source";
+      << "component storage=" << test_case.name << " modified V source";
   if (y) {
     EXPECT_EQ(FrameSnapshot::capture(y->frame, y->video_info), y->snapshot)
-        << "B4 component storage=" << test_case.name << " modified Y source";
+        << "component storage=" << test_case.name << " modified Y source";
   }
   if (alpha) {
     EXPECT_EQ(FrameSnapshot::capture(alpha->frame, alpha->video_info), alpha->snapshot)
-        << "B4 component storage=" << test_case.name << " modified alpha source";
+        << "component storage=" << test_case.name << " modified alpha source";
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    B4, YToUvConstruction,
-    ::testing::Values(ComponentStorageCase{"V16BitWithU8Bit", VideoInfo::CS_Y16, 0, 0},
-                      ComponentStorageCase{"Y16BitWithU8Chroma", VideoInfo::CS_Y8,
-                                           VideoInfo::CS_Y16, 0},
-                      ComponentStorageCase{"PackedRgb32Alpha", VideoInfo::CS_Y8, VideoInfo::CS_Y8,
-                                           VideoInfo::CS_BGR32}),
-    [](const ::testing::TestParamInfo<ComponentStorageCase>& info) { return info.param.name; });
+INSTANTIATE_TEST_SUITE_P(BoundaryCases, YToUvConstruction,
+                         ::testing::Values(ComponentStorageCase{"V16BitWithU8Bit", VideoInfo::CS_Y16, 0, 0},
+                                           ComponentStorageCase{"Y16BitWithU8Chroma", VideoInfo::CS_Y8,
+                                                                VideoInfo::CS_Y16, 0},
+                                           ComponentStorageCase{"PackedRgb32Alpha", VideoInfo::CS_Y8, VideoInfo::CS_Y8,
+                                                                VideoInfo::CS_BGR32}),
+                         [](const ::testing::TestParamInfo<ComponentStorageCase>& info) { return info.param.name; });
 
-}  // namespace
-}  // namespace avsut::test
+} // namespace
+} // namespace avsut::test

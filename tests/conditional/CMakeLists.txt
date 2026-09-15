@@ -1,3 +1,8 @@
+add_executable(conditional_filter_tests conditional_filter_tests.cpp)
+target_link_libraries(conditional_filter_tests PRIVATE GTest::gtest_main AvsCoreExternal)
+include(GoogleTest)
+gtest_discover_tests(conditional_filter_tests TEST_PREFIX "conditional_filter.")
+
 # Direct x86 kernel tests require the matching AvsCore implementations.
 if(NOT ENABLE_INTEL_SIMD)
   return()

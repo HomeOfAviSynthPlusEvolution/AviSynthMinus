@@ -12,3 +12,5 @@ target_link_libraries(histogram_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(histogram_tests TEST_PREFIX "histogram.")
+
+target_sources(histogram_tests PRIVATE histogram_validation_tests.cpp)

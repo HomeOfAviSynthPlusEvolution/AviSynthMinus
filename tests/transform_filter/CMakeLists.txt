@@ -12,3 +12,5 @@ target_link_libraries(transform_filter_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(transform_filter_tests TEST_PREFIX "transform_filter.")
+
+target_sources(transform_filter_tests PRIVATE stack_alpha_tests.cpp)

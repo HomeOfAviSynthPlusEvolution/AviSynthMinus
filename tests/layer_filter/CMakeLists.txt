@@ -12,3 +12,5 @@ target_link_libraries(layer_filter_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(layer_filter_tests TEST_PREFIX "layer_filter.")
+
+target_sources(layer_filter_tests PRIVATE layer_boundary_tests.cpp)

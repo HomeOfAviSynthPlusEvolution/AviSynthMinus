@@ -185,6 +185,8 @@ TEST(DepthProperties, SourceRangeSelectionIsLocalToEachRequestedFrame) {
         set_frame_property_int(env, f, "_ColorRange", n);
       frames.push_back(f);
     }
+    std::vector<FrameSnapshot> before;
+    for (const auto& frame : frames) before.push_back(FrameSnapshot::capture(frame, vi));
     const PClip source = new FrameSequenceClip(vi, frames);
     const AVSValue args[] = {source, 10, false};
     const char* names[] = {nullptr, "bits", "fulld"};
@@ -194,6 +196,8 @@ TEST(DepthProperties, SourceRangeSelectionIsLocalToEachRequestedFrame) {
       EXPECT_EQ(Read(f, PLANAR_Y, 0, 0, 10), n == 0 ? 119 : 64);
       EXPECT_EQ(env->propGetInt(env->getFramePropsRO(f), "_ColorRange", 0, nullptr), 1);
     }
+    for (size_t i = 0; i < frames.size(); ++i)
+      EXPECT_EQ(FrameSnapshot::capture(frames[i], vi), before[i]);
     EXPECT_EQ(env->propGetInt(env->getFramePropsRO(frames[0]), "_ColorRange", 0, nullptr), 0);
     EXPECT_EQ(env->propNumElements(env->getFramePropsRO(frames[2]), "_ColorRange"), -1);
   }

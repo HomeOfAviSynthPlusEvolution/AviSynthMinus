@@ -12,3 +12,5 @@ target_link_libraries(merge_filter_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(merge_filter_tests TEST_PREFIX "merge_filter.")
+
+target_sources(merge_filter_tests PRIVATE merge_validation_tests.cpp)

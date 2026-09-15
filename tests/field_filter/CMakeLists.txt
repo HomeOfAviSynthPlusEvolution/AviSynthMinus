@@ -12,3 +12,5 @@ target_link_libraries(field_filter_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(field_filter_tests TEST_PREFIX "field_filter.")
+
+target_sources(field_filter_tests PRIVATE field_validation_tests.cpp)

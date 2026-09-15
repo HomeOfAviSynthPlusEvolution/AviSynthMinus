@@ -12,3 +12,5 @@ target_link_libraries(planeswap_filter_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(planeswap_filter_tests TEST_PREFIX "planeswap_filter.")
+
+target_sources(planeswap_filter_tests PRIVATE planeswap_validation_tests.cpp)

@@ -12,3 +12,5 @@ target_link_libraries(convolution_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(convolution_tests TEST_PREFIX "convolution.")
+
+target_sources(convolution_tests PRIVATE convolution_validation_tests.cpp)

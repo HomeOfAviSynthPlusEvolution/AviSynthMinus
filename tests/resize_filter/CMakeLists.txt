@@ -12,3 +12,5 @@ target_link_libraries(resize_filter_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(resize_filter_tests TEST_PREFIX "resize_filter.")
+
+target_sources(resize_filter_tests PRIVATE resize_validation_tests.cpp)

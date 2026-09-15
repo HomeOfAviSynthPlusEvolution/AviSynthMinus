@@ -12,3 +12,5 @@ target_link_libraries(focus_filter_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(focus_filter_tests TEST_PREFIX "focus_filter.")
+
+target_sources(focus_filter_tests PRIVATE focus_validation_tests.cpp)

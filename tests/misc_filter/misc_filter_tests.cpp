@@ -4,12 +4,12 @@
 
 #ifndef AVS_UNUSED
 #define AVS_UNUSED(x) (void)(x)
-#define AVSUT_FINDING_B11_MISC_UNDEF_AVS_UNUSED
+#define AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #endif
 #include "filters/misc.h"
-#ifdef AVSUT_FINDING_B11_MISC_UNDEF_AVS_UNUSED
+#ifdef AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
-#undef AVSUT_FINDING_B11_MISC_UNDEF_AVS_UNUSED
+#undef AVSUT_LOCAL_UNDEF_AVS_UNUSED
 #endif
 
 #include "support/avisynth_environment.h"
@@ -31,8 +31,7 @@ struct Yuy2Source {
 };
 
 Yuy2Source make_yuy2_source(AviSynthEnvironment& environment, int frame_count) {
-  const VideoInfo video_info =
-      make_video_info(VideoInfoSpec{8, 4, VideoInfo::CS_YUY2, frame_count, 25, 1});
+  const VideoInfo video_info = make_video_info(VideoInfoSpec{8, 4, VideoInfo::CS_YUY2, frame_count, 25, 1});
   std::vector<PVideoFrame> frames;
   std::vector<FrameSnapshot> snapshots;
   frames.reserve(static_cast<std::size_t>(frame_count));
@@ -44,15 +43,13 @@ Yuy2Source make_yuy2_source(AviSynthEnvironment& environment, int frame_count) {
     frames.push_back(frame);
   }
   auto* clip_impl = new FrameSequenceClip(video_info, frames);
-  return Yuy2Source{video_info, std::move(frames), clip_impl, PClip(clip_impl),
-                    std::move(snapshots)};
+  return Yuy2Source{video_info, std::move(frames), clip_impl, PClip(clip_impl), std::move(snapshots)};
 }
 
 void expect_source_unchanged(const Yuy2Source& source, const char* operation) {
   ASSERT_EQ(source.frames.size(), source.snapshots.size());
   for (std::size_t index = 0; index < source.frames.size(); ++index) {
-    EXPECT_EQ(FrameSnapshot::capture(source.frames[index], source.video_info),
-              source.snapshots[index])
+    EXPECT_EQ(FrameSnapshot::capture(source.frames[index], source.video_info), source.snapshots[index])
         << operation << " modified source frame=" << index;
   }
 }
@@ -61,12 +58,9 @@ TEST(FixLuminanceConstruction, RejectsZeroSlopeBeforeFrameEvaluation) {
   AviSynthEnvironment environment;
   const Yuy2Source source = make_yuy2_source(environment, 1);
 
-  EXPECT_THROW(
-      { FixLuminance filter(source.clip, 1, 0, environment.get()); }, AvisynthError)
-      << "B11 FixLuminance slope=0";
-  EXPECT_TRUE(source.clip_impl->frame_requests().empty())
-      << "B11 FixLuminance requested a frame during construction";
-  expect_source_unchanged(source, "B11 FixLuminance");
+  EXPECT_THROW({ FixLuminance filter(source.clip, 1, 0, environment.get()); }, AvisynthError) << "FixLuminance slope=0";
+  EXPECT_TRUE(source.clip_impl->frame_requests().empty()) << "FixLuminance requested a frame during construction";
+  expect_source_unchanged(source, "FixLuminance");
 }
 
 TEST(PeculiarBlend, ServesLastAdvertisedFrameWithoutOutOfRangeChildRequest) {
@@ -79,11 +73,10 @@ TEST(PeculiarBlend, ServesLastAdvertisedFrameWithoutOutOfRangeChildRequest) {
   ASSERT_NE(output, nullptr);
   for (const int request : source.clip_impl->frame_requests()) {
     EXPECT_GE(request, 0);
-    EXPECT_LT(request, source.video_info.num_frames)
-        << "B11 PeculiarBlend requested a frame past its advertised range";
+    EXPECT_LT(request, source.video_info.num_frames) << "PeculiarBlend requested a frame past its advertised range";
   }
   EXPECT_NE(output->CheckMemory(), 1);
-  expect_source_unchanged(source, "B11 PeculiarBlend");
+  expect_source_unchanged(source, "PeculiarBlend");
 }
 
 TEST(SkewRowsConstruction, RejectsNegativeOutputWidth) {
@@ -97,12 +90,10 @@ TEST(SkewRowsConstruction, RejectsNegativeOutputWidth) {
 
   EXPECT_THROW(
       { SkewRows filter(source, -video_info.width - 1, environment.get()); }, AvisynthError)
-      << "B11 SkewRows width=" << video_info.width << " skew=" << -video_info.width - 1;
-  EXPECT_TRUE(clip_impl->frame_requests().empty())
-      << "B11 SkewRows requested a frame during construction";
-  EXPECT_EQ(FrameSnapshot::capture(frame, video_info), snapshot)
-      << "B11 SkewRows modified its source during construction";
+      << "SkewRows width=" << video_info.width << " skew=" << -video_info.width - 1;
+  EXPECT_TRUE(clip_impl->frame_requests().empty()) << "SkewRows requested a frame during construction";
+  EXPECT_EQ(FrameSnapshot::capture(frame, video_info), snapshot) << "SkewRows modified its source during construction";
 }
 
-}  // namespace
-}  // namespace avsut::test
+} // namespace
+} // namespace avsut::test

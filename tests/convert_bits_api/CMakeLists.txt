@@ -8,3 +8,5 @@ gtest_discover_tests(convert_bits_api_tests TEST_PREFIX "convert_bits_api." NO_P
 target_compile_definitions(convert_bits_api_tests PRIVATE
   ORDERED_FIXTURE="${PROJECT_SOURCE_DIR}/third_party/video_convert/tests/fixtures/dither/corrected-c.txt"
   FLOYD_FIXTURE="${PROJECT_SOURCE_DIR}/third_party/video_convert/tests/fixtures/dither/floyd-upstream-c.txt")
+
+target_sources(convert_bits_api_tests PRIVATE convert_bits_validation_tests.cpp)
