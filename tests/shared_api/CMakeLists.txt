@@ -32,4 +32,5 @@ if(WIN32)
 endif()
 enable_testing()
 include(GoogleTest)
-gtest_discover_tests(shared_api_tests TEST_PREFIX "shared_api.")
+# Allow DLL startup and parameterized test enumeration on busy CI runners.
+gtest_discover_tests(shared_api_tests TEST_PREFIX "shared_api." DISCOVERY_TIMEOUT 30)
