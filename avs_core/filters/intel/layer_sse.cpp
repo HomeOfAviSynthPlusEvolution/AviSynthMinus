@@ -92,7 +92,13 @@ void mask_sse2(BYTE* srcp, const BYTE* alphap, int src_pitch, int alpha_pitch, s
       _mm_store_si128(reinterpret_cast<__m128i*>(srcp + x), result);
     }
 
-    if (width_mod16 < width_bytes) {
+    if (width_bytes < 16) {
+      // A full vector ending at the row end would access bytes before the row.
+      for (size_t x = 0; x < width_bytes; x += 4) {
+        srcp[x + 3] = (cyb * alphap[x] + cyg * alphap[x + 1] + cyr * alphap[x + 2] + 16384) >> 15;
+      }
+    }
+    else if (width_mod16 < width_bytes) {
       __m128i src = _mm_loadu_si128(reinterpret_cast<const __m128i*>(srcp + width_bytes - 16));
       __m128i alpha = _mm_loadu_si128(reinterpret_cast<const __m128i*>(alphap + width_bytes - 16));
       __m128i result = mask_core_sse2(src, alpha, not_alpha_mask, zero, matrix, round_mask);

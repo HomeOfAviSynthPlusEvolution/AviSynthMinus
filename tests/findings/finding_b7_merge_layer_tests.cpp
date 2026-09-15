@@ -9,6 +9,9 @@
 #include "core/parser/script.h"
 #include "filters/layer.h"
 #include "filters/merge.h"
+#ifdef INTEL_INTRINSICS
+#include "filters/intel/layer_sse.h"
+#endif
 #ifdef AVSUT_FINDING_B7_UNDEF_AVS_UNUSED
 #undef AVS_UNUSED
 #undef AVSUT_FINDING_B7_UNDEF_AVS_UNUSED
@@ -311,6 +314,45 @@ INSTANTIATE_TEST_SUITE_P(B7, LayerThresholdConstruction,
                          });
 
 class MaskRgb32NarrowRows : public ::testing::TestWithParam<int> {};
+
+#ifdef INTEL_INTRINSICS
+TEST(MaskRgb32Sse2, PreservesGuardsAndPaddingAroundVectorBoundaries) {
+  AviSynthEnvironment environment;
+  if (!(environment.get()->GetCPUFlags() & CPUF_SSE2)) {
+    GTEST_SKIP() << "SSE2 is unavailable";
+  }
+  constexpr int kGuard = 16;
+  constexpr int kSourcePitch = 48;
+  constexpr int kMaskPitch = 64;
+  constexpr int kHeight = 3;
+  for (int width = 1; width <= 9; ++width) {
+    SCOPED_TRACE(width);
+    alignas(16) std::array<std::uint8_t, kGuard + kSourcePitch * kHeight + kGuard> source;
+    alignas(16) std::array<std::uint8_t, kGuard + kMaskPitch * kHeight + kGuard> mask;
+    source.fill(0x5a);
+    mask.fill(0xa5);
+    for (int y = 0; y < kHeight; ++y) {
+      for (int x = 0; x < width * 4; ++x) {
+        source[kGuard + y * kSourcePitch + x] = static_cast<std::uint8_t>(17 * x + 31 * y);
+        mask[kGuard + y * kMaskPitch + x] = static_cast<std::uint8_t>(43 * x + 59 * y);
+      }
+    }
+    auto expected = source;
+    const auto original_mask = mask;
+    for (int y = 0; y < kHeight; ++y) {
+      for (int x = 0; x < width; ++x) {
+        const auto* pixel = mask.data() + kGuard + y * kMaskPitch + 4 * x;
+        expected[kGuard + y * kSourcePitch + 4 * x + 3] = static_cast<std::uint8_t>(
+            (3736 * pixel[0] + 19234 * pixel[1] + 9798 * pixel[2] + 16384) >> 15);
+      }
+    }
+    mask_sse2(source.data() + kGuard, mask.data() + kGuard,
+              kSourcePitch, kMaskPitch, width, kHeight);
+    EXPECT_EQ(source, expected);
+    EXPECT_EQ(mask, original_mask);
+  }
+}
+#endif
 
 TEST_P(MaskRgb32NarrowRows, HandlesRowsShorterThanOneVector) {
   const int width = GetParam();
