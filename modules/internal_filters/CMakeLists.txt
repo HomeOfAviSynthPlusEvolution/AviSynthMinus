@@ -1,4 +1,5 @@
 add_library(AvsInternalFilters STATIC registration.cpp)
+add_dependencies(AvsInternalFilters VersionGen)
 set_target_properties(AvsInternalFilters PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(AvsInternalFilters PUBLIC cxx_std_17)
 target_compile_definitions(AvsInternalFilters PRIVATE BUILDING_AVSCORE)

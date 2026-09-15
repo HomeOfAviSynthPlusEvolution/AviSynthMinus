@@ -1,5 +1,6 @@
 # Historical kernels are reference-test dependencies only, never AvsCore inputs.
 add_library(AvsInternalFilterReferences STATIC turn.cpp)
+add_dependencies(AvsInternalFilterReferences VersionGen)
 target_compile_definitions(AvsInternalFilterReferences PRIVATE BUILDING_AVSCORE AVS_STATIC_LIB)
 target_include_directories(AvsInternalFilterReferences PRIVATE "${CMAKE_SOURCE_DIR}/avs_core"
   "${CMAKE_SOURCE_DIR}/avs_core/include" "${CMAKE_BINARY_DIR}/avs_core")
