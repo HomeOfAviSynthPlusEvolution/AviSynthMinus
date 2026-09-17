@@ -19,7 +19,7 @@ target_link_libraries(convert_matrix_tests PRIVATE
 include(GoogleTest)
 gtest_discover_tests(convert_matrix_tests TEST_PREFIX "convert_matrix.")
 
-# Match VideoConvert's separate multiply/add rounding in the frozen pixel oracle.
+# Match VideoConvert's separate multiply/add rounding when applying the fixed reference coefficients.
 # A fused reference can differ by one ULP even when the kernel is correct.
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
   if(MSVC)

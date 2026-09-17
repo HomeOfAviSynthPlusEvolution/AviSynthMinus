@@ -1,8 +1,3 @@
-# Direct x86 kernel tests require the matching AvsCore implementations.
-if(NOT ENABLE_INTEL_SIMD)
-  return()
-endif()
-
 add_executable(focus_tests
   focus_tests.cpp
   temporal_soften_tests.cpp
@@ -17,7 +12,7 @@ target_include_directories(focus_tests PRIVATE
 target_link_libraries(focus_tests PRIVATE
   GTest::gtest_main
   AvsCoreExternal
-  AvsInternalFilterReferences
+  AvsFilters::FocusKernels
 )
 
 include(GoogleTest)

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "filters/conditional/intel/conditional_functions_sse.h"
-#include "reference/internal_filters/intel/focus_sse.h"
+#include "filters/conditional/intel/sad_sse2.h"
 
 #include "support/guarded_video_buffer.h"
 #include "support/variant_registry.h"
@@ -24,7 +24,7 @@
 namespace avsut::test {
 
 using SumFunction = double (*)(const std::uint8_t*, std::size_t, std::size_t, std::size_t);
-using SadIntFunction = int (*)(const BYTE*, const BYTE*, int, int, std::size_t, std::size_t);
+using SadIntFunction = int64_t (*)(const BYTE*, const BYTE*, int, int, std::size_t, std::size_t);
 using SadWideFunction = std::int64_t (*)(const BYTE*, const BYTE*, int, int, std::size_t,
                                          std::size_t);
 

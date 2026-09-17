@@ -1,13 +1,7 @@
 #pragma once
 
-#include "reference/internal_filters/intel/limiter_sse.h"
-
-#include "support/comparators.h"
-#include "support/guarded_video_buffer.h"
-#include "support/stable_hash.h"
-#include "support/variant_registry.h"
-
 #include <gtest/gtest.h>
+#include <limiter/kernel.h>
 
 #include <algorithm>
 #include <array>
@@ -18,10 +12,12 @@
 #include <string>
 #include <utility>
 
-namespace avsut::test {
+#include "support/comparators.h"
+#include "support/guarded_video_buffer.h"
+#include "support/kernel_cpu_profiles.h"
+#include "support/stable_hash.h"
 
-using Limiter8FuncPtr = void (*)(BYTE*, int, int, int, int, int);
-using Limiter16FuncPtr = void (*)(BYTE*, unsigned int, unsigned int, int, int);
+namespace avsut::test {
 
 struct Limiter8Case {
   std::size_t width_pixels{};
@@ -29,8 +25,7 @@ struct Limiter8Case {
   std::size_t pitch_bytes{};
   std::uint8_t min_value{};
   std::uint8_t max_value{};
-  Limiter8FuncPtr function{};
-  Variant<Limiter8FuncPtr> variant;
+  KernelCpuProfile variant;
   std::string expected_hash;
   std::string name;
 };
@@ -41,14 +36,12 @@ struct Limiter16Case {
   std::size_t pitch_bytes{};
   std::uint16_t min_value{};
   std::uint16_t max_value{};
-  Limiter16FuncPtr function{};
-  Variant<Limiter16FuncPtr> variant;
+  KernelCpuProfile variant;
   std::string expected_hash;
   std::string name;
 };
 
-template <typename Function>
-inline std::string limiter_variant_name(const Variant<Function>& variant) {
+inline std::string limiter_variant_name(const KernelCpuProfile& variant) {
   std::string result = "Variant";
   bool capitalize = true;
   for (const char character : variant.name) {
@@ -65,21 +58,18 @@ inline std::string limiter_variant_name(const Variant<Function>& variant) {
 }
 
 inline std::string limiter8_case_name(std::size_t width_pixels, std::size_t height_pixels,
-                                      std::size_t pitch_bytes, std::uint8_t min_value,
-                                      std::uint8_t max_value,
-                                      const Variant<Limiter8FuncPtr>& variant) {
+                                      std::size_t pitch_bytes, std::uint8_t min_value, std::uint8_t max_value,
+                                      const KernelCpuProfile& variant) {
   std::ostringstream stream;
   stream << "Plane8_Width" << width_pixels << "_Height" << height_pixels << "_Pitch" << pitch_bytes
-         << "_Range" << static_cast<unsigned int>(min_value) << "To"
-         << static_cast<unsigned int>(max_value) << "_PatternBoundaryValues_"
-         << limiter_variant_name(variant);
+         << "_Range" << static_cast<unsigned int>(min_value) << "To" << static_cast<unsigned int>(max_value)
+         << "_PatternBoundaryValues_" << limiter_variant_name(variant);
   return stream.str();
 }
 
 inline std::string limiter16_case_name(std::size_t width_pixels, std::size_t height_pixels,
                                        std::size_t pitch_bytes, std::uint16_t min_value,
-                                       std::uint16_t max_value,
-                                       const Variant<Limiter16FuncPtr>& variant) {
+                                       std::uint16_t max_value, const KernelCpuProfile& variant) {
   std::ostringstream stream;
   stream << "Plane16_Width" << width_pixels << "_Height" << height_pixels << "_Pitch" << pitch_bytes
          << "_Range" << min_value << "To" << max_value << "_PatternBoundaryValues_"
@@ -89,15 +79,14 @@ inline std::string limiter16_case_name(std::size_t width_pixels, std::size_t hei
 
 inline Limiter8Case make_limiter8_case(std::size_t width_pixels, std::size_t height_pixels,
                                        std::size_t pitch_bytes, std::uint8_t min_value,
-                                       std::uint8_t max_value, Limiter8FuncPtr function,
-                                       Variant<Limiter8FuncPtr> variant,
+                                       std::uint8_t max_value, KernelCpuProfile variant,
                                        std::string expected_hash = {}) {
   Limiter8Case result{width_pixels,
                       height_pixels,
                       pitch_bytes,
                       min_value,
                       max_value,
-                      function,
+
                       std::move(variant),
                       std::move(expected_hash),
                       {}};
@@ -108,15 +97,14 @@ inline Limiter8Case make_limiter8_case(std::size_t width_pixels, std::size_t hei
 
 inline Limiter16Case make_limiter16_case(std::size_t width_pixels, std::size_t height_pixels,
                                          std::size_t pitch_bytes, std::uint16_t min_value,
-                                         std::uint16_t max_value, Limiter16FuncPtr function,
-                                         Variant<Limiter16FuncPtr> variant,
+                                         std::uint16_t max_value, KernelCpuProfile variant,
                                          std::string expected_hash = {}) {
   Limiter16Case result{width_pixels,
                        height_pixels,
                        pitch_bytes,
                        min_value,
                        max_value,
-                       function,
+
                        std::move(variant),
                        std::move(expected_hash),
                        {}};
@@ -125,13 +113,9 @@ inline Limiter16Case make_limiter16_case(std::size_t width_pixels, std::size_t h
   return result;
 }
 
-inline void PrintTo(const Limiter8Case& test_case, std::ostream* stream) {
-  *stream << test_case.name;
-}
+inline void PrintTo(const Limiter8Case& test_case, std::ostream* stream) { *stream << test_case.name; }
 
-inline void PrintTo(const Limiter16Case& test_case, std::ostream* stream) {
-  *stream << test_case.name;
-}
+inline void PrintTo(const Limiter16Case& test_case, std::ostream* stream) { *stream << test_case.name; }
 
 inline void fill_limiter8_input(PlaneView<std::uint8_t> view, std::uint8_t min_value,
                                 std::uint8_t max_value) {
@@ -191,10 +175,6 @@ void apply_limiter_reference(PlaneView<T> view, T min_value, T max_value) {
   }
 }
 
-inline int pack_byte_limit(std::uint8_t value) {
-  return static_cast<int>(value) | (static_cast<int>(value) << 8);
-}
-
 inline void run_limiter8_case(const Limiter8Case& test_case) {
   GuardedVideoBuffer<std::uint8_t> actual(test_case.width_pixels, test_case.height_pixels,
                                           test_case.pitch_bytes, 32);
@@ -205,10 +185,12 @@ inline void run_limiter8_case(const Limiter8Case& test_case) {
   copy_active_values(actual.view().as_const(), expected.view());
   apply_limiter_reference(expected.view(), test_case.min_value, test_case.max_value);
 
-  test_case.function(
-      reinterpret_cast<BYTE*>(actual.view().data()), pack_byte_limit(test_case.min_value),
-      pack_byte_limit(test_case.max_value), static_cast<int>(actual.view().pitch_bytes()),
-      static_cast<int>(actual.view().active_row_bytes()), static_cast<int>(actual.view().height()));
+  const aif_limiter_limits limits{float(test_case.min_value), float(test_case.max_value), 0, 0, 8};
+  ASSERT_EQ(
+      aif_limiter_apply(reinterpret_cast<uint8_t*>(actual.view().data()),
+                        static_cast<int>(test_case.pitch_bytes), static_cast<int>(test_case.width_pixels),
+                        static_cast<int>(test_case.height_pixels), &limits, 0, 0, test_case.variant.cpu),
+      0);
 
   EXPECT_TRUE(compare_exact(expected.view().as_const(), actual.view().as_const()))
       << test_case.name << " reference mismatch for variant " << test_case.variant.name;
@@ -217,12 +199,8 @@ inline void run_limiter8_case(const Limiter8Case& test_case) {
         << test_case.name << " stable output hash mismatch";
   }
   EXPECT_TRUE(actual.guards_intact()) << test_case.name << " allocation guards were corrupted";
-  if (!actual.padding_intact()) {
-    GTEST_LOG_(INFO) << test_case.name << " output padding was modified by the full-pitch "
-                      << test_case.variant.name << " implementation";
-  }
-  EXPECT_TRUE(expected.memory_intact())
-      << test_case.name << " reference padding or guards were corrupted";
+  EXPECT_TRUE(actual.padding_intact());
+  EXPECT_TRUE(expected.memory_intact()) << test_case.name << " reference padding or guards were corrupted";
 }
 
 inline void run_limiter16_case(const Limiter16Case& test_case) {
@@ -235,9 +213,12 @@ inline void run_limiter16_case(const Limiter16Case& test_case) {
   copy_active_values(actual.view().as_const(), expected.view());
   apply_limiter_reference(expected.view(), test_case.min_value, test_case.max_value);
 
-  test_case.function(reinterpret_cast<BYTE*>(actual.view().data()), test_case.min_value,
-                     test_case.max_value, static_cast<int>(actual.view().pitch_bytes()),
-                     static_cast<int>(actual.view().height()));
+  const aif_limiter_limits limits{float(test_case.min_value), float(test_case.max_value), 0, 0, 16};
+  ASSERT_EQ(
+      aif_limiter_apply(reinterpret_cast<uint8_t*>(actual.view().data()),
+                        static_cast<int>(test_case.pitch_bytes), static_cast<int>(test_case.width_pixels),
+                        static_cast<int>(test_case.height_pixels), &limits, 0, 0, test_case.variant.cpu),
+      0);
 
   EXPECT_TRUE(compare_exact(expected.view().as_const(), actual.view().as_const()))
       << test_case.name << " reference mismatch for variant " << test_case.variant.name;
@@ -246,12 +227,8 @@ inline void run_limiter16_case(const Limiter16Case& test_case) {
         << test_case.name << " stable output hash mismatch";
   }
   EXPECT_TRUE(actual.guards_intact()) << test_case.name << " allocation guards were corrupted";
-  if (!actual.padding_intact()) {
-    GTEST_LOG_(INFO) << test_case.name << " output padding was modified by the full-pitch "
-                      << test_case.variant.name << " implementation";
-  }
-  EXPECT_TRUE(expected.memory_intact())
-      << test_case.name << " reference padding or guards were corrupted";
+  EXPECT_TRUE(actual.padding_intact());
+  EXPECT_TRUE(expected.memory_intact()) << test_case.name << " reference padding or guards were corrupted";
 }
 
 }  // namespace avsut::test

@@ -23,17 +23,17 @@ std::vector<SadIntCase> sad_int_cases() {
   return {
       make_sad_int_case(
           "Plane8", false, 37, 5, 64, 80,
-          Variant<SadIntFunction>{"sse2", calculate_sad_sse2<false>, IsaRequirement::Sse2}),
+          Variant<SadIntFunction>{"sse2", calculate_sad_8_or_16_sse2<uint8_t, false>, IsaRequirement::Sse2}),
       make_sad_int_case(
           "Plane8", false, 53, 7, 96, 112,
-          Variant<SadIntFunction>{"sse2", calculate_sad_sse2<false>, IsaRequirement::Sse2},
+          Variant<SadIntFunction>{"sse2", calculate_sad_8_or_16_sse2<uint8_t, false>, IsaRequirement::Sse2},
           0xF30E5302U),
       make_sad_int_case(
           "PackedRgb32", true, 32, 5, 64, 80,
-          Variant<SadIntFunction>{"sse2", calculate_sad_sse2<true>, IsaRequirement::Sse2}),
+          Variant<SadIntFunction>{"sse2", calculate_sad_8_or_16_sse2<uint8_t, true>, IsaRequirement::Sse2}),
       make_sad_int_case(
           "PackedRgb32", true, 44, 7, 96, 112,
-          Variant<SadIntFunction>{"sse2", calculate_sad_sse2<true>, IsaRequirement::Sse2},
+          Variant<SadIntFunction>{"sse2", calculate_sad_8_or_16_sse2<uint8_t, true>, IsaRequirement::Sse2},
           0xF30E5303U),
   };
 }
@@ -79,7 +79,7 @@ TEST(SadRgbTails, CountsEveryPixelAndIgnoresAlphaAcrossVectorBoundaries) {
   for (std::size_t width = 1; width <= 12; ++width) {
     SCOPED_TRACE(width);
     run_sad_int_case(make_sad_int_case("PackedRgb32", true, width * 4, 3, 64, 80,
-        Variant<SadIntFunction>{"sse2", calculate_sad_sse2<true>, IsaRequirement::Sse2}));
+        Variant<SadIntFunction>{"sse2", calculate_sad_8_or_16_sse2<uint8_t, true>, IsaRequirement::Sse2}));
     run_sad_wide_case<std::uint8_t>(make_sad_wide_case("PackedRgb32", 1, true, width * 4, 3, 64, 80,
         Variant<SadWideFunction>{"sse2", calculate_sad_8_or_16_sse2<std::uint8_t, true>,
                                  IsaRequirement::Sse2}));

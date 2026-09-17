@@ -1,15 +1,12 @@
 #pragma once
 
-#include "focus_test_helpers.h"
-
 #include <cmath>
 #include <cstring>
 #include <type_traits>
 
-namespace avsut::test {
+#include "focus_test_helpers.h"
 
-using FocusHorizontalFloatFuncPtr = void (*)(BYTE*, std::size_t, std::size_t, std::size_t, float);
-using FocusVerticalFloatFuncPtr = void (*)(BYTE*, BYTE*, int, int, int, float);
+namespace avsut::test {
 
 struct FocusHorizontalFloatCase {
   std::size_t width{};
@@ -17,7 +14,7 @@ struct FocusHorizontalFloatCase {
   std::size_t pitch{};
   float amount{};
   std::string amount_name;
-  Variant<FocusHorizontalFloatFuncPtr> variant;
+  KernelCpuProfile variant;
   std::string name;
 };
 
@@ -27,37 +24,37 @@ struct FocusVerticalFloatCase {
   std::size_t pitch{};
   float amount{};
   std::string amount_name;
-  Variant<FocusVerticalFloatFuncPtr> variant;
+  KernelCpuProfile variant;
   std::string name;
 };
 
-template <typename Function>
 inline std::string focus_float_case_name(const char* format, std::size_t width, std::size_t height,
                                          std::size_t pitch, const std::string& amount_name,
-                                         const Variant<Function>& variant) {
+                                         const KernelCpuProfile& variant) {
   std::ostringstream stream;
   stream << format << "_Width" << width << "_Height" << height << "_Pitch" << pitch << "_Amount"
          << amount_name << "_PatternFiniteAnchors_" << focus_variant_name(variant);
   return stream.str();
 }
 
-inline FocusHorizontalFloatCase make_focus_horizontal_float_case(
-    std::size_t width, std::size_t height, std::size_t pitch, float amount, std::string amount_name,
-    Variant<FocusHorizontalFloatFuncPtr> variant) {
-  FocusHorizontalFloatCase result{
-      width, height, pitch, amount, std::move(amount_name), std::move(variant), {}};
-  result.name = focus_float_case_name("PlaneFloatHorizontal", result.width, result.height,
-                                      result.pitch, result.amount_name, result.variant);
+inline FocusHorizontalFloatCase make_focus_horizontal_float_case(std::size_t width, std::size_t height,
+                                                                 std::size_t pitch, float amount,
+                                                                 std::string amount_name,
+                                                                 KernelCpuProfile variant) {
+  FocusHorizontalFloatCase result{width, height, pitch, amount, std::move(amount_name), std::move(variant),
+                                  {}};
+  result.name = focus_float_case_name("PlaneFloatHorizontal", result.width, result.height, result.pitch,
+                                      result.amount_name, result.variant);
   return result;
 }
 
-inline FocusVerticalFloatCase make_focus_vertical_float_case(
-    std::size_t width, std::size_t height, std::size_t pitch, float amount, std::string amount_name,
-    Variant<FocusVerticalFloatFuncPtr> variant) {
-  FocusVerticalFloatCase result{
-      width, height, pitch, amount, std::move(amount_name), std::move(variant), {}};
-  result.name = focus_float_case_name("PlaneFloatVertical", result.width, result.height,
-                                      result.pitch, result.amount_name, result.variant);
+inline FocusVerticalFloatCase make_focus_vertical_float_case(std::size_t width, std::size_t height,
+                                                             std::size_t pitch, float amount,
+                                                             std::string amount_name,
+                                                             KernelCpuProfile variant) {
+  FocusVerticalFloatCase result{width, height, pitch, amount, std::move(amount_name), std::move(variant), {}};
+  result.name = focus_float_case_name("PlaneFloatVertical", result.width, result.height, result.pitch,
+                                      result.amount_name, result.variant);
   return result;
 }
 
@@ -70,8 +67,7 @@ inline void PrintTo(const FocusVerticalFloatCase& test_case, std::ostream* strea
 }
 
 inline void fill_focus_float_input(PlaneView<float> view) {
-  constexpr std::array<float, 9> anchors{-1000.0F, -64.0F, -1.0F, -0.5F,  0.0F,
-                                         0.5F,     1.0F,   64.0F, 1000.0F};
+  constexpr std::array<float, 9> anchors{-1000.0F, -64.0F, -1.0F, -0.5F, 0.0F, 0.5F, 1.0F, 64.0F, 1000.0F};
   for (std::size_t y = 0; y < view.height(); ++y) {
     for (std::size_t x = 0; x < view.width(); ++x) {
       const auto index = y * view.width() + x;
@@ -103,8 +99,8 @@ inline ::testing::AssertionResult compare_focus_float(PlaneView<const float> exp
       const float lhs = expected.row(y)[x];
       const float rhs = actual.row(y)[x];
       if (!std::isfinite(lhs) || !std::isfinite(rhs)) {
-        return ::testing::AssertionFailure() << "row=" << y << " col=" << x
-                                             << " non-finite expected=" << lhs << " actual=" << rhs;
+        return ::testing::AssertionFailure()
+               << "row=" << y << " col=" << x << " non-finite expected=" << lhs << " actual=" << rhs;
       }
       if (lhs == rhs) {
         continue;
@@ -118,10 +114,10 @@ inline ::testing::AssertionResult compare_focus_float(PlaneView<const float> exp
       std::memcpy(&lhs_bits, &lhs, sizeof(lhs_bits));
       std::memcpy(&rhs_bits, &rhs, sizeof(rhs_bits));
       constexpr std::uint32_t sign_bit = 0x80000000U;
-      const auto ulps = (lhs_bits & sign_bit) != (rhs_bits & sign_bit)
-                            ? std::numeric_limits<std::uint64_t>::max()
-                            : static_cast<std::uint64_t>(
-                                  lhs_bits >= rhs_bits ? lhs_bits - rhs_bits : rhs_bits - lhs_bits);
+      const auto ulps =
+          (lhs_bits & sign_bit) != (rhs_bits & sign_bit)
+              ? std::numeric_limits<std::uint64_t>::max()
+              : static_cast<std::uint64_t>(lhs_bits >= rhs_bits ? lhs_bits - rhs_bits : rhs_bits - lhs_bits);
       if (ulps > maximum_ulps) {
         return ::testing::AssertionFailure()
                << "row=" << y << " col=" << x << " expected=" << lhs << " actual=" << rhs
@@ -145,8 +141,8 @@ inline void apply_focus_horizontal_float_reference(PlaneView<const float> source
   }
 }
 
-inline void apply_focus_vertical_float_reference(PlaneView<const float> source,
-                                                 PlaneView<float> destination, float amount) {
+inline void apply_focus_vertical_float_reference(PlaneView<const float> source, PlaneView<float> destination,
+                                                 float amount) {
   ASSERT_EQ(source.width(), destination.width());
   ASSERT_EQ(source.height(), destination.height());
   for (std::size_t y = 0; y < source.height(); ++y) {
@@ -166,18 +162,19 @@ inline void run_focus_horizontal_float_case(const FocusHorizontalFloatCase& test
   fill_focus_float_input(input.view());
   copy_focus_active(input.view().as_const(), actual.view());
   copy_focus_active(input.view().as_const(), expected.view());
-  apply_focus_horizontal_float_reference(input.view().as_const(), expected.view(),
-                                         test_case.amount);
+  apply_focus_horizontal_float_reference(input.view().as_const(), expected.view(), test_case.amount);
 
-  test_case.variant.function(reinterpret_cast<BYTE*>(actual.view().data()), test_case.height,
-                             test_case.pitch, test_case.width * sizeof(float), test_case.amount);
+  ASSERT_EQ(aif_focus_horizontal(input.view().data(), static_cast<int>(test_case.pitch), actual.view().data(),
+                                 static_cast<int>(test_case.pitch),
+                                 static_cast<int>(input.view().active_row_bytes()),
+                                 static_cast<int>(test_case.height), 32, AIF_FOCUS_PLANAR, 0,
+                                 test_case.amount, test_case.variant.cpu),
+            AIF_FOCUS_OK);
 
   EXPECT_TRUE(compare_focus_float(expected.view().as_const(), actual.view().as_const()))
       << test_case.name << " reference mismatch for variant " << test_case.variant.name;
-  EXPECT_TRUE(actual.memory_intact())
-      << test_case.name << " output padding or guards were corrupted";
-  EXPECT_TRUE(expected.memory_intact())
-      << test_case.name << " reference padding or guards were corrupted";
+  EXPECT_TRUE(actual.memory_intact()) << test_case.name << " output padding or guards were corrupted";
+  EXPECT_TRUE(expected.memory_intact()) << test_case.name << " reference padding or guards were corrupted";
   EXPECT_TRUE(input.memory_intact()) << test_case.name << " input padding or guards were corrupted";
 }
 
@@ -185,24 +182,24 @@ inline void run_focus_vertical_float_case(const FocusVerticalFloatCase& test_cas
   const auto active_row_bytes = test_case.width * sizeof(float);
   GuardedVideoBuffer<float> actual(test_case.width, test_case.height, test_case.pitch, 32);
   GuardedVideoBuffer<float> expected(test_case.width, test_case.height, test_case.pitch, 32);
-  GuardedVideoBuffer<std::uint8_t> line_buffer(active_row_bytes, 1, active_row_bytes, 32);
+  GuardedVideoBuffer<std::uint8_t> line_buffer((active_row_bytes + 31) & ~size_t(31), 1,
+                                               (active_row_bytes + 31) & ~size_t(31), 32);
   fill_focus_float_input(actual.view());
   copy_focus_active(actual.view().as_const(), expected.view());
   apply_focus_vertical_float_reference(actual.view().as_const(), expected.view(), test_case.amount);
   std::copy_n(reinterpret_cast<const std::uint8_t*>(actual.view().data()), active_row_bytes,
               line_buffer.view().data());
 
-  test_case.variant.function(line_buffer.view().data(),
-                             reinterpret_cast<BYTE*>(actual.view().data()),
-                             static_cast<int>(test_case.height), static_cast<int>(test_case.pitch),
-                             static_cast<int>(active_row_bytes), test_case.amount);
+  ASSERT_EQ(aif_focus_vertical(actual.view().data(), static_cast<int>(test_case.pitch),
+                               static_cast<int>(active_row_bytes), static_cast<int>(test_case.height), 32, 0,
+                               test_case.amount, line_buffer.view().data(), line_buffer.view().pitch_bytes(),
+                               test_case.variant.cpu),
+            AIF_FOCUS_OK);
 
   EXPECT_TRUE(compare_focus_float(expected.view().as_const(), actual.view().as_const()))
       << test_case.name << " reference mismatch for variant " << test_case.variant.name;
-  EXPECT_TRUE(actual.memory_intact())
-      << test_case.name << " output padding or guards were corrupted";
-  EXPECT_TRUE(expected.memory_intact())
-      << test_case.name << " reference padding or guards were corrupted";
+  EXPECT_TRUE(actual.memory_intact()) << test_case.name << " output padding or guards were corrupted";
+  EXPECT_TRUE(expected.memory_intact()) << test_case.name << " reference padding or guards were corrupted";
   EXPECT_TRUE(line_buffer.memory_intact())
       << test_case.name << " line buffer padding or guards were corrupted";
 }

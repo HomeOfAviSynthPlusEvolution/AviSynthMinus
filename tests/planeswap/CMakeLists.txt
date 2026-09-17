@@ -1,8 +1,3 @@
-# Direct x86 kernel tests require the matching AvsCore implementations.
-if(NOT ENABLE_INTEL_SIMD)
-  return()
-endif()
-
 add_executable(planeswap_tests planeswap_tests.cpp)
 target_include_directories(planeswap_tests PRIVATE
   ${PROJECT_SOURCE_DIR}/tests
@@ -14,7 +9,7 @@ target_include_directories(planeswap_tests PRIVATE
 target_link_libraries(planeswap_tests PRIVATE
   GTest::gtest_main
   AvsCoreExternal
-  AvsInternalFilterReferences
+  AvsFilters::PlanesKernels
 )
 
 include(GoogleTest)

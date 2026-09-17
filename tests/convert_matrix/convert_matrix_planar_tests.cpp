@@ -1,11 +1,13 @@
-#include "convert/convert_helper.h"
-#include "legacy_matrix_reference.h"
-#include "support/avisynth_environment.h"
-#include "support/video_filter_test_support.h"
 #include <gtest/gtest.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+
+#include "convert/convert_helper.h"
+#include "matrix_pixel_coefficients.h"
+#include "support/avisynth_environment.h"
+#include "support/video_filter_test_support.h"
 namespace avsut::test {
 namespace {
 class PlanarMatrix : public ::testing::TestWithParam<int> {};
@@ -18,14 +20,13 @@ TEST_P(PlanarMatrix, PublicPixelsAlphaAndProperties) {
                      VideoInfo::CS_YUVA444P14, VideoInfo::CS_YUVA444P16, VideoInfo::CS_YUVA444PS};
   AviSynthEnvironment environment;
   auto* env = environment.get();
-  if (scalar)
-    env->Invoke("SetMaxCPU", "none");
+  if (scalar) env->Invoke("SetMaxCPU", "none");
   const auto vi = make_video_info({37, 3, forward ? rgb[depth_index] : yuv[depth_index], 1, 25, 1});
   const int depth = vi.BitsPerComponent();
-  const int src_planes[] = {forward ? PLANAR_B : PLANAR_Y, forward ? PLANAR_G : PLANAR_U, forward ? PLANAR_R : PLANAR_V,
-                            PLANAR_A};
-  const int dst_planes[] = {forward ? PLANAR_Y : PLANAR_B, forward ? PLANAR_U : PLANAR_G, forward ? PLANAR_V : PLANAR_R,
-                            PLANAR_A};
+  const int src_planes[] = {forward ? PLANAR_B : PLANAR_Y, forward ? PLANAR_G : PLANAR_U,
+                            forward ? PLANAR_R : PLANAR_V, PLANAR_A};
+  const int dst_planes[] = {forward ? PLANAR_Y : PLANAR_B, forward ? PLANAR_U : PLANAR_G,
+                            forward ? PLANAR_V : PLANAR_R, PLANAR_A};
   const int ids[] = {AVS_MATRIX_BT709, AVS_MATRIX_BT470_BG, AVS_MATRIX_BT2020_NCL};
   const char* names_matrix[] = {"709", "601", "2020"};
   for (int matrix_index = 0; matrix_index < 3; ++matrix_index)
@@ -33,20 +34,16 @@ TEST_P(PlanarMatrix, PublicPixelsAlphaAndProperties) {
       for (int destination_range : {AVS_RANGE_FULL, AVS_RANGE_LIMITED}) {
         // Reverse conversion names the input range. Limited RGB output is
         // available through :same only, so it requires limited YUV input.
-        if (!forward && destination_range == AVS_RANGE_LIMITED && source_range == AVS_RANGE_FULL)
-          continue;
+        if (!forward && destination_range == AVS_RANGE_LIMITED && source_range == AVS_RANGE_FULL) continue;
         SCOPED_TRACE(::testing::Message() << matrix_index << '/' << source_range << '/' << destination_range);
         auto source_frame = env->NewVideoFrame(vi);
         auto sample = [&](int c, int x, int y) -> double {
           const int code = (x * (43 + 7 * c) + y * 61 + c * 37) % 257;
-          if (depth == 32)
-            return code / 256.0 - (!forward && c > 0 && c < 3 ? .5 : 0);
+          if (depth == 32) return code / 256.0 - (!forward && c > 0 && c < 3 ? .5 : 0);
           return (int64_t(code) * ((1 << depth) - 1)) / 256;
         };
         for (int c = 0; c < 4; ++c) {
-          auto value = [&](int x, int y) {
-            return sample(c, x, y);
-          };
+          auto value = [&](int x, int y) { return sample(c, x, y); };
           if (depth == 8)
             write_frame_plane<uint8_t>(source_frame, src_planes[c], value);
           else if (depth == 32)
@@ -68,36 +65,37 @@ TEST_P(PlanarMatrix, PublicPixelsAlphaAndProperties) {
         const AVSValue args[] = {source, matrix_name.c_str()};
         const char* arg_names[] = {nullptr, "matrix"};
         const PClip converted =
-            env->Invoke(forward ? "ConvertToYUVA444" : "ConvertToPlanarRGBA", AVSValue(args, 2), arg_names).AsClip();
-        const PClip gray_clip = forward ? env->Invoke("ConvertToY", AVSValue(args, 2), arg_names).AsClip() : PClip{};
+            env->Invoke(forward ? "ConvertToYUVA444" : "ConvertToPlanarRGBA", AVSValue(args, 2), arg_names)
+                .AsClip();
+        const PClip gray_clip =
+            forward ? env->Invoke("ConvertToY", AVSValue(args, 2), arg_names).AsClip() : PClip{};
         const PVideoFrame gray = forward ? gray_clip->GetFrame(0, env) : PVideoFrame{};
         const PVideoFrame gray_rgb =
-            forward ? env->Invoke("Greyscale", AVSValue(args, 2), arg_names).AsClip()->GetFrame(0, env) : PVideoFrame{};
+            forward ? env->Invoke("Greyscale", AVSValue(args, 2), arg_names).AsClip()->GetFrame(0, env)
+                    : PVideoFrame{};
         if (forward) {
           const auto* gray_props = env->getFramePropsRO(gray_rgb);
           EXPECT_EQ(env->propGetInt(gray_props, "_ColorRange", 0, nullptr), destination_range);
           EXPECT_EQ(env->propGetInt(gray_props, "_Matrix", 0, nullptr), AVS_MATRIX_RGB);
           EXPECT_EQ(env->propGetInt(gray_props, "MatrixTestMarker", 0, nullptr), 173);
-          EXPECT_EQ(env->propGetInt(env->getFramePropsRO(source_frame), "_ColorRange", 0, nullptr), source_range);
+          EXPECT_EQ(env->propGetInt(env->getFramePropsRO(source_frame), "_ColorRange", 0, nullptr),
+                    source_range);
         }
         const auto output = converted->GetFrame(0, env);
         const auto props = env->getFramePropsRO(output);
         EXPECT_EQ(env->propGetInt(props, "_ColorRange", 0, nullptr), destination_range);
-        EXPECT_EQ(env->propGetInt(props, "_Matrix", 0, nullptr), forward ? ids[matrix_index] : AVS_MATRIX_RGB);
+        EXPECT_EQ(env->propGetInt(props, "_Matrix", 0, nullptr),
+                  forward ? ids[matrix_index] : AVS_MATRIX_RGB);
         EXPECT_EQ(env->propGetInt(props, "MatrixTestMarker", 0, nullptr), 173);
-        if (!forward)
-          EXPECT_EQ(env->propNumElements(props, "_ChromaLocation"), -1);
-        legacy_matrix_reference::ConversionMatrix m{};
+        if (!forward) EXPECT_EQ(env->propNumElements(props, "_ChromaLocation"), -1);
         const int precision = forward ? 15 : 13;
-        ASSERT_TRUE(
-            forward ? legacy_matrix_reference::do_BuildMatrix_Rgb2Yuv(ids[matrix_index], source_range, destination_range, precision, depth, m)
-                    : legacy_matrix_reference::do_BuildMatrix_Yuv2Rgb(ids[matrix_index], source_range, destination_range, precision, depth, m));
-        const int weights[3][3] = {{m.y_b, forward ? m.y_g : m.u_b, forward ? m.y_r : m.v_b},
-                                   {forward ? m.u_b : m.y_g, m.u_g, forward ? m.u_r : m.v_g},
-                                   {forward ? m.v_b : m.y_r, forward ? m.v_g : m.u_r, m.v_r}};
-        const float fw[3][3] = {{m.y_b_f, forward ? m.y_g_f : m.u_b_f, forward ? m.y_r_f : m.v_b_f},
-                                {forward ? m.u_b_f : m.y_g_f, m.u_g_f, forward ? m.u_r_f : m.v_g_f},
-                                {forward ? m.v_b_f : m.y_r_f, forward ? m.v_g_f : m.u_r_f, m.v_r_f}};
+        const size_t coefficient_index = (((size_t(!forward) * 6 + depth_index) * 3 + matrix_index) * 2 +
+                                          (source_range == AVS_RANGE_LIMITED)) *
+                                             2 +
+                                         (destination_range == AVS_RANGE_LIMITED);
+        const auto& m = matrix_pixel_coefficients[coefficient_index];
+        const auto& weights = m.weights;
+        const auto& fw = m.float_weights;
         for (int y = 0; y < vi.height; ++y)
           for (int x = 0; x < vi.width; ++x)
             for (int c = 0; c < 4; ++c) {
@@ -119,8 +117,9 @@ TEST_P(PlanarMatrix, PublicPixelsAlphaAndProperties) {
                 const double r = sample(2, x, y) + (forward ? m.offset_rgb : -center);
                 const double offset = forward ? (c == 0 ? m.offset_y : center) : m.offset_rgb;
                 expected = std::clamp(
-                    std::floor((weights[c][0] * a + weights[c][1] * b + weights[c][2] * r) / scale + .5) + offset, 0.,
-                    double((1 << depth) - 1));
+                    std::floor((weights[c][0] * a + weights[c][1] * b + weights[c][2] * r) / scale + .5) +
+                        offset,
+                    0., double((1 << depth) - 1));
               }
               const auto* row = output->GetReadPtr(dst_planes[c]) + y * output->GetPitch(dst_planes[c]);
               const double actual = depth == 8    ? row[x]
@@ -152,5 +151,5 @@ TEST_P(PlanarMatrix, PublicPixelsAlphaAndProperties) {
       }
 }
 INSTANTIATE_TEST_SUITE_P(StorageDirectionAndCpu, PlanarMatrix, ::testing::Range(0, 24));
-} // namespace
-} // namespace avsut::test
+}  // namespace
+}  // namespace avsut::test

@@ -13,7 +13,7 @@ target_include_directories(turn_tests PRIVATE
 target_link_libraries(turn_tests PRIVATE
   GTest::gtest_main
   AvsCoreExternal
-  AvsInternalFilterReferences
+  AvsFilters::RotationKernels
 )
 
 include(GoogleTest)

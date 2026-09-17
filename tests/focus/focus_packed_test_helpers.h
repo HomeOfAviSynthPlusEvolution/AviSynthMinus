@@ -1,15 +1,10 @@
 #pragma once
 
-#include "focus_test_helpers.h"
-
 #include <array>
 
-namespace avsut::test {
+#include "focus_test_helpers.h"
 
-using FocusRgb32FuncPtr = void (*)(BYTE*, const BYTE*, std::size_t, std::size_t, std::size_t,
-                                   std::size_t, std::size_t);
-using FocusRgb64FuncPtr = FocusRgb32FuncPtr;
-using FocusYuy2FuncPtr = FocusRgb32FuncPtr;
+namespace avsut::test {
 
 struct FocusRgb32Case {
   std::size_t width_pixels{};
@@ -17,7 +12,7 @@ struct FocusRgb32Case {
   std::size_t source_pitch{};
   std::size_t destination_pitch{};
   std::size_t amount{};
-  Variant<FocusRgb32FuncPtr> variant;
+  KernelCpuProfile variant;
   std::string expected_hash;
   std::string name;
 };
@@ -28,7 +23,7 @@ struct FocusRgb64Case {
   std::size_t source_pitch{};
   std::size_t destination_pitch{};
   std::size_t amount{};
-  Variant<FocusRgb64FuncPtr> variant;
+  KernelCpuProfile variant;
   std::string expected_hash;
   std::string name;
 };
@@ -39,16 +34,14 @@ struct FocusYuy2Case {
   std::size_t source_pitch{};
   std::size_t destination_pitch{};
   std::size_t amount{};
-  Variant<FocusYuy2FuncPtr> variant;
+  KernelCpuProfile variant;
   std::string expected_hash;
   std::string name;
 };
 
-template <typename Function>
-inline std::string focus_packed_case_name(const char* format, std::size_t width_pixels,
-                                          std::size_t height, std::size_t source_pitch,
-                                          std::size_t destination_pitch, std::size_t amount,
-                                          const Variant<Function>& variant) {
+inline std::string focus_packed_case_name(const char* format, std::size_t width_pixels, std::size_t height,
+                                          std::size_t source_pitch, std::size_t destination_pitch,
+                                          std::size_t amount, const KernelCpuProfile& variant) {
   std::ostringstream stream;
   stream << format << "_Width" << width_pixels << "_Height" << height << "_SrcPitch" << source_pitch
          << "_DstPitch" << destination_pitch << "_Amount" << amount << "_PatternBoundaryRamp_"
@@ -58,7 +51,7 @@ inline std::string focus_packed_case_name(const char* format, std::size_t width_
 
 inline FocusRgb32Case make_focus_rgb32_case(std::size_t width_pixels, std::size_t height,
                                             std::size_t source_pitch, std::size_t destination_pitch,
-                                            std::size_t amount, Variant<FocusRgb32FuncPtr> variant,
+                                            std::size_t amount, KernelCpuProfile variant,
                                             std::string expected_hash) {
   FocusRgb32Case result{width_pixels,
                         height,
@@ -68,15 +61,15 @@ inline FocusRgb32Case make_focus_rgb32_case(std::size_t width_pixels, std::size_
                         std::move(variant),
                         std::move(expected_hash),
                         {}};
-  result.name = focus_packed_case_name("Rgb32Horizontal", result.width_pixels, result.height,
-                                       result.source_pitch, result.destination_pitch, result.amount,
-                                       result.variant);
+  result.name =
+      focus_packed_case_name("Rgb32Horizontal", result.width_pixels, result.height, result.source_pitch,
+                             result.destination_pitch, result.amount, result.variant);
   return result;
 }
 
 inline FocusRgb64Case make_focus_rgb64_case(std::size_t width_pixels, std::size_t height,
                                             std::size_t source_pitch, std::size_t destination_pitch,
-                                            std::size_t amount, Variant<FocusRgb64FuncPtr> variant,
+                                            std::size_t amount, KernelCpuProfile variant,
                                             std::string expected_hash) {
   FocusRgb64Case result{width_pixels,
                         height,
@@ -86,15 +79,15 @@ inline FocusRgb64Case make_focus_rgb64_case(std::size_t width_pixels, std::size_
                         std::move(variant),
                         std::move(expected_hash),
                         {}};
-  result.name = focus_packed_case_name("Rgb64Horizontal", result.width_pixels, result.height,
-                                       result.source_pitch, result.destination_pitch, result.amount,
-                                       result.variant);
+  result.name =
+      focus_packed_case_name("Rgb64Horizontal", result.width_pixels, result.height, result.source_pitch,
+                             result.destination_pitch, result.amount, result.variant);
   return result;
 }
 
 inline FocusYuy2Case make_focus_yuy2_case(std::size_t width_pixels, std::size_t height,
                                           std::size_t source_pitch, std::size_t destination_pitch,
-                                          std::size_t amount, Variant<FocusYuy2FuncPtr> variant,
+                                          std::size_t amount, KernelCpuProfile variant,
                                           std::string expected_hash) {
   FocusYuy2Case result{width_pixels,
                        height,
@@ -104,27 +97,21 @@ inline FocusYuy2Case make_focus_yuy2_case(std::size_t width_pixels, std::size_t 
                        std::move(variant),
                        std::move(expected_hash),
                        {}};
-  result.name = focus_packed_case_name("Yuy2Horizontal", result.width_pixels, result.height,
-                                       result.source_pitch, result.destination_pitch, result.amount,
-                                       result.variant);
+  result.name =
+      focus_packed_case_name("Yuy2Horizontal", result.width_pixels, result.height, result.source_pitch,
+                             result.destination_pitch, result.amount, result.variant);
   return result;
 }
 
-inline void PrintTo(const FocusRgb32Case& test_case, std::ostream* stream) {
-  *stream << test_case.name;
-}
+inline void PrintTo(const FocusRgb32Case& test_case, std::ostream* stream) { *stream << test_case.name; }
 
-inline void PrintTo(const FocusRgb64Case& test_case, std::ostream* stream) {
-  *stream << test_case.name;
-}
+inline void PrintTo(const FocusRgb64Case& test_case, std::ostream* stream) { *stream << test_case.name; }
 
-inline void PrintTo(const FocusYuy2Case& test_case, std::ostream* stream) {
-  *stream << test_case.name;
-}
+inline void PrintTo(const FocusYuy2Case& test_case, std::ostream* stream) { *stream << test_case.name; }
 
 template <typename T>
-void apply_focus_rgb_reference(PlaneView<const T> source, PlaneView<T> destination,
-                               std::size_t width_pixels, std::size_t amount) {
+void apply_focus_rgb_reference(PlaneView<const T> source, PlaneView<T> destination, std::size_t width_pixels,
+                               std::size_t amount) {
   for (std::size_t y = 0; y < source.height(); ++y) {
     for (std::size_t x = 0; x < width_pixels; ++x) {
       const auto* left = source.row(y) + (x == 0 ? 0 : x - 1) * 4;
@@ -138,8 +125,8 @@ void apply_focus_rgb_reference(PlaneView<const T> source, PlaneView<T> destinati
   }
 }
 
-template <typename T>
-void run_focus_rgb_case(const FocusRgb32Case& test_case, FocusRgb32FuncPtr function) {
+template <typename T, typename Case>
+void run_focus_rgb_case(const Case& test_case) {
   const auto width = test_case.width_pixels * 4;
   GuardedVideoBuffer<T> source(width, test_case.height, test_case.source_pitch, 32);
   GuardedVideoBuffer<T> expected(width, test_case.height, test_case.destination_pitch, 32);
@@ -149,22 +136,21 @@ void run_focus_rgb_case(const FocusRgb32Case& test_case, FocusRgb32FuncPtr funct
   apply_focus_rgb_reference(source.view().as_const(), expected.view(), test_case.width_pixels,
                             test_case.amount);
 
-  function(reinterpret_cast<BYTE*>(actual.view().data()),
-           reinterpret_cast<const BYTE*>(source.view().data()), test_case.destination_pitch,
-           test_case.source_pitch, test_case.height, test_case.width_pixels, test_case.amount);
+  ASSERT_EQ(aif_focus_horizontal(source.view().data(), static_cast<int>(test_case.source_pitch),
+                                 actual.view().data(), static_cast<int>(test_case.destination_pitch),
+                                 static_cast<int>(width * sizeof(T)), static_cast<int>(test_case.height),
+                                 sizeof(T) * 8, AIF_FOCUS_RGB4, static_cast<int>(test_case.amount), 0.f,
+                                 test_case.variant.cpu),
+            AIF_FOCUS_OK);
 
   EXPECT_TRUE(compare_exact(expected.view().as_const(), actual.view().as_const()))
       << test_case.name << " reference mismatch for variant " << test_case.variant.name;
   EXPECT_EQ(format_hash(hash_active(expected.view().as_const())), test_case.expected_hash)
       << test_case.name << " stable output hash mismatch";
-  EXPECT_TRUE(source.active_matches(source_snapshot))
-      << test_case.name << " modified the source input";
-  EXPECT_TRUE(source.memory_intact())
-      << test_case.name << " source padding or guards were corrupted";
-  EXPECT_TRUE(expected.memory_intact())
-      << test_case.name << " reference padding or guards were corrupted";
-  EXPECT_TRUE(actual.memory_intact())
-      << test_case.name << " output padding or guards were corrupted";
+  EXPECT_TRUE(source.active_matches(source_snapshot)) << test_case.name << " modified the source input";
+  EXPECT_TRUE(source.memory_intact()) << test_case.name << " source padding or guards were corrupted";
+  EXPECT_TRUE(expected.memory_intact()) << test_case.name << " reference padding or guards were corrupted";
+  EXPECT_TRUE(actual.memory_intact()) << test_case.name << " output padding or guards were corrupted";
 }
 
 inline void fill_focus_yuy2_input(PlaneView<std::uint8_t> view) {
@@ -183,8 +169,8 @@ inline void fill_focus_yuy2_input(PlaneView<std::uint8_t> view) {
 }
 
 inline void apply_focus_yuy2_reference(PlaneView<const std::uint8_t> source,
-                                       PlaneView<std::uint8_t> destination,
-                                       std::size_t width_pixels, std::size_t amount) {
+                                       PlaneView<std::uint8_t> destination, std::size_t width_pixels,
+                                       std::size_t amount) {
   const auto groups = width_pixels / 2;
   for (std::size_t y = 0; y < source.height(); ++y) {
     for (std::size_t x = 0; x < width_pixels; ++x) {
@@ -198,43 +184,37 @@ inline void apply_focus_yuy2_reference(PlaneView<const std::uint8_t> source,
       const auto* left = source.row(y) + (group == 0 ? 0 : group - 1) * 4;
       const auto* center = source.row(y) + group * 4;
       const auto* right = source.row(y) + (group + 1 == groups ? group : group + 1) * 4;
-      destination.row(y)[group * 4 + 1] =
-          focus_reference_pixel(left[1], center[1], right[1], amount);
-      destination.row(y)[group * 4 + 3] =
-          focus_reference_pixel(left[3], center[3], right[3], amount);
+      destination.row(y)[group * 4 + 1] = focus_reference_pixel(left[1], center[1], right[1], amount);
+      destination.row(y)[group * 4 + 3] = focus_reference_pixel(left[3], center[3], right[3], amount);
     }
   }
 }
 
 inline void run_focus_yuy2_case(const FocusYuy2Case& test_case) {
   const auto width_bytes = test_case.width_pixels * 2;
-  GuardedVideoBuffer<std::uint8_t> source(width_bytes, test_case.height, test_case.source_pitch,
-                                          32);
-  GuardedVideoBuffer<std::uint8_t> expected(width_bytes, test_case.height,
-                                            test_case.destination_pitch, 32);
-  GuardedVideoBuffer<std::uint8_t> actual(width_bytes, test_case.height,
-                                          test_case.destination_pitch, 32);
+  GuardedVideoBuffer<std::uint8_t> source(width_bytes, test_case.height, test_case.source_pitch, 32);
+  GuardedVideoBuffer<std::uint8_t> expected(width_bytes, test_case.height, test_case.destination_pitch, 32);
+  GuardedVideoBuffer<std::uint8_t> actual(width_bytes, test_case.height, test_case.destination_pitch, 32);
   fill_focus_yuy2_input(source.view());
   const auto source_snapshot = source.snapshot_active();
   apply_focus_yuy2_reference(source.view().as_const(), expected.view(), test_case.width_pixels,
                              test_case.amount);
 
-  test_case.variant.function(actual.view().data(), source.view().data(),
-                             test_case.destination_pitch, test_case.source_pitch, test_case.height,
-                             test_case.width_pixels, test_case.amount);
+  ASSERT_EQ(
+      aif_focus_horizontal(source.view().data(), static_cast<int>(test_case.source_pitch),
+                           actual.view().data(), static_cast<int>(test_case.destination_pitch),
+                           static_cast<int>(width_bytes), static_cast<int>(test_case.height), 8,
+                           AIF_FOCUS_YUY2, static_cast<int>(test_case.amount), 0.f, test_case.variant.cpu),
+      AIF_FOCUS_OK);
 
   EXPECT_TRUE(compare_exact(expected.view().as_const(), actual.view().as_const()))
       << test_case.name << " reference mismatch for variant " << test_case.variant.name;
   EXPECT_EQ(format_hash(hash_active(expected.view().as_const())), test_case.expected_hash)
       << test_case.name << " stable output hash mismatch";
-  EXPECT_TRUE(source.active_matches(source_snapshot))
-      << test_case.name << " modified the source input";
-  EXPECT_TRUE(source.memory_intact())
-      << test_case.name << " source padding or guards were corrupted";
-  EXPECT_TRUE(expected.memory_intact())
-      << test_case.name << " reference padding or guards were corrupted";
-  EXPECT_TRUE(actual.memory_intact())
-      << test_case.name << " output padding or guards were corrupted";
+  EXPECT_TRUE(source.active_matches(source_snapshot)) << test_case.name << " modified the source input";
+  EXPECT_TRUE(source.memory_intact()) << test_case.name << " source padding or guards were corrupted";
+  EXPECT_TRUE(expected.memory_intact()) << test_case.name << " reference padding or guards were corrupted";
+  EXPECT_TRUE(actual.memory_intact()) << test_case.name << " output padding or guards were corrupted";
 }
 
 }  // namespace avsut::test
