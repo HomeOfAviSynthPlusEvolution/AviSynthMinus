@@ -22,20 +22,7 @@ if (MINGW)
   set_target_properties(${ProjectName} PROPERTIES IMPORT_PREFIX "")
 endif()
 
-# If checked out with compat filesystem submodule, add that to system include directories
-get_filename_component(
-    GHS_FILESYSTEM_INCLUDE_DIR
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../filesystem/include
-    ABSOLUTE
-)
-if (EXISTS ${GHS_FILESYSTEM_INCLUDE_DIR})
-    target_include_directories(${ProjectName} SYSTEM PRIVATE ${GHS_FILESYSTEM_INCLUDE_DIR})
-endif()
-
-# stdc++fs was mainlined into stdc++ in GCC 9, but GCC 8 can build it too
-if (CMAKE_COMPILER_IS_GNUCXX AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
-    set(FSLIB "stdc++fs")
-endif()
+target_link_libraries(${ProjectName} AvsFilesystem)
 
   # linux: sudo apt-get install libdevil-dev
   # fixme: put it to dependancy?
@@ -53,10 +40,8 @@ include(FindDevIL) # official CMake module
   #                  way the DevIL developers release it.
 if(DevIL_FOUND)
     message("Found DevIL library: ${IL_LIBRARIES}") 
-    target_link_libraries(${ProjectName} "${IL_LIBRARIES}" "${FSLIB}")
+    target_link_libraries(${ProjectName} "${IL_LIBRARIES}")
     target_include_directories(${ProjectName} PRIVATE "${IL_INCLUDE_DIR}" ${AvsCore_SOURCE_DIR})
-else()
-    target_link_libraries(${ProjectName} "${FSLIB}")
 endif()
 
 if (MSVC_IDE)

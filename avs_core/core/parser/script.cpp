@@ -53,7 +53,7 @@
 #include <dirent.h>
 #endif
 
-#include <avs/filesystem.h>
+#include <filesystem>
 #include <avs/minmax.h>
 #include <new>
 #include "../internal.h"
@@ -674,9 +674,9 @@ AVSValue Import(AVSValue args, void*, IScriptEnvironment* env)
     }
 
 #else // adapted from AvxSynth
-    std::string file_part = fs::path(script_name).filename().string();
-    std::string full_path = fs::path(script_name).remove_filename();
-    std::string dir_part = fs::path(script_name).parent_path();
+    std::string file_part = std::filesystem::path(script_name).filename().string();
+    std::string full_path = std::filesystem::path(script_name).remove_filename();
+    std::string dir_part = std::filesystem::path(script_name).parent_path();
 
     FILE* h = fopen(script_name, "r");
     if(NULL == h)
@@ -1336,10 +1336,10 @@ AVSValue Exist(AVSValue args, void*, IScriptEnvironment*nv) {
     // (remark applies to all utf8 in avs+)
     auto wsource = Utf8ToWideChar(filename);
     std::wstring filename_w = wsource.get();
-    return fs::exists(filename_w);
+    return std::filesystem::exists(filename_w);
   }
 #endif
-  return fs::exists(filename);
+  return std::filesystem::exists(filename);
 }
 
 

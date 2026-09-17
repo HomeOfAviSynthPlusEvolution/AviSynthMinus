@@ -46,7 +46,7 @@
 
 # "Visual Studio 16 2019" + LLVM 8.0 (clang) optional platform generator Win32 and x64
 
-CMAKE_MINIMUM_REQUIRED( VERSION 3.6.2...3.11 )
+CMAKE_MINIMUM_REQUIRED( VERSION 3.8...3.11 )
 # VS2019: 3.14.1
 # Intel 2023: 3.22.3 (Win) 3.20 (Linux)
 # VS2022: 3.21
@@ -98,11 +98,9 @@ if(NOT HEADERS_ONLY)
   set(CMAKE_CXX_STANDARD_LIBRARIES "" CACHE STRING "" FORCE)
 
   # We require C++17 or higher.
-if(CMAKE_VERSION VERSION_GREATER 3.7)
   set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
   set(CMAKE_CXX_EXTENSIONS FALSE)
-endif()
 
   # Detect Intel processors and turn Intel SIMD on or off automatically.
   # Prefer the generator target over the host processor when cross-compiling.
@@ -181,8 +179,7 @@ endif()
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/Output/system")
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/Output/c_api")
 
-    # Needed to properly handle __has_include(<filesystem>) in avs_core/filesystem.h
-    # See note in filesystem/README.md
+    # Report the selected language standard accurately to headers and dependencies.
     add_definitions("/Zc:__cplusplus")
     add_compile_options("/utf-8" "/MP")
 
@@ -354,18 +351,6 @@ endif()
   ELSE()
     # not MS Visual Studio IDE
 
-    # CMAKE_CXX_STANDARD doesn't cover the use-case of pre-final C++17 support,
-    # but I'd assume most setups with a new enough version of CMake to use
-    # CMAKE_CXX_STANDARD 17 would also be running a version of GCC/Clang new enough
-    # to not need this.  So this will most likely only ever be used by setups running
-    # older versions of CMake; regardless, it shouldn't be necessary to force a
-    # CMAKE_VERSION check on this part unless the mere presence of CMAKE_CXX_STANDARD 17
-    # ends up causing problems for the older compilers here.
-    if( ((CMAKE_CXX_COMPILER_ID STREQUAL "GNU")   AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8)) OR
-        ((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5)) )
-      add_compile_options(${CMAKE_CXX_FLAGS} -std=c++1z)
-    endif()
-
     if(ENABLE_INTEL_SIMD)
       add_compile_options(-msse2 -DINTEL_INTRINSICS)
     endif()
@@ -383,6 +368,7 @@ endif()
 
   ENDIF()
 
+  include("cmake/CheckFilesystem.cmake")
   add_subdirectory("modules/simd")
   if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/audio_convert/CMakeLists.txt")
     message(FATAL_ERROR "AudioConvert submodule is missing. Run git submodule update --init --recursive.")

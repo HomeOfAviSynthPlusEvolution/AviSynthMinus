@@ -51,7 +51,7 @@
 #include <unordered_map>
 #include <array>
 #include <iomanip>
-#include <avs/filesystem.h>
+#include <filesystem>
 
 #include <locale>
 #include <cstdio>
@@ -323,9 +323,9 @@ static BdfFont LoadBMF(std::string name, bool bold) {
   //std::ifstream ss("c:\\Download\\terminus-font-4.48\\terminus-font-4.48\\ter-u16n.bdf");
   std::ifstream ss;
   // explicite font file name
-  auto fname = fs::path(name);
+  auto fname = std::filesystem::path(name);
 
-  if (!fs::exists(name))
+  if (!std::filesystem::exists(name))
     return fnt;
 
   fnt.font_filename = fname.filename().generic_string();

@@ -103,16 +103,6 @@ if(NOT ${BUILD_SHARED_LIBS})
     target_compile_definitions("AvsCore" PUBLIC AVS_STATIC_LIB)
 endif()
 
-# If checked out with compat filesystem submodule, add that to system include directories
-get_filename_component(
-    GHS_FILESYSTEM_INCLUDE_DIR
-    ${CMAKE_CURRENT_SOURCE_DIR}/../filesystem/include
-    ABSOLUTE
-)
-if (EXISTS ${GHS_FILESYSTEM_INCLUDE_DIR})
-    target_include_directories("AvsCore" SYSTEM PRIVATE ${GHS_FILESYSTEM_INCLUDE_DIR})
-endif()
-
 if (CMAKE_SYSTEM_NAME STREQUAL "Haiku")
     set(SYSLIB "root")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
@@ -133,15 +123,11 @@ endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     list(APPEND SYSLIB "stdc++")
-    # stdc++fs was mainlined into stdc++ in GCC 9, but GCC 8 can build it too
-    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
-        list(APPEND SYSLIB "stdc++fs")
-    endif()
 elseif(NOT MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     list(APPEND SYSLIB "c++")
 endif()
 
-target_link_libraries("AvsCore" ${SYSLIB} AvsSimd)
+target_link_libraries("AvsCore" ${SYSLIB} AvsSimd AvsFilesystem)
 
 add_subdirectory("${CMAKE_SOURCE_DIR}/modules/audio_convert" "${CMAKE_CURRENT_BINARY_DIR}/modules/audio_convert")
 add_subdirectory("${CMAKE_SOURCE_DIR}/modules/video_convert" "${CMAKE_CURRENT_BINARY_DIR}/modules/video_convert")

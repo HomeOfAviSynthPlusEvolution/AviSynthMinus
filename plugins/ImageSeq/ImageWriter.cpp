@@ -39,7 +39,7 @@
 #include <algorithm>
 #include <sstream>
 #include <avs/config.h>
-#include <avs/filesystem.h>
+#include <filesystem>
 #include <iostream>
 
 #define TEXT_COLOR 0xf0f080
@@ -63,11 +63,11 @@ ImageWriter::ImageWriter(PClip _child, const char * _base_name, const int _start
   (void)GetFullPathName(base_name_good, len, base_name, NULL);
 #else
   std::string base_name_good = (*_base_name == 0) ? "./" : _base_name;
-  auto path = fs::path(base_name_good);
+  auto path = std::filesystem::path(base_name_good);
   std::error_code ec;
-  auto fullpath = fs::absolute(path, ec);
+  auto fullpath = std::filesystem::absolute(path, ec);
   // to-do: check ec
-  //auto fullpath = fs::canonical(path, ec); // canonical removes e.g. dot. Path must exist.
+  //auto fullpath = std::filesystem::canonical(path, ec); // canonical removes e.g. dot. Path must exist.
   std::string fullpaths = fullpath.string();
   // cout << fullpaths.c_str() << "\n"; // debug
   if (fullpaths.size() > sizeof(base_name) - 1)
@@ -258,7 +258,7 @@ PVideoFrame ImageWriter::GetFrame(int n, IScriptEnvironment* env)
 #ifdef AVS_WINDOWS
       DeleteFile(filename);
 #else
-      fs::remove(fs::path(filename));
+      std::filesystem::remove(std::filesystem::path(filename));
 #endif
 
       // Save to disk (format automatically inferred from extension)

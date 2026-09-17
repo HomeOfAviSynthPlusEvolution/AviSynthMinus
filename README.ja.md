@@ -45,6 +45,8 @@ AviSynthMinus は、既存の AviSynth スクリプトやプラグインとの�
 
 macOS の最低サポートバージョンは macOS 15.0（Sequoia）で、Intel x86_64 と Apple Silicon arm64 の両方に適用されます。それ以前の macOS は本プロジェクトのサポート対象外です。
 
+SDK から従来の互換ヘッダー `<avs/filesystem.h>` を削除しました。このヘッダーを使用していたソースコードは、`<filesystem>` をインクルードし、`std::filesystem` を直接使用してください。
+
 ### Expr 式
 
 `Expr` と `IrisExpr` は [Iris エンジン](third_party/iris/README.ja.md)を使用します。`Expr` は従来の引数名・型・位置を維持します。`optAvx2`、`optSingleMode`、`optSSE2`、`optVectorC` は受け付けますが無視され、CPU 命令や処理幅を制限しません。
@@ -73,7 +75,7 @@ git submodule update --init --recursive
 
 独立した [Audio](third_party/audio_convert/README.ja.md)、[Video](third_party/video_convert/README.ja.md)、[Composite](third_party/composite/README.ja.md) モジュールが計算カーネルを提供し、コアに静的リンクされます。スクリプトインターフェース、フレーム管理、CPU 方針はホストが担当します。統合後のフィルター動作と許容誤差は [Composite アダプター](modules/composite/README.md)を参照してください。
 
-本プロジェクトは CMake を使用し、C++17 対応のコンパイラーを必要とします。以下のコマンドはリポジトリのルートで実行してください。コアライブラリのみをビルドし、同梱の外部プラグインはコンパイルしません。生成されたコアは、互換性のあるプラグインを通常どおり読み込めます。
+本プロジェクトには CMake 3.8 以降と、C++17 および `std::filesystem` に対応したコンパイラーと標準ライブラリが必要です。以下のコマンドはリポジトリのルートで実行してください。コアライブラリのみをビルドし、同梱の外部プラグインはコンパイルしません。生成されたコアは、互換性のあるプラグインを通常どおり読み込めます。
 
 Iris は既定で有効になり、コアに静的リンクされます。既定の構成には LLVM 20–23 が必要です。SLEEF は自動的に取得・ビルドされ、既定バックエンドは `sleef` です。CMake が LLVM を検出できない場合は、構成時に `-DLLVM_DIR=<LLVM インストール先>/lib/cmake/llvm` を指定してください。
 

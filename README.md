@@ -45,6 +45,8 @@ Compatibility reports are welcome. Please include the AviSynthMinus version, ope
 
 The minimum supported macOS version is macOS 15.0 (Sequoia), for both Intel x86_64 and Apple Silicon arm64. Earlier macOS versions are outside the project's support scope.
 
+The former `<avs/filesystem.h>` compatibility header has been removed from the SDK. Source code that included it should include `<filesystem>` and use `std::filesystem` directly.
+
 ### Expr expressions
 
 `Expr` and `IrisExpr` use the [Iris engine](third_party/iris/README.md). `Expr` preserves the legacy argument names, types, and positions. Its `optAvx2`, `optSingleMode`, `optSSE2`, and `optVectorC` flags are accepted but ignored; they no longer restrict CPU instructions or processing width.
@@ -73,7 +75,7 @@ git submodule update --init --recursive
 
 The independent [Audio](third_party/audio_convert/README.md), [Video](third_party/video_convert/README.md), and [Composite](third_party/composite/README.md) modules supply computational kernels and are linked statically into the core. The host retains script interfaces, frame management, and CPU policy. See the [Composite adapter](modules/composite/README.md) for integrated filter behavior and numerical allowances.
 
-The project uses CMake and requires a compiler with C++17 support. Run the following commands from the repository root. They build only the core library, without compiling the bundled external plugins; the resulting core can still load compatible plugins normally.
+The project requires CMake 3.8 or newer and a C++17 compiler and standard library with `std::filesystem` support. Run the following commands from the repository root. They build only the core library, without compiling the bundled external plugins; the resulting core can still load compatible plugins normally.
 
 Iris is enabled by default and linked statically into the core. The default configuration requires LLVM 20–23 and automatically downloads and builds SLEEF; the default backend is `sleef`. If CMake cannot locate LLVM, pass `-DLLVM_DIR=<LLVM installation>/lib/cmake/llvm` when configuring.
 

@@ -10,7 +10,7 @@
 #include <cassert>
 #include <cstring>
 #include "function.h"
-#include <avs/filesystem.h>
+#include <filesystem>
 
 #ifdef AVS_WINDOWS
   #include <avs/win.h>
@@ -119,7 +119,7 @@ static bool GetRegString(HKEY rootKey, const char path[], const char entry[], st
 
 static std::string GetFullPathNameWrap(const std::string &f)
 {
-  return fs::absolute(fs::path(f).lexically_normal()).generic_string();
+  return std::filesystem::absolute(std::filesystem::path(f).lexically_normal()).generic_string();
 }
 
 // see also: AVSFunction::TypeMatch
@@ -673,7 +673,7 @@ void PluginManager::AutoloadPlugins()
 #else
     const char* binaryFilter = ".dll";
 #endif
-    for (auto& file : fs::directory_iterator(dir, fs::directory_options::skip_permission_denied | fs::directory_options::follow_directory_symlink, ec))
+    for (auto& file : std::filesystem::directory_iterator(dir, std::filesystem::directory_options::skip_permission_denied | std::filesystem::directory_options::follow_directory_symlink, ec))
     {
       const bool extensionsMatch =
 #ifdef AVS_POSIX
@@ -713,7 +713,7 @@ void PluginManager::AutoloadPlugins()
     }
 
     const char* scriptFilter = ".avsi";
-    for (auto& file : fs::directory_iterator(dir, fs::directory_options::skip_permission_denied | fs::directory_options::follow_directory_symlink, ec)) // and not recursive_directory_iterator
+    for (auto& file : std::filesystem::directory_iterator(dir, std::filesystem::directory_options::skip_permission_denied | std::filesystem::directory_options::follow_directory_symlink, ec)) // and not recursive_directory_iterator
     {
       const bool extensionsMatch =
 #ifdef AVS_POSIX

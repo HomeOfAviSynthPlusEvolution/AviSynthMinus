@@ -15,7 +15,7 @@
 #include <sstream>
 #include <iomanip>
 
-#include <avs/filesystem.h>
+#include <filesystem>
 
 static AVSValue DeepCopyValue(std::vector<std::unique_ptr<AVSValue[]>>& arrays, const AVSValue& src) {
   if (src.IsArray()) {
@@ -509,7 +509,7 @@ public:
 
 static std::string GetFullPathNameWrap(const std::string& f)
 {
-  return fs::absolute(fs::path(f).lexically_normal()).generic_string();
+  return std::filesystem::absolute(std::filesystem::path(f).lexically_normal()).generic_string();
 }
 
 static AVSValue DumpFilterGraph(AVSValue args, void* user_data, IScriptEnvironment* env) {

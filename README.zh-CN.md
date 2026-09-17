@@ -45,6 +45,8 @@ AviSynthMinus 以保持现有 AviSynth 脚本和插件的兼容性为目标，�
 
 macOS 的最低支持版本为 macOS 15.0（Sequoia），适用于 Intel x86_64 和 Apple Silicon arm64。更早的 macOS 版本不在本项目的支持范围内。
 
+SDK 已移除原有的 `<avs/filesystem.h>` 兼容头。包含该头的源码应改为包含 `<filesystem>`，并直接使用 `std::filesystem`。
+
 ### Expr 表达式
 
 `Expr` 和 `IrisExpr` 使用 [Iris 引擎](third_party/iris/README.zh-CN.md)。`Expr` 保留旧参数的名称、类型和位置；`optAvx2`、`optSingleMode`、`optSSE2`、`optVectorC` 接受但忽略，不再限制 CPU 指令集或处理宽度。
@@ -73,7 +75,7 @@ git submodule update --init --recursive
 
 独立的 [Audio](third_party/audio_convert/README.zh-CN.md)、[Video](third_party/video_convert/README.zh-CN.md) 和 [Composite](third_party/composite/README.zh-CN.md) 模块提供计算内核，并静态链接到核心。宿主保留脚本接口、帧管理和 CPU 策略。整合后的滤镜行为与精度约定见 [Composite 适配层说明](modules/composite/README.md)。
 
-项目使用 CMake 构建，需要支持 C++17 的编译器。以下命令在仓库根目录执行，仅构建核心库，不编译仓库附带的外部插件；生成的核心库仍可正常加载兼容的插件。
+项目要求 CMake 3.8 或更新版本，以及支持 C++17 和 `std::filesystem` 的编译器与标准库。以下命令在仓库根目录执行，仅构建核心库，不编译仓库附带的外部插件；生成的核心库仍可正常加载兼容的插件。
 
 默认启用 Iris，并将其静态链接到核心。默认配置需要 LLVM 20–23，自动下载并构建 SLEEF，默认后端为 `sleef`。如果 CMake 无法找到 LLVM，请在配置时传入 `-DLLVM_DIR=<LLVM 安装目录>/lib/cmake/llvm`。
 
