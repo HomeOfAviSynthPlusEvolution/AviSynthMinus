@@ -43,6 +43,8 @@ AviSynthMinus 以保持现有 AviSynth 脚本和插件的兼容性为目标，�
 
 欢迎提交兼容性问题报告。请提供 AviSynthMinus 版本、操作系统与架构、宿主应用和相关插件版本，以及能够复现问题的最小脚本；如果同一用法在 AviSynth+ 中表现不同，也请注明用于对比的版本和结果。
 
+macOS 的最低支持版本为 macOS 15.0（Sequoia），适用于 Intel x86_64 和 Apple Silicon arm64。更早的 macOS 版本不在本项目的支持范围内。
+
 ### Expr 表达式
 
 `Expr` 和 `IrisExpr` 使用 [Iris 引擎](third_party/iris/README.zh-CN.md)。`Expr` 保留旧参数的名称、类型和位置；`optAvx2`、`optSingleMode`、`optSSE2`、`optVectorC` 接受但忽略，不再限制 CPU 指令集或处理宽度。

@@ -43,6 +43,8 @@ AviSynthMinus は、既存の AviSynth スクリプトやプラグインとの�
 
 互換性の問題の報告を歓迎します。AviSynthMinus のバージョン、OS とアーキテクチャ、ホストアプリケーションと関連プラグインのバージョン、問題を再現できる最小限のスクリプトを添えてください。同じ使い方で AviSynth+ と動作が異なる場合は、比較に使用したバージョンと結果も記載してください。
 
+macOS の最低サポートバージョンは macOS 15.0（Sequoia）で、Intel x86_64 と Apple Silicon arm64 の両方に適用されます。それ以前の macOS は本プロジェクトのサポート対象外です。
+
 ### Expr 式
 
 `Expr` と `IrisExpr` は [Iris エンジン](third_party/iris/README.ja.md)を使用します。`Expr` は従来の引数名・型・位置を維持します。`optAvx2`、`optSingleMode`、`optSSE2`、`optVectorC` は受け付けますが無視され、CPU 命令や処理幅を制限しません。

@@ -43,6 +43,8 @@ The project targets Windows, Linux, and macOS, but the extent of validation may 
 
 Compatibility reports are welcome. Please include the AviSynthMinus version, operating system and architecture, host application and relevant plugin versions, and a minimal script that reproduces the issue. If the same usage behaves differently in AviSynth+, include the version and results used for comparison.
 
+The minimum supported macOS version is macOS 15.0 (Sequoia), for both Intel x86_64 and Apple Silicon arm64. Earlier macOS versions are outside the project's support scope.
+
 ### Expr expressions
 
 `Expr` and `IrisExpr` use the [Iris engine](third_party/iris/README.md). `Expr` preserves the legacy argument names, types, and positions. Its `optAvx2`, `optSingleMode`, `optSSE2`, and `optVectorC` flags are accepted but ignored; they no longer restrict CPU instructions or processing width.
