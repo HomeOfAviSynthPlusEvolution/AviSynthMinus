@@ -12,8 +12,8 @@
 # Minimum Cmake version for Intel C++ Compiler 2023: 3.22.3 (Win) 3.20 (Linux)
 # Howto: https://www.intel.com/content/www/us/en/developer/articles/technical/using-oneapi-compilers-with-cmake-in-visual-studio.html
 # "Intel(R) oneAPI DPC++ Compiler", two flavours. DPCPP is not compatible with Avisynth.
-# - Intel® NextGen Compiler (in base kit, LLVM based): TOOLSET = "Intel C++ Compiler 2023", COMPILER EXE NAME = icx.exe
-# - Intel® Classic Compiler (in extra HPC kit): TOOLSET = "Intel C++ Compiler 19.2", COMPILER EXE NAME = icl.exe
+# - Intel庐 NextGen Compiler (in base kit, LLVM based): TOOLSET = "Intel C++ Compiler 2023", COMPILER EXE NAME = icx.exe
+# - Intel庐 Classic Compiler (in extra HPC kit): TOOLSET = "Intel C++ Compiler 19.2", COMPILER EXE NAME = icl.exe
 # CMake support files.
 # - Info from: c:\Program Files (x86)\Intel\oneAPI\compiler\latest\windows\IntelDPCPP\ReadMe.txt
 # - copy c:\Program Files (x86)\Intel\oneAPI\compiler\latest\windows\IntelDPCPP\IntelDPCPPConfig.cmake to c:\Program Files\CMake\share\cmake-3.20\Modules\
@@ -64,6 +64,9 @@ set(version_bugfix ${CMAKE_MATCH_1})
 file(READ "avs_core/include/avisynth.h" versioning)
 string(REGEX MATCH "AVISYNTH_INTERFACE_VERSION = ([0-9]*)" _ ${versioning})
 set(AVISYNTH_INTERFACE_VERSION ${CMAKE_MATCH_1})
+
+option(ENABLE_IRIS "Build the internal IrisExpr filter" ON)
+set(AVS_IRIS_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/iris" CACHE PATH "Iris engine source directory")
 
 option(ENABLE_TESTS "Build unit tests" OFF)
 if(ENABLE_TESTS)
@@ -422,6 +425,36 @@ endif()
   set_directory_properties(PROPERTIES COMPILE_OPTIONS "${avs_if_compile_options}")
   add_subdirectory("third_party/internal_filters")
   set_directory_properties(PROPERTIES COMPILE_OPTIONS "${avs_core_compile_options}")
+  if(ENABLE_IRIS)
+    set(avs_iris_llvm_default ON)
+    if(WIN32 AND WINXP_SUPPORT)
+      set(avs_iris_llvm_default OFF)
+    endif()
+    set(avs_iris_sleef_default ${avs_iris_llvm_default})
+    if(WIN32 AND (CMAKE_GENERATOR_PLATFORM MATCHES "^[Aa][Rr][Mm]64$" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|arm64|aarch64|AARCH64)$"))
+      set(avs_iris_sleef_default OFF)
+    endif()
+    option(IRIS_LLVM "Build Iris with LLVM JIT" ${avs_iris_llvm_default})
+    option(IRIS_SLEEF "Build Iris with SLEEF math backends" ${avs_iris_sleef_default})
+    option(IRIS_FETCH_SLEEF "Fetch SLEEF when no local library is supplied" ON)
+    if(NOT EXISTS "${AVS_IRIS_SOURCE_DIR}/include/iris/host.h")
+      message(FATAL_ERROR "ENABLE_IRIS requires an Iris source tree with the internal host bridge; set AVS_IRIS_SOURCE_DIR.")
+    endif()
+    # Scope optional engine tests/plugin settings to this embedded build.
+    function(add_iris_engine)
+      set(BUILD_TESTING OFF)
+      set(IRIS_AVS OFF)
+      set(IRIS_BENCHMARKS OFF)
+      if(WIN32 OR APPLE)
+        # Windows/macOS distributions embed LLVM in the core shared library.
+        set(IRIS_LLVM_STATIC ON CACHE BOOL "Link LLVM component libraries statically" FORCE)
+      endif()
+      add_subdirectory("${AVS_IRIS_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/iris-engine" EXCLUDE_FROM_ALL)
+    endfunction()
+    set_directory_properties(PROPERTIES COMPILE_OPTIONS "${avs_if_compile_options}")
+    add_iris_engine()
+    set_directory_properties(PROPERTIES COMPILE_OPTIONS "${avs_core_compile_options}")
+  endif()
   add_subdirectory("avs_core")
   if(ENABLE_PLUGINS)
     add_subdirectory("plugins")

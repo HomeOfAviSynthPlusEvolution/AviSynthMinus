@@ -1,0 +1,43 @@
+name: Iris build dependencies
+description: Install pinned static LLVM SDKs on Windows/macOS and system LLVM on Linux.
+inputs:
+  architecture:
+    description: Windows target architecture
+    default: x64
+    required: false
+runs:
+  using: composite
+  steps:
+  - name: Select Iris backends
+    shell: bash
+    env:
+      TARGET_ARCH: ${{ inputs.architecture }}
+    run: |
+      sleef=ON
+      if [[ "$RUNNER_OS" == Windows && "$TARGET_ARCH" == ARM64 ]]; then
+        sleef=OFF
+      fi
+      echo 'IRIS_LLVM=ON' >> "$GITHUB_ENV"
+      echo "IRIS_SLEEF=$sleef" >> "$GITHUB_ENV"
+  - name: Install LLVM (Linux)
+    if: runner.os == 'Linux'
+    shell: bash
+    run: |
+      sudo apt-get update
+      sudo apt-get install -y ninja-build llvm-21-dev
+      echo 'LLVM_DIR=/usr/lib/llvm-21/lib/cmake/llvm' >> "$GITHUB_ENV"
+  - uses: actions/setup-python@v7.0.0
+    if: runner.os != 'Linux'
+    with:
+      python-version: '3.12'
+  - name: Install Ninja (macOS)
+    if: runner.os == 'macOS'
+    shell: bash
+    run: brew install ninja
+  - name: Download and verify static LLVM SDK
+    if: runner.os != 'Linux'
+    shell: bash
+    env:
+      SDK_ACTION_PATH: ${{ github.action_path }}
+      SDK_TARGET_ARCH: ${{ inputs.architecture }}
+    run: python "$SDK_ACTION_PATH/install-sdk.py"

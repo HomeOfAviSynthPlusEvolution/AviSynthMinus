@@ -164,6 +164,14 @@ void GlobalLockManager::release(const char* name)
     s_namedMutexes.erase(it);
 }
 
+#ifdef AVS_ENABLE_IRIS
+#include <avs_iris/expr.h>
+static const AVSFunction Iris_filters[] = {
+    {"Expr", BUILTIN_FUNC_PREFIX, "c+s+[format]s[optAvx2]b[optSingleMode]b[optSSE2]b[scale_inputs]s[clamp_float]b[clamp_float_UV]b[lut]i[optVectorC]b[backend]s[optimize]b[lut_max_mb]i", CreateExprCompat},
+    {"IrisExpr", BUILTIN_FUNC_PREFIX, "c+s+[format]s[backend]s[scale_inputs]s[clamp_float]b[clamp_float_UV]b[optimize]b[lut]i[lut_max_mb]i", CreateIrisExpr},
+    {0}};
+#endif
+
 extern const AVSFunction Audio_filters[],
                          Combine_filters[],
                          Convert_filters[],
@@ -178,7 +186,6 @@ extern const AVSFunction Audio_filters[],
                          Conditional_filters[],
                          Conditional_funtions_filters[],
                          Cache_filters[],
-                         Exprfilter_filters[],
                          FilterGraph_filters[],
                          Device_filters[]
 ;
@@ -224,7 +231,10 @@ const AVSFunction *const builtin_functions[] = {
     Cache_filters,
     FilterGraph_filters,
     Device_filters,
-    Exprfilter_filters};
+#ifdef AVS_ENABLE_IRIS
+    Iris_filters,
+#endif
+};
 
 #if 0
 // Global statistics counters

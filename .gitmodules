@@ -13,3 +13,6 @@
 [submodule "third_party/internal_filters"]
 	path = third_party/internal_filters
 	url = https://github.com/HomeOfAviSynthPlusEvolution/AviSynthInternalFilters.git
+[submodule "third_party/iris"]
+	path = third_party/iris
+	url = https://github.com/HomeOfAviSynthPlusEvolution/AviSynthIris.git

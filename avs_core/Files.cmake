@@ -34,9 +34,6 @@ FILE(GLOB AvsCore_Sources RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
   "filters/conditional/*.h"
 
 
-  "filters/exprfilter/*.cpp"
-  "filters/exprfilter/*.h"
-
 )
 
 IF(ENABLE_INTEL_SIMD)

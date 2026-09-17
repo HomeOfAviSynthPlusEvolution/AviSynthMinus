@@ -47,6 +47,11 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Install Iris dependencies
+        uses: ./.github/actions/iris-dependencies
+        with:
+          architecture: ${{ matrix.architecture || 'x64' }}
+
       - name: Configure (POSIX)
         if: matrix.family == 'linux' || matrix.family == 'macos'
         shell: bash
@@ -56,7 +61,7 @@ jobs:
             -DBUILD_SHARED_LIBS=ON \
             -DENABLE_TESTS=OFF \
             -DENABLE_PLUGINS=OFF \
-            -DENABLE_CUDA=OFF
+            -DENABLE_CUDA=OFF -DIRIS_LLVM=${{ env.IRIS_LLVM }} -DIRIS_SLEEF=${{ env.IRIS_SLEEF }}
 
       - name: Configure (Windows)
         if: matrix.family == 'windows'
@@ -67,7 +72,7 @@ jobs:
           -DBUILD_SHARED_LIBS=ON
           -DENABLE_TESTS=OFF
           -DENABLE_PLUGINS=OFF
-          -DENABLE_CUDA=OFF
+          -DENABLE_CUDA=OFF -DIRIS_LLVM=${{ env.IRIS_LLVM }} -DIRIS_SLEEF=${{ env.IRIS_SLEEF }}
 
       - name: Build (POSIX)
         if: matrix.family == 'linux' || matrix.family == 'macos'
@@ -114,12 +119,12 @@ jobs:
       - name: Configure shared API tests (POSIX)
         if: matrix.family == 'linux' || matrix.family == 'macos'
         shell: bash
-        run: cmake -S tests/shared_api -B build/shared-api -G Ninja -DCMAKE_BUILD_TYPE=Release -DAVS_INSTALL_PREFIX="$PWD/stage"
+        run: cmake -S tests/shared_api -B build/shared-api -G Ninja -DCMAKE_BUILD_TYPE=Release -DAVS_INSTALL_PREFIX="$PWD/stage" -DAVS_TEST_IRIS=ON -DAVS_TEST_IRIS_LLVM=${{ env.IRIS_LLVM }} -DAVS_TEST_IRIS_SLEEF=${{ env.IRIS_SLEEF }}
 
       - name: Configure shared API tests (Windows)
         if: matrix.family == 'windows'
         shell: pwsh
-        run: cmake -S tests/shared_api -B build/shared-api -G "Visual Studio 18 2026" -A ${{ matrix.architecture }} -T v145 -DAVS_INSTALL_PREFIX="$PWD/stage"
+        run: cmake -S tests/shared_api -B build/shared-api -G "Visual Studio 18 2026" -A ${{ matrix.architecture }} -T v145 -DAVS_INSTALL_PREFIX="$PWD/stage" -DAVS_TEST_IRIS=ON -DAVS_TEST_IRIS_LLVM=${{ env.IRIS_LLVM }} -DAVS_TEST_IRIS_SLEEF=${{ env.IRIS_SLEEF }}
 
       - name: Build shared API tests
         run: cmake --build build/shared-api --config Release --parallel
@@ -151,12 +156,17 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+      - name: Install Iris dependencies
+        uses: ./.github/actions/iris-dependencies
+        with:
+          architecture: ${{ matrix.architecture || 'x64' }}
+
       - name: Configure (POSIX)
         if: runner.os != 'Windows'
-        run: cmake -S . -B build/regression -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DENABLE_TESTS=ON -DENABLE_PLUGINS=OFF -DENABLE_CUDA=OFF
+        run: cmake -S . -B build/regression -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DENABLE_TESTS=ON -DENABLE_PLUGINS=OFF -DENABLE_CUDA=OFF -DIRIS_LLVM=${{ env.IRIS_LLVM }} -DIRIS_SLEEF=${{ env.IRIS_SLEEF }}
       - name: Configure (Windows)
         if: runner.os == 'Windows'
-        run: cmake -S . -B build/regression -G "Visual Studio 18 2026" -A ${{ matrix.architecture }} -T v145 -DBUILD_SHARED_LIBS=OFF -DENABLE_TESTS=ON -DENABLE_PLUGINS=OFF -DENABLE_CUDA=OFF
+        run: cmake -S . -B build/regression -G "Visual Studio 18 2026" -A ${{ matrix.architecture }} -T v145 -DBUILD_SHARED_LIBS=OFF -DENABLE_TESTS=ON -DENABLE_PLUGINS=OFF -DENABLE_CUDA=OFF -DIRIS_LLVM=${{ env.IRIS_LLVM }} -DIRIS_SLEEF=${{ env.IRIS_SLEEF }}
       - name: Build
         run: cmake --build build/regression --config Release --parallel
       - name: Test

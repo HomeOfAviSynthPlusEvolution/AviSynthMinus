@@ -148,6 +148,11 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/modules/video_convert" "${CMAKE_CURRENT_BI
 add_subdirectory("${CMAKE_SOURCE_DIR}/modules/composite" "${CMAKE_CURRENT_BINARY_DIR}/modules/composite")
 add_subdirectory("${CMAKE_SOURCE_DIR}/modules/internal_filters" "${CMAKE_CURRENT_BINARY_DIR}/modules/internal_filters")
 target_link_libraries(AvsCore AvsInternalFilters)
+if(ENABLE_IRIS)
+  add_subdirectory("${CMAKE_SOURCE_DIR}/modules/iris" "${CMAKE_CURRENT_BINARY_DIR}/modules/iris")
+  target_link_libraries(AvsCore AvsIris)
+  target_compile_definitions(AvsCore PRIVATE AVS_ENABLE_IRIS=1)
+endif()
 
 target_link_libraries(AvsCore AvsAudioConvert AvsVideoConvert AviSynth::ConvertVideo AvsComposite)
 

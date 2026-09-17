@@ -1,0 +1,26 @@
+{
+  "repository": "HomeOfAviSynthPlusEvolution/llvm-static-builds",
+  "tag": "llvm-23.1.1-r1",
+  "assets": {
+    "windows-x86": {
+      "name": "llvm-23.1.1-r1-windows-x86-clang-cl23.1.1-v145-md.zip",
+      "sha256": "b7194b0a6785c75fd01b4f4dc230ec286740f587b668987ca9092ecf68f18981"
+    },
+    "windows-x64": {
+      "name": "llvm-23.1.1-r1-windows-x64-clang-cl23.1.1-v145-md.zip",
+      "sha256": "c84ef7e5d7e8b7ab8ebb4fd1e3e2493b9c69b4586f07450c83553d2f1daa952c"
+    },
+    "windows-arm64": {
+      "name": "llvm-23.1.1-r1-windows-arm64-clang-cl23.1.1-v145-md.zip",
+      "sha256": "0ef69b3f2276a12dc965d83f5ade5dced6ebc48e0c1d57fa09181335798c8e5a"
+    },
+    "macos-x64": {
+      "name": "llvm-23.1.1-r1-macos-x64-xcode16.4-macos15.0.tar.xz",
+      "sha256": "a50db4d130f621a81a29ef8d2f4f0cecb1c45e3e069a73871ba71bf01f08d05c"
+    },
+    "macos-arm64": {
+      "name": "llvm-23.1.1-r1-macos-arm64-xcode16.4-macos15.0.tar.xz",
+      "sha256": "49758d87f7368f83e2472baef9c8f4532336e090de80100798fc21a3348f6046"
+    }
+  }
+}

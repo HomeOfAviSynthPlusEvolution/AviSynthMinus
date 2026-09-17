@@ -43,6 +43,12 @@ AviSynthMinus 以保持现有 AviSynth 脚本和插件的兼容性为目标，�
 
 欢迎提交兼容性问题报告。请提供 AviSynthMinus 版本、操作系统与架构、宿主应用和相关插件版本，以及能够复现问题的最小脚本；如果同一用法在 AviSynth+ 中表现不同，也请注明用于对比的版本和结果。
 
+### Expr 表达式
+
+`Expr` 和 `IrisExpr` 使用 [Iris 引擎](third_party/iris/README.zh-CN.md)。`Expr` 保留旧参数的名称、类型和位置；`optAvx2`、`optSingleMode`、`optSSE2`、`optVectorC` 接受但忽略，不再限制 CPU 指令集或处理宽度。
+
+新参数 `backend`、`optimize`、`lut_max_mb` 追加在旧参数之后。通过 `backend` 选择执行后端，省略时使用构建默认值。`IrisExpr` 提供不含旧优化开关的接口。表达式和后端选项详见 Iris 文档。
+
 ## 快速开始
 
 安装完成后，新建一个名为 `version.avs` 的纯文本文件，内容如下：
@@ -67,7 +73,15 @@ git submodule update --init --recursive
 
 项目使用 CMake 构建，需要支持 C++17 的编译器。以下命令在仓库根目录执行，仅构建核心库，不编译仓库附带的外部插件；生成的核心库仍可正常加载兼容的插件。
 
-**Windows（Visual Studio 2026，x64）：**
+默认启用 Iris，并将其静态链接到核心。默认配置需要 LLVM 20–23，自动下载并构建 SLEEF，默认后端为 `sleef`。如果 CMake 无法找到 LLVM，请在配置时传入 `-DLLVM_DIR=<LLVM 安装目录>/lib/cmake/llvm`。
+
+可通过 `IRIS_LLVM`、`IRIS_SLEEF` 调整依赖配置；缺少所请求的依赖会在配置时报错。`ENABLE_IRIS=OFF` 会同时移除 `Expr` 和 `IrisExpr`。
+
+**Windows：**
+
+Windows XP 默认使用标量 Iris；Windows ARM64 使用 LLVM，不启用 SLEEF。Windows 构建将 LLVM 静态链接进 `avisynth.dll`，不额外部署 LLVM DLL。现代 Windows x86 和 x64 默认启用 LLVM 与 SLEEF。LLVM 组件库必须与核心使用一致的 C/C++ 运行库配置（标准 Release 构建使用 `/MD`）。
+
+以下示例使用 Visual Studio 2026 构建 x64 版本：
 
 ```powershell
 cmake -S . -B build/core -G "Visual Studio 18 2026" -A x64 -DBUILD_SHARED_LIBS=ON -DENABLE_TESTS=OFF -DENABLE_PLUGINS=OFF
@@ -77,6 +91,8 @@ cmake --build build/core --config Release --parallel
 Windows 下也可以使用 clang-cl 编译。在部分处理场景中，clang-cl 构建的性能可能优于 MSVC 构建；具体表现取决于编译器版本、编译选项和处理内容，建议使用实际工作负载进行比较。
 
 **Linux / macOS（需要 Ninja 和相应的 C++ 工具链）：**
+
+Linux 使用系统 LLVM 运行库。Windows 和 macOS CI 下载固定校验值的 [LLVM 静态 SDK](https://github.com/HomeOfAviSynthPlusEvolution/llvm-static-builds/releases/tag/llvm-23.1.1-r1)；macOS 将 LLVM 嵌入核心，最低目标系统为 macOS 15.0。
 
 ```sh
 cmake -S . -B build/core -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DENABLE_TESTS=OFF -DENABLE_PLUGINS=OFF

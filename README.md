@@ -43,6 +43,12 @@ The project targets Windows, Linux, and macOS, but the extent of validation may 
 
 Compatibility reports are welcome. Please include the AviSynthMinus version, operating system and architecture, host application and relevant plugin versions, and a minimal script that reproduces the issue. If the same usage behaves differently in AviSynth+, include the version and results used for comparison.
 
+### Expr expressions
+
+`Expr` and `IrisExpr` use the [Iris engine](third_party/iris/README.md). `Expr` preserves the legacy argument names, types, and positions. Its `optAvx2`, `optSingleMode`, `optSSE2`, and `optVectorC` flags are accepted but ignored; they no longer restrict CPU instructions or processing width.
+
+The new `backend`, `optimize`, and `lut_max_mb` arguments follow the legacy arguments. Use `backend` to select execution; omitting it uses the build default. `IrisExpr` provides the interface without the legacy flags. See the Iris documentation for expressions and backend options.
+
 ## Quick start
 
 After installation, create a plain text file named `version.avs` containing:
@@ -67,7 +73,15 @@ The independent [Audio](third_party/audio_convert/README.md), [Video](third_part
 
 The project uses CMake and requires a compiler with C++17 support. Run the following commands from the repository root. They build only the core library, without compiling the bundled external plugins; the resulting core can still load compatible plugins normally.
 
-**Windows (Visual Studio 2026, x64):**
+Iris is enabled by default and linked statically into the core. The default configuration requires LLVM 20–23 and automatically downloads and builds SLEEF; the default backend is `sleef`. If CMake cannot locate LLVM, pass `-DLLVM_DIR=<LLVM installation>/lib/cmake/llvm` when configuring.
+
+Use `IRIS_LLVM` and `IRIS_SLEEF` to change the dependency configuration. Missing requested dependencies cause a configuration error. `ENABLE_IRIS=OFF` removes both `Expr` and `IrisExpr`.
+
+**Windows:**
+
+Windows XP defaults to scalar Iris; Windows ARM64 uses LLVM without SLEEF. Windows builds link LLVM statically into `avisynth.dll`; no separate LLVM DLL is deployed. Modern Windows x86 and x64 use LLVM with SLEEF by default. The LLVM component libraries must match the core’s C/C++ runtime configuration (`/MD` for the standard Release build).
+
+Example using Visual Studio 2026 for x64:
 
 ```powershell
 cmake -S . -B build/core -G "Visual Studio 18 2026" -A x64 -DBUILD_SHARED_LIBS=ON -DENABLE_TESTS=OFF -DENABLE_PLUGINS=OFF
@@ -77,6 +91,8 @@ cmake --build build/core --config Release --parallel
 You can also build with clang-cl on Windows. In some processing scenarios, clang-cl builds may perform better than MSVC builds. Results depend on compiler versions, build options, and the processing involved, so compare them using your actual workloads.
 
 **Linux / macOS (requires Ninja and an appropriate C++ toolchain):**
+
+Linux uses the system LLVM runtime. Windows and macOS CI download checksum-pinned [static LLVM SDKs](https://github.com/HomeOfAviSynthPlusEvolution/llvm-static-builds/releases/tag/llvm-23.1.1-r1); macOS embeds LLVM in the core and targets macOS 15.0 or newer.
 
 ```sh
 cmake -S . -B build/core -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DENABLE_TESTS=OFF -DENABLE_PLUGINS=OFF

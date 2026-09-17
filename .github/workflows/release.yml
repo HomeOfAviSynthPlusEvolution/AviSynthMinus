@@ -130,6 +130,11 @@ jobs:
           test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
           test "$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
 
+      - name: Install Iris dependencies
+        uses: ./.github/actions/iris-dependencies
+        with:
+          architecture: ${{ matrix.architecture || 'x64' }}
+
       - name: Configure (POSIX)
         if: matrix.family == 'linux' || matrix.family == 'macos'
         shell: bash
@@ -139,7 +144,7 @@ jobs:
             -DBUILD_SHARED_LIBS=ON \
             -DENABLE_TESTS=OFF \
             -DENABLE_PLUGINS=OFF \
-            -DENABLE_CUDA=OFF
+            -DENABLE_CUDA=OFF -DIRIS_LLVM=${{ env.IRIS_LLVM }} -DIRIS_SLEEF=${{ env.IRIS_SLEEF }}
 
       - name: Configure (Windows)
         if: matrix.family == 'windows'
@@ -150,7 +155,7 @@ jobs:
           -DBUILD_SHARED_LIBS=ON
           -DENABLE_TESTS=OFF
           -DENABLE_PLUGINS=OFF
-          -DENABLE_CUDA=OFF
+          -DENABLE_CUDA=OFF -DIRIS_LLVM=${{ env.IRIS_LLVM }} -DIRIS_SLEEF=${{ env.IRIS_SLEEF }}
 
       - name: Build (POSIX)
         if: matrix.family == 'linux' || matrix.family == 'macos'
@@ -296,7 +301,7 @@ jobs:
           -DBUILD_SHARED_LIBS=ON
           -DENABLE_TESTS=OFF
           -DENABLE_PLUGINS=OFF
-          -DENABLE_CUDA=OFF
+          -DENABLE_CUDA=OFF -DIRIS_LLVM=OFF -DIRIS_SLEEF=OFF
           -DWINXP_SUPPORT=ON
           -DMSVC_CPU_ARCH=${{ matrix.msvc_cpu_arch }}
 

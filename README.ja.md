@@ -43,6 +43,12 @@ AviSynthMinus は、既存の AviSynth スクリプトやプラグインとの�
 
 互換性の問題の報告を歓迎します。AviSynthMinus のバージョン、OS とアーキテクチャ、ホストアプリケーションと関連プラグインのバージョン、問題を再現できる最小限のスクリプトを添えてください。同じ使い方で AviSynth+ と動作が異なる場合は、比較に使用したバージョンと結果も記載してください。
 
+### Expr 式
+
+`Expr` と `IrisExpr` は [Iris エンジン](third_party/iris/README.ja.md)を使用します。`Expr` は従来の引数名・型・位置を維持します。`optAvx2`、`optSingleMode`、`optSSE2`、`optVectorC` は受け付けますが無視され、CPU 命令や処理幅を制限しません。
+
+新しい `backend`、`optimize`、`lut_max_mb` は従来の引数の後に追加されます。`backend` で実行バックエンドを選択でき、省略時はビルドの既定値が使われます。`IrisExpr` は旧フラグを含まないインターフェースを提供します。式とバックエンドの詳細は Iris のドキュメントを参照してください。
+
 ## クイックスタート
 
 インストール後、`version.avs` という名前のプレーンテキストファイルを作成し、次の内容を記述します。
@@ -67,7 +73,15 @@ git submodule update --init --recursive
 
 本プロジェクトは CMake を使用し、C++17 対応のコンパイラーを必要とします。以下のコマンドはリポジトリのルートで実行してください。コアライブラリのみをビルドし、同梱の外部プラグインはコンパイルしません。生成されたコアは、互換性のあるプラグインを通常どおり読み込めます。
 
-**Windows（Visual Studio 2026、x64）：**
+Iris は既定で有効になり、コアに静的リンクされます。既定の構成には LLVM 20–23 が必要です。SLEEF は自動的に取得・ビルドされ、既定バックエンドは `sleef` です。CMake が LLVM を検出できない場合は、構成時に `-DLLVM_DIR=<LLVM インストール先>/lib/cmake/llvm` を指定してください。
+
+`IRIS_LLVM` と `IRIS_SLEEF` で依存関係を変更できます。要求した依存関係がない場合は構成エラーになります。`ENABLE_IRIS=OFF` は `Expr` と `IrisExpr` の両方を除外します。
+
+**Windows：**
+
+Windows XP はスカラー Iris、Windows ARM64 は SLEEF なしの LLVM を既定とします。Windows では LLVM を `avisynth.dll` に静的リンクするため、別の LLVM DLL は配布しません。最新の Windows 向け x86/x64 ビルドは LLVM と SLEEF を既定で有効にします。LLVM コンポーネントライブラリの C/C++ ランタイム設定は、コアと一致する必要があります（標準の Release ビルドは `/MD`）。
+
+以下は Visual Studio 2026 で x64 版をビルドする例です。
 
 ```powershell
 cmake -S . -B build/core -G "Visual Studio 18 2026" -A x64 -DBUILD_SHARED_LIBS=ON -DENABLE_TESTS=OFF -DENABLE_PLUGINS=OFF
@@ -77,6 +91,8 @@ cmake --build build/core --config Release --parallel
 Windows では clang-cl でビルドすることもできます。処理内容によっては、clang-cl によるビルドが MSVC によるビルドより高い性能を示す場合があります。実際の性能はコンパイラーのバージョン、ビルドオプション、処理内容によって変わるため、実際のワークロードで比較することをお勧めします。
 
 **Linux / macOS（Ninja と適切な C++ ツールチェーンが必要）：**
+
+Linux はシステムの LLVM ランタイムを使用します。Windows と macOS の CI はチェックサムを固定した [LLVM 静的 SDK](https://github.com/HomeOfAviSynthPlusEvolution/llvm-static-builds/releases/tag/llvm-23.1.1-r1) を取得します。macOS は LLVM をコアに組み込み、macOS 15.0 以降を対象とします。
 
 ```sh
 cmake -S . -B build/core -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DENABLE_TESTS=OFF -DENABLE_PLUGINS=OFF

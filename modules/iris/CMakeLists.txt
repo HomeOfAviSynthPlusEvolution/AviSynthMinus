@@ -1,0 +1,21 @@
+# Internal host adapter; only C data crosses into the Iris engine.
+add_library(AvsIris STATIC src/expr.cpp)
+set_target_properties(AvsIris PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_features(AvsIris PRIVATE cxx_std_17)
+target_compile_definitions(AvsIris PRIVATE BUILDING_AVSCORE)
+if(NOT BUILD_SHARED_LIBS)
+  target_compile_definitions(AvsIris PRIVATE AVS_STATIC_LIB)
+endif()
+target_link_libraries(AvsIris PRIVATE Iris::Iris)
+if(IRIS_LLVM AND IRIS_SLEEF)
+  target_compile_definitions(AvsIris PRIVATE AVS_IRIS_DEFAULT_BACKEND="sleef")
+elseif(IRIS_LLVM)
+  target_compile_definitions(AvsIris PRIVATE AVS_IRIS_DEFAULT_BACKEND="llvm")
+else()
+  target_compile_definitions(AvsIris PRIVATE AVS_IRIS_DEFAULT_BACKEND="scalar")
+endif()
+# The parent supports old CMake policies that do not forward link options
+# through a static library's private dependencies (CMP0099).
+target_link_options(AvsIris INTERFACE "$<TARGET_PROPERTY:iris,INTERFACE_LINK_OPTIONS>")
+target_include_directories(AvsIris PRIVATE "${CMAKE_SOURCE_DIR}/avs_core/include")
+target_include_directories(AvsIris PUBLIC "${CMAKE_CURRENT_LIST_DIR}/include")
