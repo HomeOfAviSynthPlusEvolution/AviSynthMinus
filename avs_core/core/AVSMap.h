@@ -61,11 +61,12 @@ public:
   }
 
   vs_intrusive_ptr& operator=(vs_intrusive_ptr const& ptr) noexcept {
+    T* next = ptr.obj;
+    if (next)
+      next->add_ref();
     if (obj)
       obj->release();
-    obj = ptr.obj;
-    if (obj)
-      obj->add_ref();
+    obj = next;
     return *this;
   }
 
