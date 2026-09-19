@@ -67,7 +67,6 @@ def main():
     licenses = {
         'licenses/GPL.txt': (repo / 'distrib/gpl.txt').read_bytes(),
         'licenses/LGPL-used-libraries.txt': (repo / 'distrib/lgpl_for_used_libs.txt').read_bytes(),
-        'licenses/filesystem-MIT.txt': (repo / 'filesystem/LICENSE').read_bytes(),
     }
     platforms = [
         ('windows', 'x86', 'avisynth-windows-vs2026-x86', 'pe', 0x14c),
