@@ -301,7 +301,16 @@ void convert_yv24_back_to_yuy2_sse2(const BYTE* srcY, const BYTE* srcU, const BY
       _mm_store_si128(reinterpret_cast<__m128i*>(dstp+x*2+16), yuv_hi);
     }
 
-    if (mod16_width != width) {
+    if (width < 16) {
+      // A full vector ending at the row end would access bytes before the row.
+      for (int x = 0; x < width; x += 2) {
+        dstp[x * 2] = srcY[x];
+        dstp[x * 2 + 1] = srcU[x];
+        dstp[x * 2 + 2] = srcY[x + 1];
+        dstp[x * 2 + 3] = srcV[x];
+      }
+    }
+    else if (mod16_width != width) {
       __m128i y = _mm_loadu_si128(reinterpret_cast<const __m128i*>(srcY+width-16));
       __m128i u = _mm_loadu_si128(reinterpret_cast<const __m128i*>(srcU+width-16));
       __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i*>(srcV+width-16));
