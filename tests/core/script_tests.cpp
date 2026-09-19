@@ -4,9 +4,43 @@
 #include "support/avisynth_environment.h"
 
 #include <cstdint>
+#include <limits>
+#include <string>
 
 namespace avsut::test {
 namespace {
+
+TEST(ScriptFormatting, PreservesLargeFloatsAndDefaultPrecision) {
+  AviSynthEnvironment environment;
+  auto* env = environment.get();
+  for (double value : {std::numeric_limits<double>::max(),
+                       -std::numeric_limits<double>::max(), 1.25, -0.0}) {
+    const AVSValue input(value);
+    const std::string plain = env->Invoke("String", AVSValue(&input, 1)).AsString();
+    const AVSValue format_args[] = {AVSValue("{}"), input};
+    const std::string formatted = env->Invoke("Format", AVSValue(format_args, 2)).AsString();
+    EXPECT_EQ(plain, formatted);
+    if (value == std::numeric_limits<double>::max() ||
+        value == -std::numeric_limits<double>::max()) {
+      EXPECT_EQ(plain.size(), value < 0 ? 317u : 316u);
+      EXPECT_EQ(plain.substr(plain.size() - 7), ".000000");
+      EXPECT_EQ(std::stod(plain), value);
+    } else {
+      EXPECT_EQ(plain, value == 1.25 ? "1.250000" : "-0.000000");
+    }
+  }
+}
+
+TEST(ScriptFormatting, PreservesFullWidthIntegers) {
+  AviSynthEnvironment environment;
+  for (int64_t value : {INT64_C(5000000000), INT64_C(-5000000000),
+                        std::numeric_limits<int64_t>::min(),
+                        std::numeric_limits<int64_t>::max()}) {
+    const AVSValue args[] = {AVSValue("{}"), AVSValue(value)};
+    EXPECT_EQ(environment.get()->Invoke("Format", AVSValue(args, 2)).AsString(),
+              std::to_string(value));
+  }
+}
 
 TEST(ScriptAbs, PreservesSixtyFourBitIntegerRange) {
   AviSynthEnvironment environment;

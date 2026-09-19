@@ -41,6 +41,7 @@
 #include <vector>
 #include <fstream>
 #include <memory>
+#include <type_traits>
 #include <limits>
 #include <bitset>
 
@@ -1688,6 +1689,32 @@ AVSValue GetParity(AVSValue args, void*, IScriptEnvironment*) {  return args[0].
 AVSValue HasVideo(AVSValue args, void*, IScriptEnvironment*) {  return VI(args[0]).HasVideo(); }
 AVSValue HasAudio(AVSValue args, void*, IScriptEnvironment*) {  return VI(args[0]).HasAudio(); }
 
+static std::string FormatDefaultFloat(double value, IScriptEnvironment* env)
+{
+  // Keep the historical six fractional digits without imposing a size limit.
+#ifdef MSVC
+  const auto free_locale = [](_locale_t locale) { _free_locale(locale); };
+  std::unique_ptr<std::remove_pointer_t<_locale_t>, decltype(free_locale)>
+    locale(_create_locale(LC_NUMERIC, "C"), free_locale);
+  if (!locale)
+    env->ThrowError("String: could not create numeric locale");
+  const int length = _scprintf_l("%lf", locale.get(), value);
+#else
+  const int length = std::snprintf(nullptr, 0, "%lf", value);
+#endif
+  if (length < 0)
+    env->ThrowError("String: could not format floating-point value");
+  std::vector<char> buffer(static_cast<size_t>(length) + 1);
+#ifdef MSVC
+  const int written = _snprintf_l(buffer.data(), buffer.size(), "%lf", locale.get(), value);
+#else
+  const int written = std::snprintf(buffer.data(), buffer.size(), "%lf", value);
+#endif
+  if (written != length)
+    env->ThrowError("String: could not format floating-point value");
+  return std::string(buffer.data(), static_cast<size_t>(length));
+}
+
 AVSValue String(AVSValue args, void*, IScriptEnvironment* env)
 {
   if (args[0].IsString()) return args[0];
@@ -1722,15 +1749,7 @@ AVSValue String(AVSValue args, void*, IScriptEnvironment* env)
       return env->SaveString(s);
     }
     if (args[0].IsFloat()) { // for double as well.
-      char s[50]; // safe size for double
-#ifdef MSVC
-      _locale_t locale = _create_locale(LC_NUMERIC, "C"); // decimal point: dot
-      _sprintf_l(s, "%lf", locale, args[0].AsFloat());
-      _free_locale(locale);
-#else
-      sprintf(s, "%lf", args[0].AsFloat());
-#endif
-      return env->SaveString(s);
+      return env->SaveString(FormatDefaultFloat(args[0].AsFloat(), env).c_str());
     }
   }
   return "";
@@ -1750,17 +1769,9 @@ static std::string AVSValue_to_string(AVSValue v, IScriptEnvironment* env) {
   if (v.IsString()) return v.AsString();
   if (v.IsBool()) return v.AsBool() ? "true" : "false";
   if (v.IsFunction()) return v.AsFunction()->ToString(env);
-  if (v.IsInt()) return std::to_string(v.AsInt());
+  if (v.IsInt()) return std::to_string(v.AsLong());
   if (v.IsFloat()) {
-    char s[30];
-#ifdef MSVC
-    _locale_t locale = _create_locale(LC_NUMERIC, "C"); // decimal point: dot
-    _sprintf_l(s, "%lf", locale, v.AsFloat());
-    _free_locale(locale);
-#else
-    sprintf(s, "%lf", v.AsFloat());
-#endif
-    return s;
+    return FormatDefaultFloat(v.AsFloat(), env);
   }
   return "";
 }
