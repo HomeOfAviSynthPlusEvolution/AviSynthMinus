@@ -53,6 +53,14 @@ SDK 已移除原有的 `<avs/filesystem.h>` 兼容头。包含该头的源码应
 
 新参数 `backend`、`optimize`、`lut_max_mb` 追加在旧参数之后。通过 `backend` 选择执行后端，省略时使用构建默认值。`IrisExpr` 提供不含旧优化开关的接口。表达式和后端选项详见 Iris 文档。
 
+Iris 的 JIT 目标选择目前不遵循 `SetMaxCPU`；需要解释器时请指定 `backend="scalar"`。这一点与 Highway 转换／合成路径不同。不同后端和优化设置的浮点结果不保证完全一致。
+
+### 跨架构 SIMD 与独立模块
+
+AudioConvert、VideoConvert、Composite 和 InternalFilters 将许多原有的 x86 SSE/AVX 内核替换为普通 C/C++ 与 Google Highway 实现。音频格式转换、视频转换／缩放和合成可在编译器、内核与 CPU 均支持时使用原生 ARM64 SIMD。共享分派策略包含 NEON，以及有条件可用的 SVE/SVE2；实际目标随编译器、操作和构建配置而异。
+
+这些模块链接在核心内，用户无需额外安装为插件。Audio、Video、Composite 和 Iris 的 C 接口也便于其他宿主以匹配的源码和适配层复用，但不等于已经提供受支持的其他宿主插件。
+
 ## 快速开始
 
 安装完成后，新建一个名为 `version.avs` 的纯文本文件，内容如下：
@@ -73,11 +81,11 @@ Version()
 git submodule update --init --recursive
 ```
 
-独立的 [Audio](third_party/audio_convert/README.zh-CN.md)、[Video](third_party/video_convert/README.zh-CN.md) 和 [Composite](third_party/composite/README.zh-CN.md) 模块提供计算内核，并静态链接到核心。宿主保留脚本接口、帧管理和 CPU 策略。整合后的滤镜行为与精度约定见 [Composite 适配层说明](modules/composite/README.md)。
+固定版本的五个模块为 [Audio](third_party/audio_convert/README.zh-CN.md)、[Video](third_party/video_convert/README.zh-CN.md)、[Composite](third_party/composite/README.zh-CN.md)、[InternalFilters](third_party/internal_filters) 和 [Iris](third_party/iris/README.zh-CN.md)，随核心一起构建。首次获取请使用 `git clone --recurse-submodules`；GitHub 自动生成的源码 ZIP/tar 不包含子模块内容，不能单独作为完整构建源码。
 
-项目要求 CMake 3.8 或更新版本，以及支持 C++17 和 `std::filesystem` 的编译器与标准库。以下命令在仓库根目录执行，仅构建核心库，不编译仓库附带的外部插件；生成的核心库仍可正常加载兼容的插件。
+项目要求 CMake 3.24 或更新版本，以及支持 C++17 和 `std::filesystem` 的编译器与标准库。以下命令在仓库根目录执行，仅构建核心库，不编译仓库附带的外部插件；生成的核心库仍可正常加载兼容的插件。
 
-默认启用 Iris，并将其静态链接到核心。默认配置需要 LLVM 20–23，自动下载并构建 SLEEF，默认后端为 `sleef`。如果 CMake 无法找到 LLVM，请在配置时传入 `-DLLVM_DIR=<LLVM 安装目录>/lib/cmake/llvm`。
+默认启用 Iris，并将其静态链接到核心。默认配置需要 LLVM 20 或更新版本（已测试的 API 范围为 20–23），自动下载并构建 SLEEF，默认后端为 `sleef`。如果 CMake 无法找到 LLVM，请在配置时传入 `-DLLVM_DIR=<LLVM 安装目录>/lib/cmake/llvm`。
 
 可通过 `IRIS_LLVM`、`IRIS_SLEEF` 调整依赖配置；缺少所请求的依赖会在配置时报错。`ENABLE_IRIS=OFF` 会同时移除 `Expr` 和 `IrisExpr`。
 

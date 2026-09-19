@@ -53,6 +53,14 @@ SDK から従来の互換ヘッダー `<avs/filesystem.h>` を削除しました
 
 新しい `backend`、`optimize`、`lut_max_mb` は従来の引数の後に追加されます。`backend` で実行バックエンドを選択でき、省略時はビルドの既定値が使われます。`IrisExpr` は旧フラグを含まないインターフェースを提供します。式とバックエンドの詳細は Iris のドキュメントを参照してください。
 
+Iris の JIT 対象選択は現在 `SetMaxCPU` に従いません。インタープリターを使う場合は `backend="scalar"` を指定してください。Highway の変換・合成経路とは異なり、バックエンドや最適化設定によって浮動小数点結果が異なる場合があります。
+
+### クロスアーキテクチャ SIMD と独立モジュール
+
+AudioConvert、VideoConvert、Composite、InternalFilters は、従来の x86 SSE/AVX カーネルの多くを通常の C/C++ と Google Highway に置き換えています。音声形式変換、映像変換・リサイズ、合成は、コンパイル済みカーネルと CPU が対応する場合、ネイティブ ARM64 SIMD を利用できます。共通の選択方針には NEON と条件付きの SVE/SVE2 が含まれます。利用可能な対象はコンパイラー、処理、構成によって異なります。
+
+モジュールはコアにリンクされるため、別のプラグインとしてインストールする必要はありません。Audio、Video、Composite、Iris の C インターフェースは、対応するソースとアダプターを使った他ホストでの再利用にも役立ちますが、他ホスト用の正式なプラグインを提供するものではありません。
+
 ## クイックスタート
 
 インストール後、`version.avs` という名前のプレーンテキストファイルを作成し、次の内容を記述します。
@@ -73,11 +81,11 @@ AviSynth スクリプトの読み込みに対応したプレーヤー、エデ�
 git submodule update --init --recursive
 ```
 
-独立した [Audio](third_party/audio_convert/README.ja.md)、[Video](third_party/video_convert/README.ja.md)、[Composite](third_party/composite/README.ja.md) モジュールが計算カーネルを提供し、コアに静的リンクされます。スクリプトインターフェース、フレーム管理、CPU 方針はホストが担当します。統合後のフィルター動作と許容誤差は [Composite アダプター](modules/composite/README.md)を参照してください。
+固定された 5 つのモジュールは [Audio](third_party/audio_convert/README.ja.md)、[Video](third_party/video_convert/README.ja.md)、[Composite](third_party/composite/README.ja.md)、[InternalFilters](third_party/internal_filters)、[Iris](third_party/iris/README.ja.md) で、コアと一緒にビルドします。新規取得には `git clone --recurse-submodules` を使用してください。GitHub が自動生成するソース ZIP/tar にはサブモジュールの内容が含まれず、それだけではビルドできません。
 
-本プロジェクトには CMake 3.8 以降と、C++17 および `std::filesystem` に対応したコンパイラーと標準ライブラリが必要です。以下のコマンドはリポジトリのルートで実行してください。コアライブラリのみをビルドし、同梱の外部プラグインはコンパイルしません。生成されたコアは、互換性のあるプラグインを通常どおり読み込めます。
+本プロジェクトには CMake 3.24 以降と、C++17 および `std::filesystem` に対応したコンパイラーと標準ライブラリが必要です。以下のコマンドはリポジトリのルートで実行してください。コアライブラリのみをビルドし、同梱の外部プラグインはコンパイルしません。生成されたコアは、互換性のあるプラグインを通常どおり読み込めます。
 
-Iris は既定で有効になり、コアに静的リンクされます。既定の構成には LLVM 20–23 が必要です。SLEEF は自動的に取得・ビルドされ、既定バックエンドは `sleef` です。CMake が LLVM を検出できない場合は、構成時に `-DLLVM_DIR=<LLVM インストール先>/lib/cmake/llvm` を指定してください。
+Iris は既定で有効になり、コアに静的リンクされます。既定の構成には LLVM 20 以降が必要です（テスト済み API の範囲は 20–23）。SLEEF は自動的に取得・ビルドされ、既定バックエンドは `sleef` です。CMake が LLVM を検出できない場合は、構成時に `-DLLVM_DIR=<LLVM インストール先>/lib/cmake/llvm` を指定してください。
 
 `IRIS_LLVM` と `IRIS_SLEEF` で依存関係を変更できます。要求した依存関係がない場合は構成エラーになります。`ENABLE_IRIS=OFF` は `Expr` と `IrisExpr` の両方を除外します。
 

@@ -53,6 +53,14 @@ The former `<avs/filesystem.h>` compatibility header has been removed from the S
 
 The new `backend`, `optimize`, and `lut_max_mb` arguments follow the legacy arguments. Use `backend` to select execution; omitting it uses the build default. `IrisExpr` provides the interface without the legacy flags. See the Iris documentation for expressions and backend options.
 
+Iris JIT target selection currently does not honor `SetMaxCPU`; use `backend="scalar"` to select its interpreter. This differs from the Highway conversion/compositing paths. Backends and optimization settings need not produce identical floating-point results.
+
+### Cross-architecture SIMD and independent modules
+
+AudioConvert, VideoConvert, Composite, and InternalFilters replace many former x86 SSE/AVX kernels with ordinary C/C++ and Google Highway implementations. Audio, video conversion/resizing, and compositing can use native ARM64 SIMD where a matching kernel is compiled and supported by the CPU. The shared target policy includes NEON and conditional SVE/SVE2 targets; available targets vary by compiler, operation, and build.
+
+These modules are linked into the core; users do not install them as separate plugins. The Audio, Video, Composite, and Iris C interfaces also allow reuse by other hosts with matching sources and an appropriate adapter. This does not establish a supported plugin for another host.
+
 ## Quick start
 
 After installation, create a plain text file named `version.avs` containing:
@@ -73,11 +81,11 @@ Initialize the pinned submodules before configuring, including after checking ou
 git submodule update --init --recursive
 ```
 
-The independent [Audio](third_party/audio_convert/README.md), [Video](third_party/video_convert/README.md), and [Composite](third_party/composite/README.md) modules supply computational kernels and are linked statically into the core. The host retains script interfaces, frame management, and CPU policy. See the [Composite adapter](modules/composite/README.md) for integrated filter behavior and numerical allowances.
+The five pinned modules are [Audio](third_party/audio_convert/README.md), [Video](third_party/video_convert/README.md), [Composite](third_party/composite/README.md), [InternalFilters](third_party/internal_filters), and [Iris](third_party/iris/README.md). They are built with the core. Use `git clone --recurse-submodules` for a new checkout; GitHub’s automatic source ZIP/tar archives do not include submodule contents and are insufficient by themselves.
 
-The project requires CMake 3.8 or newer and a C++17 compiler and standard library with `std::filesystem` support. Run the following commands from the repository root. They build only the core library, without compiling the bundled external plugins; the resulting core can still load compatible plugins normally.
+The project requires CMake 3.24 or newer and a C++17 compiler and standard library with `std::filesystem` support. Run the following commands from the repository root. They build only the core library, without compiling the bundled external plugins; the resulting core can still load compatible plugins normally.
 
-Iris is enabled by default and linked statically into the core. The default configuration requires LLVM 20–23 and automatically downloads and builds SLEEF; the default backend is `sleef`. If CMake cannot locate LLVM, pass `-DLLVM_DIR=<LLVM installation>/lib/cmake/llvm` when configuring.
+Iris is enabled by default and linked statically into the core. The default configuration requires LLVM 20 or newer (the tested API range is 20–23) and automatically downloads and builds SLEEF; the default backend is `sleef`. If CMake cannot locate LLVM, pass `-DLLVM_DIR=<LLVM installation>/lib/cmake/llvm` when configuring.
 
 Use `IRIS_LLVM` and `IRIS_SLEEF` to change the dependency configuration. Missing requested dependencies cause a configuration error. `ENABLE_IRIS=OFF` removes both `Expr` and `IrisExpr`.
 
