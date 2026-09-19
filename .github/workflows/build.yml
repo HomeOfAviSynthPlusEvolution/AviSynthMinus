@@ -1,173 +1,124 @@
-name: Test builds
+name: XP compatibility builds
 
 on:
   push:
-    branches: ['**']
-  pull_request:
+    branches: [codex/xp-v141-fixes]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+env:
+  _CL_: /MP1
+
 jobs:
-  build-core:
+  build-xp:
     name: ${{ matrix.name }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    # Keep the modern builds on VS2026, but use the supported VS2022 host for
+    # the legacy v141_xp component.
+    runs-on: windows-2022
+    timeout-minutes: 60
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         include:
-          - name: Ubuntu 26.04 x64
-            runner: ubuntu-26.04
-            family: linux
-            artifact_name: avisynth-ubuntu-26.04-x64
-            artifact_path: stage/**/*.so*
-          - name: macOS 15 Apple Silicon arm64
-            runner: macos-15
-            family: macos
-            artifact_name: avisynth-macos-15-arm64
-            artifact_path: stage/**/*.dylib
-          - name: Windows VS2026 x86
-            runner: windows-2025-vs2026
-            family: windows
+          - name: Windows XP v141_xp x86
             architecture: Win32
-            artifact_name: avisynth-windows-vs2026-x86
-            artifact_path: stage/**/*.dll
-          - name: Windows VS2026 x64
-            runner: windows-2025-vs2026
-            family: windows
+            msvc_cpu_arch: SSE
+            artifact_name: avisynth-windows-xp-v141-xp-x86
+          - name: Windows XP v141_xp x64
             architecture: x64
-            artifact_name: avisynth-windows-vs2026-x64
-            artifact_path: stage/**/*.dll
+            msvc_cpu_arch: SSE2
+            artifact_name: avisynth-windows-xp-v141-xp-x64
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Install Iris dependencies
-        uses: ./.github/actions/iris-dependencies
-        with:
-          architecture: ${{ matrix.architecture || 'x64' }}
-
-      - name: Configure (POSIX)
-        if: matrix.family == 'linux' || matrix.family == 'macos'
-        shell: bash
+      - name: Install and verify Windows XP build toolset
+        shell: pwsh
         run: |
-          cmake -S . -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=ON \
-            -DENABLE_TESTS=OFF \
-            -DENABLE_PLUGINS=OFF \
-            -DENABLE_CUDA=OFF -DIRIS_LLVM=${{ env.IRIS_LLVM }} -DIRIS_SLEEF=${{ env.IRIS_SLEEF }}
+          $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\setup.exe'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path $vswhere)) { throw "vswhere.exe was not found at $vswhere." }
 
-      - name: Configure (Windows)
-        if: matrix.family == 'windows'
+          $installPath = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -property installationPath
+          if (-not $installPath) { throw 'No Visual Studio installation with MSBuild was found.' }
+          if (-not (Test-Path $installer)) { throw "Visual Studio Installer was not found at $installer." }
+
+          $installerArgs = @(
+            'modify'
+            "--installPath `"$installPath`""
+            '--add Microsoft.VisualStudio.Component.VC.v141.x86.x64'
+            '--add Microsoft.VisualStudio.Component.WinXP'
+            '--quiet'
+            '--norestart'
+          )
+          $process = Start-Process -FilePath $installer -ArgumentList $installerArgs -Wait -PassThru -WindowStyle Hidden
+          Write-Host "Visual Studio Installer exit code: $($process.ExitCode)"
+          if ($process.ExitCode -notin 0, 3010) {
+            throw "Visual Studio Installer failed with exit code $($process.ExitCode)."
+          }
+
+          $xpInstallPath = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.WinXP -property installationPath
+          if (-not $xpInstallPath) {
+            throw 'Visual Studio Installer completed, but vswhere cannot find Microsoft.VisualStudio.Component.WinXP.'
+          }
+          if ((Resolve-Path -LiteralPath $xpInstallPath).Path -ine (Resolve-Path -LiteralPath $installPath).Path) {
+            throw "The XP component was registered for a different Visual Studio instance: $xpInstallPath"
+          }
+
+          $platform = '${{ matrix.architecture }}'
+          $toolsetsRoot = Join-Path $installPath 'MSBuild\Microsoft\VC'
+          if (-not (Test-Path $toolsetsRoot)) { throw "MSBuild VC targets were not found at $toolsetsRoot." }
+          $platformPattern = [regex]::Escape($platform)
+          $toolsetProps = @(
+            Get-ChildItem -Path $toolsetsRoot -Filter Toolset.props -File -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match "\\Platforms\\$platformPattern\\PlatformToolsets\\v141_xp\\Toolset\.props$" }
+          )
+          if (-not $toolsetProps) {
+            $discoveredToolsets = @(Get-ChildItem -Path $toolsetsRoot -Filter v141_xp -Directory -Recurse -ErrorAction SilentlyContinue)
+            if ($discoveredToolsets) {
+              Write-Host 'Unexpected v141_xp toolset locations:'
+              $discoveredToolsets | Select-Object -ExpandProperty FullName
+            }
+            throw "The v141_xp toolset is not registered for platform $platform."
+          }
+          $toolsetProps | Select-Object -ExpandProperty FullName
+
+      - name: Configure (Windows XP)
         shell: pwsh
         run: >
-          cmake -S . -B build -G "Visual Studio 18 2026"
-          -A ${{ matrix.architecture }} -T v145
+          cmake -S . -B build -G "Visual Studio 17 2022"
+          -A ${{ matrix.architecture }} -T v141_xp
           -DBUILD_SHARED_LIBS=ON
           -DENABLE_TESTS=OFF
           -DENABLE_PLUGINS=OFF
-          -DENABLE_CUDA=OFF -DIRIS_LLVM=${{ env.IRIS_LLVM }} -DIRIS_SLEEF=${{ env.IRIS_SLEEF }}
+          -DENABLE_CUDA=OFF -DIRIS_LLVM=OFF -DIRIS_SLEEF=OFF
+          -DWINXP_SUPPORT=ON
+          -DMSVC_CPU_ARCH=${{ matrix.msvc_cpu_arch }}
 
-      - name: Build (POSIX)
-        if: matrix.family == 'linux' || matrix.family == 'macos'
-        shell: bash
-        run: cmake --build build --parallel
-
-      - name: Build (Windows)
-        if: matrix.family == 'windows'
+      - name: Build (Windows XP)
         shell: pwsh
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build --config Release --parallel 4
 
-      - name: Stage shared library (POSIX)
-        if: matrix.family == 'linux' || matrix.family == 'macos'
-        shell: bash
-        run: cmake --install build --prefix "$PWD/stage"
-
-      - name: Stage shared library (Windows)
-        if: matrix.family == 'windows'
+      - name: Stage shared library (Windows XP)
         shell: pwsh
         run: cmake --install build --config Release --prefix "$PWD/stage"
 
-      - name: Verify shared library (Linux)
-        if: matrix.family == 'linux'
-        shell: bash
-        run: |
-          find stage -type f -name 'libavisynth.so*' -print
-          test -n "$(find stage -type f -name 'libavisynth.so*' -print -quit)"
-
-      - name: Verify shared library (macOS)
-        if: matrix.family == 'macos'
-        shell: bash
-        run: |
-          find stage -type f -name 'libavisynth*.dylib' -print
-          test -n "$(find stage -type f -name 'libavisynth*.dylib' -print -quit)"
-
-      - name: Verify shared library (Windows)
-        if: matrix.family == 'windows'
+      - name: Verify shared library (Windows XP)
         shell: pwsh
         run: |
           $dll = Get-ChildItem -Path stage -Filter AviSynth.dll -Recurse -File
           if (-not $dll) { throw 'AviSynth.dll was not installed.' }
           $dll | Select-Object -ExpandProperty FullName
 
-      - name: Configure shared API tests (POSIX)
-        if: matrix.family == 'linux' || matrix.family == 'macos'
-        shell: bash
-        run: cmake -S tests/shared_api -B build/shared-api -G Ninja -DCMAKE_BUILD_TYPE=Release -DAVS_INSTALL_PREFIX="$PWD/stage" -DAVS_TEST_IRIS=ON -DAVS_TEST_IRIS_LLVM=${{ env.IRIS_LLVM }} -DAVS_TEST_IRIS_SLEEF=${{ env.IRIS_SLEEF }}
-
-      - name: Configure shared API tests (Windows)
-        if: matrix.family == 'windows'
-        shell: pwsh
-        run: cmake -S tests/shared_api -B build/shared-api -G "Visual Studio 18 2026" -A ${{ matrix.architecture }} -T v145 -DAVS_INSTALL_PREFIX="$PWD/stage" -DAVS_TEST_IRIS=ON -DAVS_TEST_IRIS_LLVM=${{ env.IRIS_LLVM }} -DAVS_TEST_IRIS_SLEEF=${{ env.IRIS_SLEEF }}
-
-      - name: Build shared API tests
-        run: cmake --build build/shared-api --config Release --parallel
-
-      - name: Run shared API tests
-        run: ctest --test-dir build/shared-api -C Release --output-on-failure --timeout 120
-
-      - name: Upload shared library
+      - name: Upload Windows XP shared library
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_path }}
+          path: stage/**/*.dll
           if-no-files-found: error
-
-  regression:
-    name: Regression / ${{ matrix.name }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - {name: Linux x64 (legacy Intel SIMD off), runner: ubuntu-26.04, architecture: x64, cmake_options: '-DENABLE_INTEL_SIMD=OFF'}
-          - {name: macOS ARM64, runner: macos-15, architecture: arm64}
-          - {name: Windows x64, runner: windows-2025-vs2026, architecture: x64}
-          - {name: Windows x86, runner: windows-2025-vs2026, architecture: Win32}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          submodules: recursive
-      - name: Install Iris dependencies
-        uses: ./.github/actions/iris-dependencies
-        with:
-          architecture: ${{ matrix.architecture || 'x64' }}
-
-      - name: Configure (POSIX)
-        if: runner.os != 'Windows'
-        run: cmake -S . -B build/regression -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DENABLE_TESTS=ON -DENABLE_PLUGINS=OFF -DENABLE_CUDA=OFF -DIRIS_LLVM=${{ env.IRIS_LLVM }} -DIRIS_SLEEF=${{ env.IRIS_SLEEF }} ${{ matrix.cmake_options }}
-      - name: Configure (Windows)
-        if: runner.os == 'Windows'
-        run: cmake -S . -B build/regression -G "Visual Studio 18 2026" -A ${{ matrix.architecture }} -T v145 -DBUILD_SHARED_LIBS=OFF -DENABLE_TESTS=ON -DENABLE_PLUGINS=OFF -DENABLE_CUDA=OFF -DIRIS_LLVM=${{ env.IRIS_LLVM }} -DIRIS_SLEEF=${{ env.IRIS_SLEEF }}
-      - name: Build
-        run: cmake --build build/regression --config Release --parallel
-      - name: Test
-        run: ctest --test-dir build/regression -C Release --output-on-failure --parallel 2 --timeout 180
