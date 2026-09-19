@@ -4,6 +4,41 @@ AviSynthMinus 0.2 series
 This page covers the 0.2.x series. Changes are grouped by release, newest first.
 Earlier changes are listed in :doc:`changelist001`.
 
+0.2.2
+-----
+
+Bugfixes
+~~~~~~~~
+
+- Prevent SSE2 ``Mask`` from reading or writing before RGB32 rows narrower
+  than four pixels.
+- Prevent SSE2 ``ConvertBackToYUY2`` from reading or writing before rows when
+  converting YV24 input narrower than 16 pixels.
+- Correct float ``ColorKeyMask`` comparisons to enforce both tolerance bounds.
+- Retain incoming frame-property storage before releasing the previous storage,
+  making self-assignment through ``copyFrameProps`` safe.
+- Release frame properties before tearing down the environment so property-held
+  clips can safely call back during destruction. Handle frame-reference cycles
+  and reentrant frame allocation and registration during this cleanup.
+- Size default floating-point formatting buffers dynamically in ``String`` and
+  ``Format`` to avoid buffer overflow for large values, while retaining six
+  fractional digits. Preserve full-width 64-bit integers in ``Format``.
+- Reject function capture lists longer than 1024 entries before writing past
+  the capture array.
+- Prevent Linux shared-core calls and linkage-table entries from resolving to
+  client SDK wrappers. Use the core's own linkage table when loading plugins
+  and answering ``GetAVSLinkage``, while retaining the exported variable for
+  existing binary clients.
+
+Build and testing
+~~~~~~~~~~~~~~~~~
+
+- Add regression coverage for narrow RGB32 ``Mask`` rows, float
+  ``ColorKeyMask`` tolerance, frame-property assignment and shutdown, large
+  numeric formatting, and function capture-list boundaries.
+- Restore release-compatible ``Layer`` and ``Merge`` test coverage.
+- Recognize the decorated legacy plugin entry point in Windows x86 CX SDK tests.
+
 0.2.1
 -----
 
