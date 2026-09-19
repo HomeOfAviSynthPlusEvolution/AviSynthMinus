@@ -147,7 +147,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {name: Linux x64, runner: ubuntu-26.04, architecture: x64}
+          - {name: Linux x64 (legacy Intel SIMD off), runner: ubuntu-26.04, architecture: x64, cmake_options: '-DENABLE_INTEL_SIMD=OFF'}
           - {name: macOS ARM64, runner: macos-15, architecture: arm64}
           - {name: Windows x64, runner: windows-2025-vs2026, architecture: x64}
           - {name: Windows x86, runner: windows-2025-vs2026, architecture: Win32}
@@ -163,7 +163,7 @@ jobs:
 
       - name: Configure (POSIX)
         if: runner.os != 'Windows'
-        run: cmake -S . -B build/regression -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DENABLE_TESTS=ON -DENABLE_PLUGINS=OFF -DENABLE_CUDA=OFF -DIRIS_LLVM=${{ env.IRIS_LLVM }} -DIRIS_SLEEF=${{ env.IRIS_SLEEF }}
+        run: cmake -S . -B build/regression -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DENABLE_TESTS=ON -DENABLE_PLUGINS=OFF -DENABLE_CUDA=OFF -DIRIS_LLVM=${{ env.IRIS_LLVM }} -DIRIS_SLEEF=${{ env.IRIS_SLEEF }} ${{ matrix.cmake_options }}
       - name: Configure (Windows)
         if: runner.os == 'Windows'
         run: cmake -S . -B build/regression -G "Visual Studio 18 2026" -A ${{ matrix.architecture }} -T v145 -DBUILD_SHARED_LIBS=OFF -DENABLE_TESTS=ON -DENABLE_PLUGINS=OFF -DENABLE_CUDA=OFF -DIRIS_LLVM=${{ env.IRIS_LLVM }} -DIRIS_SLEEF=${{ env.IRIS_SLEEF }}

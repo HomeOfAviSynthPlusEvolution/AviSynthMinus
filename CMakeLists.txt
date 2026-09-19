@@ -400,10 +400,9 @@ endif()
   set(AIF_BUILD_BENCHMARKS OFF)
   set(AIF_ENABLE_INSTALL OFF)
   set(AIF_AVISYNTH_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/avs_core/include")
-  set(AIF_SCALAR_ONLY OFF)
-  if(NOT ENABLE_INTEL_SIMD)
-    set(AIF_SCALAR_ONLY ON)
-  endif()
+  # Highway targets are independent of the legacy x86 intrinsics switch.
+  # In particular, disabling Intel SIMD must not remove ARM64 NEON kernels.
+  option(AIF_SCALAR_ONLY "Build InternalFilters without Highway SIMD" OFF)
   # Keep the core's contraction setting out of the strict filter kernels.
   get_directory_property(avs_core_compile_options COMPILE_OPTIONS)
   set(avs_if_compile_options ${avs_core_compile_options})
