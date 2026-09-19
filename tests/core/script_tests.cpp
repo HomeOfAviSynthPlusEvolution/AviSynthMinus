@@ -42,6 +42,32 @@ TEST(ScriptFormatting, PreservesFullWidthIntegers) {
   }
 }
 
+TEST(ScriptCapture, AcceptsLimitAndRejectsOverflow) {
+  AviSynthEnvironment environment;
+  for (int count : {1023, 1024, 1025}) {
+    std::string script;
+    for (int i = 0; i < count; ++i)
+      script += "v" + std::to_string(i) + " = 1\n";
+    script += "f = function[";
+    for (int i = 0; i < count; ++i) {
+      if (i) script += ',';
+      script += "v" + std::to_string(i);
+    }
+    script += "]() { return v0 }\nf()";
+    const AVSValue arg(script.c_str());
+    if (count <= 1024) {
+      EXPECT_EQ(environment.get()->Invoke("Eval", AVSValue(&arg, 1)).AsInt(), 1);
+    } else {
+      try {
+        environment.get()->Invoke("Eval", AVSValue(&arg, 1));
+        FAIL() << "Oversized capture list was accepted";
+      } catch (const AvisynthError& error) {
+        EXPECT_NE(std::string(error.msg).find("variable capture list too long"), std::string::npos);
+      }
+    }
+  }
+}
+
 TEST(ScriptAbs, PreservesSixtyFourBitIntegerRange) {
   AviSynthEnvironment environment;
   const int64_t input_val = -5000000000LL;
