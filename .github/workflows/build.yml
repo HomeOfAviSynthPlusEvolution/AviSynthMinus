@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      max-parallel: 1
+      max-parallel: 2
       matrix:
         include:
           - name: Windows XP v141_xp x86
@@ -103,7 +103,7 @@ jobs:
 
       - name: Build (Windows XP)
         shell: pwsh
-        run: cmake --build build --config Release --parallel 4
+        run: cmake --build build --config Release --parallel 2
 
       - name: Stage shared library (Windows XP)
         shell: pwsh
