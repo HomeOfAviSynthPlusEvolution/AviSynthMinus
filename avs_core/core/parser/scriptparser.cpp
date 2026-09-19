@@ -118,6 +118,8 @@ PExpression ScriptParser::ParseFunctionDefinition(void)
       }
 
       if (tokenizer.IsIdentifier()) {
+        if (var_count == max_args)
+          env->ThrowError("Script error: variable capture list too long");
         var_names[var_count++] = tokenizer.AsIdentifier();
       }
       else {
