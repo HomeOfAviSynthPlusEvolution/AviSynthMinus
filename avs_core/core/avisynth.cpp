@@ -1064,6 +1064,9 @@ private:
 
 
   FrameRegistryType2 FrameRegistry2; // P.F.
+  bool frame_properties_closing = false; // Protected by memory_mutex.
+  PVSMapStorage FindFramePropertiesForShutdown() const noexcept;
+  void DrainFramePropertiesForShutdown();
 #ifdef _DEBUG
   void ListFrameRegistry(size_t min_size, size_t max_size, bool someframes);
 #endif
@@ -2689,6 +2692,40 @@ void ScriptEnvironment::InitMT()
   top_frame.Set("MT_SPECIAL_MT", (int)MT_SPECIAL_MT);
 }
 
+PVSMapStorage ScriptEnvironment::FindFramePropertiesForShutdown() const noexcept {
+  // No user destructors run during this scan. Return an owning storage reference,
+  // never a registry iterator or a borrowed AVSMap pointer across a callback.
+  for (const auto& sizes : FrameRegistry2)
+    for (const auto& buffers : sizes.second)
+      for (const auto& entry : buffers.second)
+        if (entry.frame->properties && entry.frame->properties->size() != 0)
+          return entry.frame->properties->storageForShutdown();
+  return {};
+}
+
+void ScriptEnvironment::DrainFramePropertiesForShutdown() {
+  {
+    std::lock_guard<std::recursive_mutex> lock(memory_mutex);
+    frame_properties_closing = true;
+  }
+  for (;;) {
+    // Declaration order matters: destroy the extracted node before releasing
+    // the storage that keeps callbacks' map accesses valid.
+    PVSMapStorage storage;
+    std::map<std::string, PVSArrayBase>::node_type property;
+    {
+      std::lock_guard<std::recursive_mutex> lock(memory_mutex);
+      storage = FindFramePropertiesForShutdown();
+      if (!storage)
+        break;
+      property = storage->data.extract(storage->data.begin());
+    }
+    // Both destructors run without registry iterators or memory_mutex held.
+    // A callback may add frames/properties: rescan from scratch next time.
+    // extract() avoids COW and allocates no replacement map or temporary list.
+  }
+}
+
 ScriptEnvironment::~ScriptEnvironment() {
 
   _RPT0(0, "~ScriptEnvironment() called.\n");
@@ -2716,6 +2753,10 @@ ScriptEnvironment::~ScriptEnvironment() {
     pool->Join();
   }
   ThreadPoolRegistry.clear();
+
+  // Property-held clips can call back into the environment from their destructor.
+  // Drain while threadEnv, every registered frame/VFB, and plugin code are alive.
+  DrainFramePropertiesForShutdown();
 
   // delete ThreadScriptEnvironment
   threadEnv = nullptr;
@@ -3535,6 +3576,8 @@ void ScriptEnvironment::ListFrameRegistry(size_t min_size, size_t max_size, bool
 
 VideoFrame* ScriptEnvironment::GetFrameFromRegistry(size_t vfb_size, Device* device)
 {
+  if (frame_properties_closing) return nullptr;
+
 #ifdef _DEBUG
   std::chrono::time_point<std::chrono::high_resolution_clock> t_start, t_end; // std::chrono::time_point<std::chrono::system_clock> t_start, t_end;
   t_start = std::chrono::high_resolution_clock::now();
@@ -3652,6 +3695,16 @@ VideoFrame* ScriptEnvironment::GetNewFrame(size_t vfb_size, size_t margin, Devic
   else if (vfb_size < 1024) vfb_size = 1024;
   else if (vfb_size < 2048) vfb_size = 2048;
   else if (vfb_size < 4096) vfb_size = 4096;
+
+  if (frame_properties_closing) {
+    // Reentrant allocation must not reuse or collect frames whose properties
+    // are being drained. Keep ordinary allocation/error behavior, without GC.
+    if (VideoFrame* frame = AllocateFrame(vfb_size, margin, device))
+      return frame;
+    ThrowError("Could not allocate video frame during environment shutdown. Out of memory.");
+    return nullptr;
+  }
+
 
   /* -----------------------------------------------------------
    *   Try to return an unused but already allocated instance
@@ -3791,6 +3844,8 @@ VideoFrame* ScriptEnvironment::GetNewFrame(size_t vfb_size, size_t margin, Devic
 
 void ScriptEnvironment::ShrinkCache(Device *device)
 {
+  if (frame_properties_closing) return;
+
   /* -----------------------------------------------------------
   *   Shrink cache to keep memory limit
   * -----------------------------------------------------------
@@ -4200,6 +4255,11 @@ void ScriptEnvironment::RegisterSubFrameInRegistry(size_t vfb_size, VideoFrameBu
 {
   // caller must already hold memory_mutex
   auto& vec = FrameRegistry2[vfb_size][vfb];
+  if (frame_properties_closing) {
+    // Registration may grow the vector, but must not destroy a drained frame.
+    vec.push_back(DebugTimestampedFrame(new_frame));
+    return;
+  }
   for (auto it = vec.begin(); it != vec.end(); ) {
     VideoFrame* f = it->frame;
     if (f->refcount == 0) {

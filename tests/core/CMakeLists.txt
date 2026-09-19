@@ -51,3 +51,13 @@ add_executable(global_lock_tests global_lock_tests.cpp)
 target_link_libraries(global_lock_tests PRIVATE GTest::gtest_main AvsCoreExternal)
 gtest_discover_tests(global_lock_tests TEST_PREFIX "core."
   PROPERTIES TIMEOUT 15)
+
+
+
+# Isolate allocator failure injection and environment teardown regressions.
+add_executable(frame_property_shutdown_tests frame_property_shutdown_tests.cpp)
+target_include_directories(frame_property_shutdown_tests PRIVATE
+  ${PROJECT_SOURCE_DIR}/tests ${PROJECT_SOURCE_DIR}/avs_core/include
+  ${PROJECT_SOURCE_DIR}/avs_core ${PROJECT_BINARY_DIR}/avs_core ${xxhash_SOURCE_DIR})
+target_link_libraries(frame_property_shutdown_tests PRIVATE GTest::gtest_main AvsCoreExternal)
+gtest_discover_tests(frame_property_shutdown_tests TEST_PREFIX "core." PROPERTIES TIMEOUT 20)

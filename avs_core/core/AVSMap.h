@@ -285,6 +285,10 @@ public:
     return *this;
   }
 
+  // Environment teardown only: keep the storage alive while extracting nodes.
+  // Deliberately bypass COW; normal map operations must continue to use detach().
+  PVSMapStorage storageForShutdown() const noexcept { return data; }
+
   bool detach() {
     if (!data->unique()) {
       data = new VSMapStorage(*data);
