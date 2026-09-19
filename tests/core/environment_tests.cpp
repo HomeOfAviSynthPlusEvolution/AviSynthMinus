@@ -7,6 +7,25 @@
 namespace avsut::test {
 namespace {
 
+TEST(FrameProperties, CopyToSelfAndSharedFramePreservesValues) {
+  AviSynthEnvironment environment;
+  auto* env = environment.get();
+  VideoInfo vi;
+  vi.width = vi.height = 16;
+  vi.pixel_type = VideoInfo::CS_Y8;
+  PVideoFrame first = env->NewVideoFrame(vi);
+  env->propSetInt(env->getFramePropsRW(first), "value", 42, 0);
+  env->copyFrameProps(first, first);
+  EXPECT_EQ(env->propGetInt(env->getFramePropsRO(first), "value", 0, nullptr), 42);
+  PVideoFrame second = env->NewVideoFrame(vi);
+  env->copyFrameProps(first, second);
+  env->copyFrameProps(first, second);
+  env->copyFrameProps(second, second);
+  env->propSetInt(env->getFramePropsRW(second), "value", 99, 0);
+  EXPECT_EQ(env->propGetInt(env->getFramePropsRO(first), "value", 0, nullptr), 42);
+  EXPECT_EQ(env->propGetInt(env->getFramePropsRO(second), "value", 0, nullptr), 99);
+}
+
 TEST(EnvironmentStrings, ExplicitLengthIncludesBytesAfterNul) {
   AviSynthEnvironment environment;
   auto *env = environment.get();
